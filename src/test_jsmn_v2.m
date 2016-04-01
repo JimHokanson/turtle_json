@@ -1,0 +1,69 @@
+function test_jsmn_v2
+
+
+t = tic;
+%profile on
+for i = 1:1
+  
+file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
+file_name = 'testfile_new.wcon';
+file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
+file_path = fullfile(file_root,file_name);
+d1_all = zeros(1,10);
+t3 = tic;
+for i = 1:10
+	jt = json.tokens(file_path);
+    d1_all(i) = jt.d1;
+    %sobj = jt.get_parsed_data();
+end
+fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
+%0.48724, 0.275296, 2.8141
+%0.492493, 0.277961, 2.8222
+%0.483474, 0.264727, 2.71777
+%0.480431, 0.26557, 2.68592
+
+%No math
+%0.4,
+%0.76, 0.54, 5.47
+%0.5, 0.27, 2.82
+
+%2.58 - 2016-03-21, removed test for null tokens
+%2.50 - 2016-03-22, removed error checking at the end for closed arrays and objects
+%- minor refactoring of code
+%2.26 - 2016-03-22, removed double string parsing, only parsing once
+%2.25 - 2016-03-25, removed unecessary loop checks and moved token
+%allocation to main loop
+%2.18 - 2016-03-25, time now includes read time and token fixing time, 
+%saved a LARGE amount of time by reading into uint8 and avoiding
+%mxArrayToString
+%0.94 - 2016-03-27, some reorganization and custom number parser
+%0.93 - 2016-03-27, brought out token initialization, created super_token_is_string
+%variable
+%0.86 - 2016-03-27, large initial allocation to avoid reallocating ...
+%0.81 - 2016-03-28, doubles are separate
+%0.79 - 2016-03-29, parser->pos to parser_position variable
+%0.77 - 2016-03-29 - changed numeric parser
+
+%0.4096 - no number math
+
+jt = json.tokens(file_path);
+root = jt.get_root_token;
+
+
+%i.e. the code isn't doing -1
+t2 = tic;
+for i = 1:10
+obj = parse_json(jt.file_string,jt.info,jt.numeric_data);
+end
+toc(t2)/10
+%0.64 - 2016-03-21
+end
+%profile off
+toc(t);
+
+h = load('wtf2.mat');
+isequal(h.wtf2,token_info)
+
+
+
+end
