@@ -4,11 +4,6 @@
 #include "mex.h"
 #include <math.h>
 
-//From:
-//------
-//http://tinodidriksen.com/uploads/code/cpp/speed-string-to-double.cpp
-//https://tinodidriksen.com/2011/05/28/cpp-convert-string-to-double-speed/
-
 const bool is_number_array[256] = {false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false};
 const double p1e0[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9};
 const double p1e1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,20,30,40,50,60,70,80,90};
@@ -22,39 +17,44 @@ const double p1e_3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 const double p1e_4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000,0.0001,0.0002,0.0003,0.0004,0.0005,0.0006,0.0007,0.0008,0.0009};
 const double p1e_5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000,0.00001,0.00002,0.00003,0.00004,0.00005,0.00006,0.00007,0.00008,0.00009};
 const double p1e_6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000,0.000001,0.000002,0.000003,0.000004,0.000005,0.000006,0.000007,0.000008,0.000009};
+//TODO: I did these manually, go back and fix with script from laptop
+const double p1e_7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000,0.0000001,0.0000002,0.0000003,0.0000004,0.0000005,0.0000006,0.0000007,0.0000008,0.0000009};
+const double p1e_8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000,0.00000001,0.00000002,0.00000003,0.00000004,0.00000005,0.00000006,0.00000007,0.00000008,0.00000009};
+const double p1e_9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000,0.000000001,0.000000002,0.000000003,0.000000004,0.000000005,0.000000006,0.000000007,0.000000008,0.000000009};
 
 //TODO: Pass in pointer to double
-//Return error value ...
+//TODO: Return error value ...
 double string_to_double(const char *p,char **char_offset) {
 
+    //Possible errors - NYI
+    //-----------------------------
     
     double r;
-    
-    bool neg = false;
-    double f = 0.0;
+    double f;
+    bool neg;
     int n = 0;
     char *start;
-    //double integer_scalars = [1 10 100 1000 10000];
     
     if (*p == '-') {
         neg = true;
         ++p;
     }else if (*p == '+') {
+        neg = false;
         ++p;
     }
     
     start = p;
-    
     while (is_number_array[*p++]) {  
     }
-    --p;
     
-    //? Subtraction vs lookup
-    //
-    // TODO: Just do fall through for now
+    //We could remove this by playing with the case logic ...
+    //n = 1 would mean no #s
+    //TODO: Do this and build in an error code for no #s
+    --p;
     
     r = 0;
     n = p-start;
+    //reset p so that we can increment our way down
     p = start;
     switch (n) {
         case 6:
@@ -72,129 +72,49 @@ double string_to_double(const char *p,char **char_offset) {
            break;
         default:
             mexPrintf("Too many #s: %d\n",n);
-        mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
+            mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
     }  
-//     switch (p-start) {
-//         case 1:
-//                r = p1e0[*(p-1)]; 
-//             break;
-//         case 2:
-//             r = p1e0[*(p-1)]+
-//                 p1e1[*(p-2)]; 
-//             break;
-//         case 3:
-//             r = p1e0[*(p-1)]+
-//                 p1e1[*(p-2)]+
-//                 p1e2[*(p-3)];
-//             break;
-//         case 4:
-//                r = p1e0[*(p-1)]+
-//                    p1e1[*(p-2)]+
-//                    p1e2[*(p-3)]+
-//                    p1e3[*(p-4)];
-//             break;
-//         case 5:
-//                 r = (*(p-1) - '0') + 
-//                         (*(p-2) - '0')*10 + 
-//                         (*(p-3) - '0')*100 + 
-//                         (*(p-4) - '0')*1000 + 
-//                         (*(p-5) - '0')*10000;
-//             break;
-//         case 6:
-//                 r = (*(p-1) - '0') + 
-//                         (*(p-2) - '0')*10 + 
-//                         (*(p-3) - '0')*100 + 
-//                         (*(p-4) - '0')*1000 + 
-//                         (*(p-5) - '0')*10000 + 
-//                         (*(p-6) - '0')*100000;    
-//         default:
-//             mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
-//     }    
     
     if (*p == '.') {
-        ++p;
-        start = p;
-        
-        while (is_number_array[*p++]) { 
+        ++p;        
+        if(is_number_array[*p]){
+            r += p1e_1[*p++];
+            if(is_number_array[*p]){
+                r += p1e_2[*p++];
+                if(is_number_array[*p]){
+                    r += p1e_3[*p++];
+                    if(is_number_array[*p]){
+                        r += p1e_4[*p++];
+                        if(is_number_array[*p]){
+                            r += p1e_5[*p++];
+                            if(is_number_array[*p]){
+                                r += p1e_6[*p++];
+                                if(is_number_array[*p]){
+                                    r += p1e_7[*p++];
+                                    if(is_number_array[*p]){
+                                        r += p1e_8[*p++];
+                                        if(is_number_array[*p]){
+                                            r += p1e_9[*p++];
+                                            if(is_number_array[*p]){
+                                                mexPrintf("%d\n",10);
+                                                mexErrMsgIdAndTxt("wtf:wtf3","Too many #s fractions");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-         --p;
-                
-        
-        switch (p-start) {
-            case 1:
-                   r += p1e_1[*(p-1)];
-                break;
-            case 2:
-                   r += p1e_2[*(p-1)] +
-                        p1e_1[*(p-2)];
-                break;
-            case 3:
-                r +=    p1e_3[*(p-1)] + 
-                        p1e_2[*(p-2)] + 
-                        p1e_1[*(p-3)];
-                break;
-            case 4:
-                r +=    p1e_4[*(p-1)] + 
-                        p1e_3[*(p-2)] + 
-                        p1e_2[*(p-3)] +
-                        p1e_1[*(p-4)] ;
-                break;
-            case 5:
-                    r += (*(p-1) - '0')*0.00001 + 
-                            (*(p-2) - '0')*0.0001 + 
-                            (*(p-3) - '0')*0.001 + 
-                            (*(p-4) - '0')*0.01 + 
-                            (*(p-5) - '0')*0.1;
-                break;
-                
-            case 6:
-                    r +=    (*(p-1) - '0')*0.000001 + 
-                            (*(p-2) - '0')*0.00001 + 
-                            (*(p-3) - '0')*0.0001 + 
-                            (*(p-4) - '0')*0.001 + 
-                            (*(p-5) - '0')*0.01 + 
-                            (*(p-6) - '0')*0.1;
-                break;                
-            case 7:
-                    r +=    (*(p-1) - '0')*0.0000001 + 
-                            (*(p-2) - '0')*0.000001 + 
-                            (*(p-3) - '0')*0.00001 + 
-                            (*(p-4) - '0')*0.0001 + 
-                            (*(p-5) - '0')*0.001 +
-                            (*(p-6) - '0')*0.01 +
-                            (*(p-7) - '0')*0.1;
-               case 8:
-                    r +=    (*(p-1) - '0')*0.00000001 + 
-                            (*(p-2) - '0')*0.0000001 + 
-                            (*(p-3) - '0')*0.000001 + 
-                            (*(p-4) - '0')*0.00001 + 
-                            (*(p-5) - '0')*0.0001 +
-                            (*(p-6) - '0')*0.001 +
-                            (*(p-7) - '0')*0.01 +
-                            (*(p-8) - '0')*0.1;
-                case 9:
-                    r +=    (*(p-1) - '0')*0.000000001 + 
-                            (*(p-2) - '0')*0.00000001 + 
-                            (*(p-3) - '0')*0.0000001 + 
-                            (*(p-4) - '0')*0.000001 + 
-                            (*(p-5) - '0')*0.00001 +
-                            (*(p-6) - '0')*0.0001 +
-                            (*(p-7) - '0')*0.001 +
-                            (*(p-8) - '0')*0.01 +
-                            (*(p-9) - '0')*0.1;
-                break;                 
-                
-            default:
-                mexPrintf("%d\n",p-start);
-                mexErrMsgIdAndTxt("wtf:wtf3","Too many #s fractions");
-        }
-
     }
+    //End of if '.'
+    
     if (neg) {
         r = -r;
     }
     
-    //This code hasn't been touched
     if (*p == 'E' || *p == 'e') {
         ++p;
         if (*p == '-'){
@@ -203,11 +123,37 @@ double string_to_double(const char *p,char **char_offset) {
         }else if (*p == '+') {
             neg = false;
             ++p;
+        }else {
+            neg = false;
         }
-        f = 0.0;
-        while (is_number_array[*p]) {
-            f = (f*10.0) + (*p - '0');
-            ++p;
+        
+        //TODO: See note above on removing --p
+        start = p;
+        while (is_number_array[*p++]) {  
+        }
+        --p;
+
+        f = 0;
+        n = p-start;
+        //reset p so that we can increment our way down
+        p = start;
+        switch (n) {
+            case 6:
+               f += p1e5[*p++];
+            case 5:
+               f += p1e4[*p++];
+            case 4:
+               f += p1e3[*p++];
+            case 3:
+               f += p1e2[*p++];
+            case 2:
+               f += p1e1[*p++];
+            case 1:
+               f += p1e0[*p++];
+               break;
+            default:
+                mexPrintf("Too many #s: %d\n",n);
+                mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
         }
         if (neg){
           f = -f;  
@@ -217,7 +163,6 @@ double string_to_double(const char *p,char **char_offset) {
     
     *char_offset = p;
     
-
     return r;
 }
     
