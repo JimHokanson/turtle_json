@@ -29,7 +29,7 @@ classdef tokens
     str = '{}'
     jt = json_tokens('','raw_string',str);
     
-    str = '[1,null,true,false,"my_string",4]'
+    str = '[1,null,true,false,"my_string",2.0123456789012345]'
     jt = json.tokens('','raw_string',str);
     obj = parse_json(str,jt.info,jt.numeric_data)
     
