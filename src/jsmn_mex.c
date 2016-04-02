@@ -99,6 +99,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         if (string_byte_length == 0){
             mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
         }
+        
+        mexPrintf("Last Character: %c\n",json_string[string_byte_length]);
+        
     }else {
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
     }

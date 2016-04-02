@@ -5,6 +5,8 @@ t = tic;
 %profile on
 for i = 1:1
   
+file_path =  'G:\repos\matlab_git\jsmn_mex\example_data\canada.json'; 
+
 file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
 file_name = 'testfile_new.wcon';
 file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
@@ -25,6 +27,7 @@ fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 %0.426512, 0.213866, 2.18608
 %0.431448, 0.216494, 2.21083
 %0.429771, 0.215826, 2.1721
+%0.425321, 0.209873, 2.12384
 
 %No math
 %0.4,

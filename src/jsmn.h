@@ -1,8 +1,6 @@
 #ifndef __JSMN_H_
 #define __JSMN_H_
 
-#define JSMN_TOKEN_AFTER_CLOSE 1
-#define JSMN_STRICT 1
 //NYI
 //#define JSMN_ONE_BASED_INDICES 1
 
@@ -50,9 +48,7 @@ typedef struct {
 	int end;
 	int size;
 	int parent;
-#ifdef JSMN_TOKEN_AFTER_CLOSE
     int token_after_close; //
-#endif
 } jsmntok_t;
 
 /**
