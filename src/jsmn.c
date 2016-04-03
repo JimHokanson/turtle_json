@@ -437,13 +437,14 @@ int jsmn_parse(jsmn_parser *parser,
         unsigned int num_tokens,
         double *values) {
     
-    //
-    //  Inputs
-    //  ------
-    //  parser : 
-    //      Initialized parser from jsmn_init()
-    //  js : string
-    //      The JSON string to parse
+    /*
+     *  Inputs
+     *  ------
+     *  parser :
+     *    Initialized parser from jsmn_init()
+     *  js :
+     *    The JSON string to parse
+     */
     
     const double MX_NAN = mxGetNaN();
     
@@ -453,25 +454,15 @@ int jsmn_parse(jsmn_parser *parser,
     unsigned int next_token_index;
     int super_token_index;
     
-    //Temp local variables
-    //----------------------------------------------------
-    bool string_parsed; // 
-    
-    
-    
-    bool super_token_is_string; //Happens for attributes
-	int r;
-    int start;
-	int i;
-    
-    //This was moved to a variable for large arrays
+    //Frequently accessed super token attributes
+    //------------------------------------------
+    //This is true when inside an attribute
+    bool super_token_is_string; 
+    //This was moved to a variable specifically for large arrays
     int super_token_size;
     
 	char c;
     char *pEndNumber;
-    //Neither of these worked for me with MSVC++ 2012
-    //double NAN = 0.0/0.0;
-	//double NAN = strtod("NaN", NULL);
     
     jsmntype_t type;
     jsmntok_t null_super[1];
@@ -479,8 +470,8 @@ int jsmn_parse(jsmn_parser *parser,
     jsmntok_t *super_token;
     
     //parser back to local variables
-    parser_position = parser->pos;
-    next_token_index = parser->toknext;
+    parser_position   = parser->pos;
+    next_token_index  = parser->toknext;
     super_token_index = parser->toksuper;
     
     
@@ -495,26 +486,27 @@ int jsmn_parse(jsmn_parser *parser,
         super_token_is_string = false;
     }
 
-// // //     
-// // //     //We shouldn't ever allocate to this in the loop
-// // //     //otherwise we have a parsing error
-// // //     //TODO: Build in checks in the loop that are better than those I took 
-// // //     //out
-// // //     null_super->size = 0;
-// // //     null_super->type = 0;
-// // //     null_super->parent = -1;
-
     //Initialization
     //---------------------------------------------------------------------
-    while (is_whitespace[js[++parser_position]]) {  
-    }
+    if(parser_position == -1){
+        while (is_whitespace[js[++parser_position]]) {  
+        }
+
+        switch (js[parser_position]) {
+            case '{':
+                goto parse_object;
+                break;
+            case '[':
+                goto parse_array;
+                break;
+            default:
+                mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
+                    
+        }
+	}
     
-    if (!(js[parser_position] == '{' || js[parser_position] == '[')){
-        //TODO: Might need to check for an empty string ...
-        //TODO: Should provide more error information here
-        mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
-    }
-    
+    //This is for reexecuting code. I might remove it and throw in a switch ...
+    //We know we have to be creating something to have exited
     //-------------  THE MAIN LOOP   --------------------------------------    
     parser_position--;
     while((c = js[++parser_position])){
@@ -543,104 +535,32 @@ int jsmn_parse(jsmn_parser *parser,
                 //Update parent to reflect that it has 1 more child
                 super_token->size = ++super_token_size;
                 
-                //Move onto the 1st attribute or close of object
-                //---------------------------------------------------------
+                
+                super_token_index = next_token_index-1;
+                super_token_is_string = false;
+                
+                //Store size on old super
+                super_token->size = super_token_size;
+
+                //Now make this the super token
+                super_token = token;
+                super_token_size = 0;
+                super_token_is_string = false;
+				super_token_index = next_token_index - 1;
+
                 while (is_whitespace[js[++parser_position]]){  
                 }
                 
-                //Check for string or closed object
-                if (js[parser_position] == '"'){
-                    //----------  Processing 1st attribute of object ------
-                    
-                    //This is referring to the {
-                    token->size = 1;
-                    
-                    //TODO:Call string parser
-                    
-                    if (next_token_index >= num_tokens) {
-                        refill_parser(parser,parser_position,next_token_index,super_token_index);
-                        return JSMN_ERROR_NOMEM;
-                    }
-                    
-                    //-----------------------------------
-                    token = &tokens[next_token_index++];
-                    token->type   = JSMN_STRING;
-                    //TODO: For Matlab we could add 2 instead of 1
-                    //if we didn't want to 
-                    token->start  = parser_position+1;
-                    //token->end  <= defined in loop
-                    //token->size <= not currently defined ...
-                    //-1, back to this token
-                    //-2, back to {
-                    token->parent = next_token_index-2;
-                    token->token_after_close = next_token_index;
-                    
-                    *values++ = 0;
-                    //-----------------------------------
-                    
-                    parse_string(js,token,&parser_position,len);
-                                        
-                    //TODO: now go onto attributes
-                    //----------------------------------------------
-                    while (is_whitespace[js[++parser_position]]){  
-                    }
-                    
-//                     mexPrintf("Parser position: %d\n",parser_position);
-//                     return 1;
-                    
-                    if (js[parser_position] == ':'){
-                        super_token = token;
-                        super_token_is_string = true;
-                        super_token_size = 0;
-                        super_token_index = next_token_index - 1; 
-                        
-                    }else{
-                        //TODO: provide more info
-                        mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
-                    }
-                    
-                    
-                    
-                } else if (js[parser_position] == '}'){
-                    //Closing of the { that we just opened (empty object)
-                    //---------------------------------------------------
-                    
-                    //refers to the { object
-                    token->size = 0;
-
-                    token->token_after_close = next_token_index;
-                    
-                    //Again, this is off by 1 for C
-                    token->end = parser_position + 1;
-
-                    //Since we're closing the object, we need to
-                    //move the super to the parent
-                    //TODO: If this is ever -1, then we should break to the end
-                    //and make sure nothing follows except whitepsace
-                    if(token->parent == -1){
-                        while (is_whitespace[js[++parser_position]]){  
-                        }
-
-                        if (!(js[parser_position] == '\0')){
-                            mexErrMsgIdAndTxt("jsmn_mex:invalid_end","non-whitespace characters found after end of root token close");
-                        }
-                        return next_token_index;
-                    }
-//                     //This is already up to date since we never
-                    //updated the super when opening, since we were
-                    //going to change it anyway to the 1st attribute
-//                     else{
-//                         super_token_index = token->parent;
-//                         super_token = &tokens[super_token_index];
-//                         super_token_size = super_token->size;
-//                         super_token_is_string = super_token->type == JSMN_STRING;
-//                     }  
-
-                } else {
-                    //error, need to close the object
-                    mexErrMsgIdAndTxt("jsmn_mex:unclosed_object","Open object not followed by an attribute or a closed object");
+                switch (js[parser_position]){
+                    case '"':
+                        goto parse_string_label;
+                        break;
+                    case '}':
+                        goto close_object;
+                        break;
+                    default:
+                        mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
                 }
-                
                 
 				break;
                 //---------------- End of Open Object ---------------------                
@@ -658,9 +578,9 @@ int jsmn_parse(jsmn_parser *parser,
                 token = &tokens[next_token_index++];
                 
                 token->end    = -1;
-                token->size   = 0;
+                //token->size   = 0; Handled below
                 token->token_after_close = -1;
-                token->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
+                token->type = JSMN_ARRAY;
 				token->start = parser_position;
                 token->parent = super_token_index;
                 
@@ -676,21 +596,18 @@ int jsmn_parse(jsmn_parser *parser,
 				super_token_index = next_token_index - 1;
 				break;
                 //---------------- End of Open Array ----------------------
-			case '}': 
+			case '}':
+            close_object:
                 //---------------- Start of Close Object ------------------
+                //We need to close out the attribute (if present)
+                //and the object
                 //
                 //{ "test" : 1  }
                 //1  2       3  4  
                 //     p        x   <= p is parent/super_token
-                        
-                //We need to close out the attribute (if present)
-                //and the object
-               
-                //TODO: Super token has to be the string since
-                //otherwise we have an empty object
-                //alterntively we have bad code
                 
                 //Closing the attribute
+                //----------------------
                 if (super_token_is_string){
                    //Again, this may be useless since it should be 1
                    super_token->size = super_token_size; 
@@ -731,7 +648,8 @@ int jsmn_parse(jsmn_parser *parser,
                 }                   
                 break;
                 //--------       End of Close Object       ---------------
-            case ']':   
+            case ']':
+            close_array:
                 //----------   Start of Close Array  ----------------------
                 //Grabs the last token, why aren't we grabbing the parent
                 //token?
@@ -775,7 +693,9 @@ int jsmn_parse(jsmn_parser *parser,
                 //-----------   End of Close Array     --------------------
 			case '\"':
             parse_string_label:
+                //---------------------------------------------------------
                 //-----------  Start parsing of String --------------------
+                //---------------------------------------------------------
                 if (next_token_index >= num_tokens) {
                     refill_parser(parser,parser_position,next_token_index,super_token_index);
                     return JSMN_ERROR_NOMEM;
