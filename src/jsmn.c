@@ -20,24 +20,26 @@ ws_chars = [' ',sprintf('\n'),sprintf('\r'),sprintf('\t')];
 temp(double(ws_chars)+1) = {'true'};
 clipboard('copy',['const bool is_whitespace[256] = {' sl.cellstr.join(temp,'d',',') '};'])
 
-values = 0:9;
-str = cell(1,6);
-for i = 1:6
+%POSITIVE_VALUES
+values = 1:9;
+n_entries = 16;
+str = cell(1,n_entries);
+for i = 1:n_entries
     temp = cell(1,58);
     temp(:) = {'0'};
-    temp(49:58) = arrayfun(@(x) sprintf('%d',x),values*1*10^(i-1),'un',0);
+    temp(50:58) = arrayfun(@(x) sprintf('%d',x),values*1*10^(i-1),'un',0);
     str{i} = ['const double p1e' int2str(i-1) '[58] = {' sl.cellstr.join(temp,'d',',') '};'];
 end
 clipboard('copy',sl.cellstr.join(str,'d',char(10)))
 
-values = 0:9;
+values = 1:9;
 n_entries = 16;
 str = cell(1,n_entries);
 for i = 1:n_entries
     temp = cell(1,58);
     temp(:) = {'0'};
     format = ['%0.' int2str(i) 'f'];
-    temp(49:58) = arrayfun(@(x) sprintf(format,x),values.*10^(-i),'un',0);
+    temp(50:58) = arrayfun(@(x) sprintf(format,x),values.*10^(-i),'un',0);
     str{i} = ['const double p1e_' int2str(i) '[58] = {' sl.cellstr.join(temp,'d',',') '};'];
 end
 clipboard('copy',sl.cellstr.join(str,'d',char(10)))
@@ -48,122 +50,188 @@ clipboard('copy',sl.cellstr.join(str,'d',char(10)))
 const bool is_whitespace[256] = {false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false};
 const bool is_number_array[256] = {false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false};
 
+//Values for Integer portion of number
+//------------------------------------
+//Note that I'm avoiding subtracting 0 which makes these arrays rather large ...
 const double p1e0[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9};
 const double p1e1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,20,30,40,50,60,70,80,90};
 const double p1e2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,200,300,400,500,600,700,800,900};
 const double p1e3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000,2000,3000,4000,5000,6000,7000,8000,9000};
 const double p1e4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000,20000,30000,40000,50000,60000,70000,80000,90000};
 const double p1e5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000,200000,300000,400000,500000,600000,700000,800000,900000};
+const double p1e6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000,2000000,3000000,4000000,5000000,6000000,7000000,8000000,9000000};
+const double p1e7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000,20000000,30000000,40000000,50000000,60000000,70000000,80000000,90000000};
+const double p1e8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000,200000000,300000000,400000000,500000000,600000000,700000000,800000000,900000000};
+const double p1e9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000,2000000000,3000000000,4000000000,5000000000,6000000000,7000000000,8000000000,9000000000};
+const double p1e10[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000000,20000000000,30000000000,40000000000,50000000000,60000000000,70000000000,80000000000,90000000000};
+const double p1e11[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000000,200000000000,300000000000,400000000000,500000000000,600000000000,700000000000,800000000000,900000000000};
+const double p1e12[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000000,2000000000000,3000000000000,4000000000000,5000000000000,6000000000000,7000000000000,8000000000000,9000000000000};
+const double p1e13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000000000,20000000000000,30000000000000,40000000000000,50000000000000,60000000000000,70000000000000,80000000000000,90000000000000};
+const double p1e14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000000000,200000000000000,300000000000000,400000000000000,500000000000000,600000000000000,700000000000000,800000000000000,900000000000000};
+const double p1e15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000000000,2000000000000000,3000000000000000,4000000000000000,5000000000000000,6000000000000000,7000000000000000,8000000000000000,9000000000000000};
 
-//TODO: How accurate can we get with this?
+//Values for fractional component
+//-------------------------------
+//Note, it is unclear how accurate we can really be with this ...
+//and accordingly, how far out we should really populate ...
+//
+//I've gone out to the maximum of double (I think)
+//
 //i.e. 2.0123456789012345 ?
-const double p1e_1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9};
-const double p1e_2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09};
-const double p1e_3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000,0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009};
-const double p1e_4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000,0.0001,0.0002,0.0003,0.0004,0.0005,0.0006,0.0007,0.0008,0.0009};
-const double p1e_5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000,0.00001,0.00002,0.00003,0.00004,0.00005,0.00006,0.00007,0.00008,0.00009};
-const double p1e_6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000,0.000001,0.000002,0.000003,0.000004,0.000005,0.000006,0.000007,0.000008,0.000009};
-const double p1e_7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000,0.0000001,0.0000002,0.0000003,0.0000004,0.0000005,0.0000006,0.0000007,0.0000008,0.0000009};
-const double p1e_8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000,0.00000001,0.00000002,0.00000003,0.00000004,0.00000005,0.00000006,0.00000007,0.00000008,0.00000009};
-const double p1e_9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000,0.000000001,0.000000002,0.000000003,0.000000004,0.000000005,0.000000006,0.000000007,0.000000008,0.000000009};
-const double p1e_10[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000,0.0000000001,0.0000000002,0.0000000003,0.0000000004,0.0000000005,0.0000000006,0.0000000007,0.0000000008,0.0000000009};
-const double p1e_11[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000,0.00000000001,0.00000000002,0.00000000003,0.00000000004,0.00000000005,0.00000000006,0.00000000007,0.00000000008,0.00000000009};
-const double p1e_12[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000,0.000000000001,0.000000000002,0.000000000003,0.000000000004,0.000000000005,0.000000000006,0.000000000007,0.000000000008,0.000000000009};
-const double p1e_13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000,0.0000000000001,0.0000000000002,0.0000000000003,0.0000000000004,0.0000000000005,0.0000000000006,0.0000000000007,0.0000000000008,0.0000000000009};
-const double p1e_14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000,0.00000000000001,0.00000000000002,0.00000000000003,0.00000000000004,0.00000000000005,0.00000000000006,0.00000000000007,0.00000000000008,0.00000000000009};
-const double p1e_15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000000,0.000000000000001,0.000000000000002,0.000000000000003,0.000000000000004,0.000000000000005,0.000000000000006,0.000000000000007,0.000000000000008,0.000000000000009};
-const double p1e_16[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000000,0.0000000000000001,0.0000000000000002,0.0000000000000003,0.0000000000000004,0.0000000000000005,0.0000000000000006,0.0000000000000007,0.0000000000000008,0.0000000000000009};//TODO: Pass in pointer to double
-//TODO: Return error value ...
+const double p1e_1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9};
+const double p1e_2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09};
+const double p1e_3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009};
+const double p1e_4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0001,0.0002,0.0003,0.0004,0.0005,0.0006,0.0007,0.0008,0.0009};
+const double p1e_5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00001,0.00002,0.00003,0.00004,0.00005,0.00006,0.00007,0.00008,0.00009};
+const double p1e_6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000001,0.000002,0.000003,0.000004,0.000005,0.000006,0.000007,0.000008,0.000009};
+const double p1e_7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000001,0.0000002,0.0000003,0.0000004,0.0000005,0.0000006,0.0000007,0.0000008,0.0000009};
+const double p1e_8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000001,0.00000002,0.00000003,0.00000004,0.00000005,0.00000006,0.00000007,0.00000008,0.00000009};
+const double p1e_9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000001,0.000000002,0.000000003,0.000000004,0.000000005,0.000000006,0.000000007,0.000000008,0.000000009};
+const double p1e_10[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000001,0.0000000002,0.0000000003,0.0000000004,0.0000000005,0.0000000006,0.0000000007,0.0000000008,0.0000000009};
+const double p1e_11[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000001,0.00000000002,0.00000000003,0.00000000004,0.00000000005,0.00000000006,0.00000000007,0.00000000008,0.00000000009};
+const double p1e_12[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000001,0.000000000002,0.000000000003,0.000000000004,0.000000000005,0.000000000006,0.000000000007,0.000000000008,0.000000000009};
+const double p1e_13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000001,0.0000000000002,0.0000000000003,0.0000000000004,0.0000000000005,0.0000000000006,0.0000000000007,0.0000000000008,0.0000000000009};
+const double p1e_14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000001,0.00000000000002,0.00000000000003,0.00000000000004,0.00000000000005,0.00000000000006,0.00000000000007,0.00000000000008,0.00000000000009};
+const double p1e_15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000001,0.000000000000002,0.000000000000003,0.000000000000004,0.000000000000005,0.000000000000006,0.000000000000007,0.000000000000008,0.000000000000009};
+const double p1e_16[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000001,0.0000000000000002,0.0000000000000003,0.0000000000000004,0.0000000000000005,0.0000000000000006,0.0000000000000007,0.0000000000000008,0.0000000000000009};
+
 double string_to_double(const char *p,char **char_offset) {
 
-    //Possible errors - NYI
-    //-----------------------------
+    /*
+     *  I found atof to be the main bottleneck in this code. It was 
+     *  suggested to me by some internet searching that a custom algorithm
+     *  would be close enough in 99.99 of the cases. I found a couple
+     *  basic ones online that used loops and multiplation. This was my
+     *  attempt to make something as fast possible. I welcome a faster
+     *  approach!
+     */
     
-    double r;
-    double f;
-    bool neg;
-    int n = 0;
-    char *start;
+    double value = 0;
+    double exponent_value;
+    bool negate;
+    int n_numeric_chars_plus_1;
+    char *number_start;
     
-    if (*p == '-') {
-        neg = true;
-        ++p;
-    }else if (*p == '+') {
-        neg = false;
-        ++p;
-    }else{
-        neg = false;
+    switch (*p){
+        case '-':
+            ++p;
+            negate = true;
+            break;
+        case '+':
+            ++p;
+        default:
+            negate = false;
     }
-    
-    start = p;
+
+    number_start = p;
     while (is_number_array[*p++]) {  
     }
     
-    //We could remove this by playing with the case logic ...
-    //n = 1 would mean no #s
-    //TODO: Do this and build in an error code for no #s
-    --p;
+    n_numeric_chars_plus_1 = p-number_start; //# of numeric characters (off by 1 due to ++)
     
-    r = 0;
-    n = p-start;
-    //reset p so that we can increment our way down
-    p = start;
-    switch (n) {
+    //reset p so that we can increment our way along the number
+    p = number_start;
+    //Now that we know how many #s we have (off by 1 due to ++)
+    //we can start at the beginning and add each to its correct place
+    //e.g:
+    //  4086 =
+    //  4000 +
+    //   0   +
+    //    80 +
+    //     6
+    
+    //I'm curious if you could take advantage of something like SSE
+    //if each case was written out explicitly rather than via fall through
+    switch (n_numeric_chars_plus_1) {
+        case 17:
+           value += p1e15[*p++];  
+        case 16:
+           value += p1e14[*p++];  
+        case 15:
+           value += p1e13[*p++];   
+        case 14:
+           value += p1e12[*p++];   
+        case 13:
+           value += p1e11[*p++];   
+        case 12:
+           value += p1e10[*p++];       
+        case 11:
+           value += p1e9[*p++];  
+        case 10:
+           value += p1e8[*p++];  
+        case 9:
+           value += p1e7[*p++];  
+        case 8:
+           value += p1e6[*p++]; 
+        case 7:
+           value += p1e5[*p++];
         case 6:
-           r += p1e5[*p++];
+           value += p1e4[*p++];
         case 5:
-           r += p1e4[*p++];
+           value += p1e3[*p++];
         case 4:
-           r += p1e3[*p++];
+           value += p1e2[*p++];
         case 3:
-           r += p1e2[*p++];
+           value += p1e1[*p++]; //1e1 == 10, 2 #s plus the off by 1
         case 2:
-           r += p1e1[*p++];
-        case 1:
-           r += p1e0[*p++];
+           value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
            break;
+        case 1:
+            //TODO: Provide a location
+            mexErrMsgIdAndTxt("jsmn_mex:no_number","Too many #s");
         default:
-            mexPrintf("Too many #s: %d\n",n);
-            mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
+            mexErrMsgIdAndTxt("jsmn_mex:too_many_integers","The integer component of the number had too many digits");
     }  
     
+    //This would be written neater as a while loop that updates a pointer
+    //to the various arrays but I don't think it would be as fast
+    //
+    //Unlike the integer part, we know how to interpret each
+    //numeric value as we are parsing it
+    //
+    //0.1234 =
+    //0.1 +
+    //0.02 +
+    //0.003 +
+    //0.0004
+    
     if (*p == '.') {
-        ++p;        
+        ++p;   
+        //TODO: Is no digit ok?
         if(is_number_array[*p]){
-            r += p1e_1[*p++];
+            value += p1e_1[*p++];
             if(is_number_array[*p]){
-                r += p1e_2[*p++];
+                value += p1e_2[*p++];
                 if(is_number_array[*p]){
-                    r += p1e_3[*p++];
+                    value += p1e_3[*p++];
                     if(is_number_array[*p]){
-                        r += p1e_4[*p++];
+                        value += p1e_4[*p++];
                         if(is_number_array[*p]){
-                            r += p1e_5[*p++];
+                            value += p1e_5[*p++];
                             if(is_number_array[*p]){
-                                r += p1e_6[*p++];
+                                value += p1e_6[*p++];
                                 if(is_number_array[*p]){
-                                    r += p1e_7[*p++];
+                                    value += p1e_7[*p++];
                                     if(is_number_array[*p]){
-                                        r += p1e_8[*p++];
+                                        value += p1e_8[*p++];
                                         if(is_number_array[*p]){
-                                            r += p1e_9[*p++];
+                                            value += p1e_9[*p++];
                                             if(is_number_array[*p]){
-                                                r += p1e_10[*p++];
+                                                value += p1e_10[*p++];
                                                 if(is_number_array[*p]){
-                                                    r += p1e_11[*p++];
+                                                    value += p1e_11[*p++];
                                                     if(is_number_array[*p]){
-                                                        r += p1e_12[*p++];
+                                                        value += p1e_12[*p++];
                                                         if(is_number_array[*p]){
-                                                            r += p1e_13[*p++];
+                                                            value += p1e_13[*p++];
                                                             if(is_number_array[*p]){
-                                                                r += p1e_14[*p++];
+                                                                value += p1e_14[*p++];
                                                                 if(is_number_array[*p]){
-                                                                    r += p1e_15[*p++];
+                                                                    value += p1e_15[*p++];
                                                                     if(is_number_array[*p]){
-                                                                        r += p1e_16[*p++];
+                                                                        value += p1e_16[*p++];
                                                                         if(is_number_array[*p]){
-                                                                            mexPrintf("At least 17 decimal points ....\n");
-                                                                            mexErrMsgIdAndTxt("wtf:wtf3","Too many #s fractions");
+                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_decimals","The fractional component of the number had too many digits");
                                                                         }
                                                                     }
                                                                 }
@@ -184,64 +252,88 @@ double string_to_double(const char *p,char **char_offset) {
     }
     //End of if '.'
 
-    if (neg) {
-        r = -r;
+    if (negate) {
+        value = -value;
     }
     
     if (*p == 'E' || *p == 'e') {
         ++p;
-        if (*p == '-'){
-            neg = true;
-            ++p;
-        }else if (*p == '+') {
-            neg = false;
-            ++p;
-        }else {
-            neg = false;
+        switch (*p){
+            case '-':
+                ++p;
+                negate = true;
+                break;
+            case '+':
+                ++p;
+            default:
+                negate = false;
         }
         
-        //TODO: See note above on removing --p
-        start = p;
+        number_start = p;
         while (is_number_array[*p++]) {  
         }
-        --p;
 
-        f = 0;
-        n = p-start;
+        exponent_value = 0;
+        n_numeric_chars_plus_1 = p-number_start;
         //reset p so that we can increment our way down
-        p = start;
-        switch (n) {
+        p = number_start;
+        switch (n_numeric_chars_plus_1) {
+            case 17:
+               exponent_value += p1e15[*p++];  
+            case 16:
+               exponent_value += p1e14[*p++];  
+            case 15:
+               exponent_value += p1e13[*p++];   
+            case 14:
+               exponent_value += p1e12[*p++];   
+            case 13:
+               exponent_value += p1e11[*p++];   
+            case 12:
+               exponent_value += p1e10[*p++];       
+            case 11:
+               exponent_value += p1e9[*p++];  
+            case 10:
+               exponent_value += p1e8[*p++];  
+            case 9:
+               exponent_value += p1e7[*p++];  
+            case 8:
+               exponent_value += p1e6[*p++]; 
+            case 7:
+               exponent_value += p1e5[*p++];
             case 6:
-               f += p1e5[*p++];
+               exponent_value += p1e4[*p++];
             case 5:
-               f += p1e4[*p++];
+               exponent_value += p1e3[*p++];
             case 4:
-               f += p1e3[*p++];
+               exponent_value += p1e2[*p++];
             case 3:
-               f += p1e2[*p++];
+               exponent_value += p1e1[*p++];
             case 2:
-               f += p1e1[*p++];
-            case 1:
-               f += p1e0[*p++];
+               exponent_value += p1e0[*p++];
                break;
+            case 1:
+                mexErrMsgIdAndTxt("jsmn_mex:empty_exponent","An exponent was given with no numeric value");
             default:
-                mexPrintf("Too many #s: %d\n",n);
-                mexErrMsgIdAndTxt("wtf:wtf2","Too many #s");
+                //TODO: Give error location in string
+                mexErrMsgIdAndTxt("jsmn_mex:large_exponent","There were more than 15 digits in a numeric exponent");
         }
-        if (neg){
-          f = -f;  
+        if (negate){
+          exponent_value = -exponent_value;  
         }
-        r *= pow(10.0, f);
+        value *= pow(10.0, exponent_value);
     }
     
     *char_offset = p;
     
-    return r;
+    return value;
 }
+//-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
+//-------------------------------------------------------------------------
 
-//TODO: Fill this in ...
 void parse_string(const char *js, jsmntok_t *token, unsigned int *input_parser_position, size_t len){
+    
+    //TODO: This function needs work
     
     //  parse_string(js,token,parser_position)
     unsigned int parser_position = *input_parser_position;
@@ -640,7 +732,7 @@ int jsmn_parse(jsmn_parser *parser,
                 break;
                 //--------       End of Close Object       ---------------
             case ']':   
-                //----------   Start of Cloes Array  ----------------------
+                //----------   Start of Close Array  ----------------------
                 //Grabs the last token, why aren't we grabbing the parent
                 //token?
                 //[ ]
@@ -659,8 +751,7 @@ int jsmn_parse(jsmn_parser *parser,
                 //This is Matlab based, we should add on a flag for this ...
                 super_token->end = parser_position + 1;
                 
-                //TODO: If this is ever -1, then we should break to the end
-                //and make sure nothing follows except whitepsace
+                
                 if(super_token->parent == -1){
                     
                     super_token->size = super_token_size;
