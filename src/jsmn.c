@@ -33,7 +33,8 @@ end
 clipboard('copy',sl.cellstr.join(str,'d',char(10)))
 
 values = 1:9;
-n_entries = 16;
+%   1.json had 20 :/
+n_entries = 20;
 str = cell(1,n_entries);
 for i = 1:n_entries
     temp = cell(1,58);
@@ -94,6 +95,10 @@ const double p1e_13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 const double p1e_14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000001,0.00000000000002,0.00000000000003,0.00000000000004,0.00000000000005,0.00000000000006,0.00000000000007,0.00000000000008,0.00000000000009};
 const double p1e_15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000001,0.000000000000002,0.000000000000003,0.000000000000004,0.000000000000005,0.000000000000006,0.000000000000007,0.000000000000008,0.000000000000009};
 const double p1e_16[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000001,0.0000000000000002,0.0000000000000003,0.0000000000000004,0.0000000000000005,0.0000000000000006,0.0000000000000007,0.0000000000000008,0.0000000000000009};
+const double p1e_17[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000001,0.00000000000000002,0.00000000000000003,0.00000000000000004,0.00000000000000005,0.00000000000000006,0.00000000000000007,0.00000000000000008,0.00000000000000009};
+const double p1e_18[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000000001,0.000000000000000002,0.000000000000000003,0.000000000000000004,0.000000000000000005,0.000000000000000006,0.000000000000000007,0.000000000000000008,0.000000000000000009};
+const double p1e_19[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000000001,0.0000000000000000002,0.0000000000000000003,0.0000000000000000004,0.0000000000000000005,0.0000000000000000006,0.0000000000000000007,0.0000000000000000008,0.0000000000000000009};
+const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000000001,0.00000000000000000002,0.00000000000000000003,0.00000000000000000004,0.00000000000000000005,0.00000000000000000006,0.00000000000000000007,0.00000000000000000008,0.00000000000000000009};
 
 double string_to_double(const char *p,char **char_offset) {
 
@@ -112,15 +117,11 @@ double string_to_double(const char *p,char **char_offset) {
     int n_numeric_chars_plus_1;
     char *number_start;
     
-    switch (*p){
-        case '-':
-            ++p;
-            negate = true;
-            break;
-        case '+':
-            ++p;
-        default:
-            negate = false;
+    if (*p == '-'){
+        ++p;
+        negate = true;    
+    }else{
+        negate = false;
     }
 
     number_start = p;
@@ -231,7 +232,20 @@ double string_to_double(const char *p,char **char_offset) {
                                                                     if(is_number_array[*p]){
                                                                         value += p1e_16[*p++];
                                                                         if(is_number_array[*p]){
-                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_decimals","The fractional component of the number had too many digits");
+                                                                            value += p1e_17[*p++];
+                                                                            if(is_number_array[*p]){
+                                                                                value += p1e_18[*p++];
+                                                                                if(is_number_array[*p]){
+                                                                                    value += p1e_19[*p++];
+                                                                                    if(is_number_array[*p]){
+                                                                                        value += p1e_20[*p++];
+                                                                                        if(is_number_array[*p]){
+                                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_decimals","The fractional component of the number had too many digits");
+
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
@@ -250,8 +264,7 @@ double string_to_double(const char *p,char **char_offset) {
             }
         }
     }
-    //End of if '.'
-
+    //End of if '.'    
     if (negate) {
         value = -value;
     }
@@ -331,6 +344,10 @@ double string_to_double(const char *p,char **char_offset) {
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
 
+
+//-------------------------------------------------------------------------
+//                  String Parsing
+//-------------------------------------------------------------------------
 void parse_string(const char *js, jsmntok_t *token, unsigned int *input_parser_position, size_t len){
     
     //TODO: This function needs work
@@ -812,7 +829,7 @@ int jsmn_parse(jsmn_parser *parser,
                     case '[':
                         goto parse_array;
                     default:
-                        mexPrintf("Current Position: %d\n",parser_position);
+                        //mexPrintf("Current Position: %d\n",parser_position);
                         mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma"); 
                     
                 }
@@ -929,9 +946,10 @@ int jsmn_parse(jsmn_parser *parser,
 
 			//---------  Unexpected Character  ---------
 			default:
-
-                mexPrintf("Invalid Char: %c\n",js[parser_position]);
-            	mexPrintf("Location: %d\n",parser_position);
+                //TODO: Provide more info ...
+                mexErrMsgIdAndTxt("jsmn_mex:invalid_token_character","Invalided token character found"); 
+//                 mexPrintf("Invalid Char: %c\n",js[parser_position]);
+//             	mexPrintf("Location: %d\n",parser_position);
                 
 				return JSMN_ERROR_INVALID_TOKEN_CHAR;
 		}

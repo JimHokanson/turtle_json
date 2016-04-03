@@ -7,6 +7,7 @@ for i = 1:1
   
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\canada.json'; 
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\citm_catalog.json'; 
+file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\1.json'; 
 
 file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
 file_name = 'testfile_new.wcon';

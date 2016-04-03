@@ -1,6 +1,7 @@
 classdef tokens
     %
-    %
+    %   Class:
+    %   json.tokens
     %
     
     properties
