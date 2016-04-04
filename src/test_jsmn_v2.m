@@ -34,6 +34,8 @@ fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 %0.390577, 0.180577, 1.817
 %0.386232, 0.179044, 1.8223 //Nice speedup on not messing as much with the numeric pointer
 %
+%0.359798, 0.15692, 1.58492 //Complete state machine
+%0.375252, 0.16457, 1.66198
 
 
 %No math

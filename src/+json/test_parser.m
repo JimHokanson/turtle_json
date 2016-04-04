@@ -10,14 +10,8 @@ function test_parser
 
 %{
 
-
-
-
-
 str = '{"Missing colon" null}';
 jt = json.tokens('','raw_string',str);
-
-
 
 
 %}
