@@ -61,6 +61,13 @@ classdef tokens
     
     methods
         function obj = tokens(file_path,varargin)
+            %
+            %
+            %
+            %   See Also:
+            %   ---------
+            %   json.stringToTokens
+            %   json.fileToTokens
             
             in.raw_string = -1;
             in = sl.in.processVarargin(in,varargin);

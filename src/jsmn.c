@@ -352,11 +352,11 @@ double string_to_double(const char *p,char **char_offset) {
 //                  String Parsing
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
-void parse_string(const char *js, jsmntok_t *token, unsigned int *input_parser_position, size_t len){
+void parse_string_helper(const char *js, jsmntok_t *token, unsigned int *input_parser_position, size_t len){
     
     //TODO: This function needs work
     
-    //  parse_string(js,token,parser_position)
+    //      parse_string_helper(js,token,parser_position)
     unsigned int parser_position = *input_parser_position;
     char c;
     int i;
@@ -523,573 +523,513 @@ int jsmn_parse(jsmn_parser *parser,
                 mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
                     
         }
-	}
+	}else{
+    //=====================================================================
+    //                          Reinitialization
+    //=====================================================================
+    //We will have terminated on starting a token since we exited
+    //at token reallocation
     
-    //This is for reexecuting code. I might remove it and throw in a switch ...
-    //We know we have to be creating something to have exited
-    //-------------  THE MAIN LOOP   --------------------------------------    
-    parser_position--;
-    while((c = js[++parser_position])){
-		switch (c) {
-			case '{':
-            parse_object:
-                if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                
-                //Initialization
-                //-----------------------------
-                token = &tokens[next_token_index++];
-                
-                token->type   = JSMN_OBJECT;
-                token->start  = parser_position;
-                token->end    = -1;
-                //token->size //Handled below
-                token->parent = super_token_index;
-                token->token_after_close = -1;
-                
-                *values++ = 0;
-                
-                //Update parent to reflect that it has 1 more child
-                super_token->size = ++super_token_size;
-                
-                
-                super_token_index = next_token_index-1;
-                super_token_is_string = false;
-                
-                //Store size on old super
-                super_token->size = super_token_size;
+        switch(js[parser_position]){
+        case '"':
+            goto parse_string;
+        case '-': 
+        case '0': 
+        case '1': 
+        case '2': 
+        case '3': 
+        case '4':
+        case '5': 
+        case '6': 
+        case '7': 
+        case '8': 
+        case '9':
+            goto parse_number;
+        case '{':
+            goto parse_object;
+        case '[':
+            goto parse_array;
+        case 't':
+            goto parse_true;
+        case 'f':
+            goto parse_false;
+        case 'n':
+            goto parse_null;
+        default:
+            mexErrMsgIdAndTxt("jsmn_mex:code_error","Unable to restart parsing following memory reallocation");
+        }    
+        
+    }
+    
+    
+//=========================================================================
+//                       Opening an Object '{'  
+//========================================================================= 
+parse_object:
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
 
-                //Now make this the super token
-                super_token = token;
-                super_token_size = 0;
-                super_token_is_string = false;
-				super_token_index = next_token_index - 1;
+    //Initialization
+    //-----------------------------
+    token = &tokens[next_token_index++];
 
-                while (is_whitespace[js[++parser_position]]){  
-                }
-                
-                switch (js[parser_position]){
-                    case '"':
-                        goto parse_string_label;
-                    case '}':
-                        goto close_object;
-                    default:
-                        mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
-                }
-                
-                mexPrintf("open object, I should never run\n");
-                
-				break;
-                //---------------- End of Open Object ---------------------
-                
-                
-            //-------------------------------------------------------------  
-            //----------------   Start of opening an array ----------------   
-            //-------------------------------------------------------------    
-            case '[':
-            parse_array:
-                if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                  
-                super_token_size++;
-                
-                //Initialization
-                //-----------------------------
-                token = &tokens[next_token_index++];
-                
-                token->end    = -1;
-                //token->size   = 0; Handled below
-                token->token_after_close = -1;
-                token->type = JSMN_ARRAY;
-				token->start = parser_position;
-                token->parent = super_token_index;
-                
-                *values++ = 0;
-                
-                //Need to update the super token size
-                super_token->size = super_token_size;
+    token->type   = JSMN_OBJECT;
+    token->start  = parser_position;
+    token->end    = -1;
+    //token->size //Handled below
+    token->parent = super_token_index;
+    token->token_after_close = -1;
 
-                //Now make this the super token
-                super_token = token;
-                super_token_size = 0;
-                super_token_is_string = false;
-				super_token_index = next_token_index - 1;
-  
-                while (is_whitespace[js[++parser_position]]){  
-                }
+    *values++ = 0;
 
-                switch(js[parser_position]){
-                    case '"':
-                        goto parse_string_label;
-                    case '-': 
-                    case '0': 
-                    case '1': 
-                    case '2': 
-                    case '3': 
-                    case '4':
-                    case '5': 
-                    case '6': 
-                    case '7': 
-                    case '8': 
-                    case '9':
-                        goto parse_number;
-                    case '{':
-                        goto parse_object;
-                    case '[':
-                        goto parse_array;
-                    case ']':
-                        goto close_array;   
-                    case 't':
-                        goto parse_true;
-                    case 'f':
-                        goto parse_false;
-                    case 'n':
-                        goto parse_null;
-                    default:
-                        mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
-                }
-                
-                mexPrintf("open array, I should never run\n");
+    //Update parent to reflect that it has 1 more child
+    super_token->size = ++super_token_size;
+
+    //Now make this the super token
+    //-----------------------------
+    super_token = token;
+    super_token_size = 0;
+    super_token_is_string = false;
+    super_token_index = next_token_index - 1;
+
+    //Process the attribute
+    //---------------------
+    while (is_whitespace[js[++parser_position]]){  
+    }
+
+    switch (js[parser_position]){
+        case '"':
+            //Found first attribute
+            goto parse_string;
+        case '}':
+            //We have an empty object
+            goto close_object;
+        default:
+            mexErrMsgIdAndTxt("jsmn_mex:invalid_start","An attribute or closing '}' needs to follow '{'");
+    }
                 
                 
+//=========================================================================
+//                        Opening an Array '['  
+//=========================================================================   
+parse_array:
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+    //Initialization
+    //-----------------------------
+    token = &tokens[next_token_index++];
+
+    token->end    = -1;
+    //token->size   = 0; Handled below
+    token->token_after_close = -1;
+    token->type   = JSMN_ARRAY;
+    token->start  = parser_position;
+    token->parent = super_token_index;
+
+    *values++ = 0;
+
+    //Need to update the super token size
+    super_token->size = ++super_token_size;
+
+    //Now make this the super token
+    //-------------------------------
+    super_token = token;
+    super_token_size = 0;
+    super_token_is_string = false;
+    super_token_index = next_token_index - 1;
+
+    while (is_whitespace[js[++parser_position]]){  
+    }
+
+    switch(js[parser_position]){
+        case '"':
+            goto parse_string;
+        case '-': 
+        case '0': 
+        case '1': 
+        case '2': 
+        case '3': 
+        case '4':
+        case '5': 
+        case '6': 
+        case '7': 
+        case '8': 
+        case '9':
+            goto parse_number;
+        case '{':
+            goto parse_object;
+        case '[':
+            goto parse_array;
+        case ']':
+            goto close_array;   
+        case 't':
+            goto parse_true;
+        case 'f':
+            goto parse_false;
+        case 'n':
+            goto parse_null;
+        default:
+            mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
+    }
+
+//=========================================================================
+//                      Closing an object   '}'   
+//=========================================================================      
+close_object:
+    //---------------- Start of Close Object ------------------
+    //We need to close out the attribute (if present)
+    //and the object
+    //
+    //{ "test" : 1  }
+    //1  2       3  4  
+    //     p        x   <= p is parent/super_token
+
+    //Closing the attribute
+    //----------------------
+    if (super_token_is_string){
+       //Again, this may be useless since it should be 1
+       super_token->size = super_token_size; 
+       super_token->token_after_close = next_token_index;
+       //Now move up to "{" character
+       super_token_index = super_token->parent;
+       super_token = &tokens[super_token_index];
+    } //else{ empty object }
+
+    //Note, we don't handle size because size is only incremented
+    //by attributes
+    //super_token->size = super_token_size;
+    
+    //Now we should be at the '{', but we still
+    //need to move up to its parent since we are closing
+    //the object as well, not just the attribute
+    super_token->token_after_close = next_token_index;
+    super_token->end = parser_position + 1;
+
+    if(super_token->parent == -1){
+        goto process_end_of_file;
+    }else{
+        super_token_index = super_token->parent;
+        super_token = &tokens[super_token_index];
+        super_token_size = super_token->size;
+        super_token_is_string = super_token->type == JSMN_STRING;
+
+        goto process_end_of_token;
+    } 
                 
-				break;
-                //---------------- End of Open Array ----------------------
-			case '}':
-            close_object:
-                //---------------- Start of Close Object ------------------
-                //We need to close out the attribute (if present)
-                //and the object
-                //
-                //{ "test" : 1  }
-                //1  2       3  4  
-                //     p        x   <= p is parent/super_token
-                
-                //Closing the attribute
-                //----------------------
-                if (super_token_is_string){
-                   //Again, this may be useless since it should be 1
-                   super_token->size = super_token_size; 
-                   super_token->token_after_close = next_token_index;
-                   //Now move up to "{" character
-                   super_token_index = super_token->parent;
-                   super_token = &tokens[super_token_index];
-                }
-                //else - empty object
                 
                 
-                
-                //Now we should be at the '{', but we still
-                //need to move up to its parent since we are closing
-                //the object
-                super_token->token_after_close = next_token_index;
-                super_token->end = parser_position + 1;
-                
-                //Since we're closing the object, we need to
-                //move the super to the parent
-                //TODO: If this is ever -1, then we should break to the end
-                //and make sure nothing follows except whitepsace
-                if(super_token->parent == -1){
-                    
-                    while (is_whitespace[js[++parser_position]]){  
-                    }
-                    
-                    if (!(js[parser_position] == '\0')){
-                        mexErrMsgIdAndTxt("jsmn_mex:invalid_end","non-whitespace characters found after end of root token close");
-                    }
-                    return next_token_index;
-                }else{
-                    super_token_index = super_token->parent;
-                    super_token = &tokens[super_token_index];
-                    super_token_size = super_token->size;
-                    super_token_is_string = super_token->type == JSMN_STRING;
-                    
-                    goto process_end_of_token;
-                } 
-                
-                mexPrintf("close object, I should never run\n");
-                
-                break;
-                //--------       End of Close Object       ---------------
-                
-                
-                
-                
-            //-------------------------------------------------------------   
-            //----------       Start of Close Array  ----------------------    
-            //-------------------------------------------------------------  
+//=========================================================================
+//                         Closing an Array   ']'   
+//========================================================================= 
+close_array:
+    super_token->token_after_close = next_token_index;
+    //This is Matlab based, we should add on a flag for this ...
+    super_token->end = parser_position + 1;
+    super_token->size = super_token_size;
+
+    if(super_token->parent == -1){
+        goto process_end_of_file;
+    }else{
+        super_token_index = super_token->parent;
+        super_token = &tokens[super_token_index];
+        super_token_size = super_token->size;
+        super_token_is_string = super_token->type == JSMN_STRING;
+
+        goto process_end_of_token;
+
+    }
+
+//=========================================================================
+//                        Parsing a String '"'
+//========================================================================= 
+parse_string:
+
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+
+    token = &tokens[next_token_index++];
+    token->type   = JSMN_STRING;
+    //TODO: For Matlab we could add 2 instead of 1
+    token->start  = parser_position+1;
+    //token->end  <= defined in loop
+    //token->size <= not currently defined ...
+    token->parent = super_token_index;
+    token->token_after_close = next_token_index;
+
+    *values++ = 0;
+
+    parse_string_helper(js,token,&parser_position,len);
+
+    
+
+    //TODO: We may wish to make this a variable as well
+    if (super_token->type == JSMN_OBJECT){
+        //Then this is an attribute, move past : and parse
+        while (is_whitespace[js[++parser_position]]){  
+        }
+
+        if (js[parser_position] == ':'){
+            //Make the attribute string the super token
+            super_token->size = ++super_token_size;
+            super_token = token;
+            super_token_is_string = true;
+            super_token_size = 0;
+            super_token_index = next_token_index - 1; 
+
+            //Advance now to the next token
+            while (is_whitespace[js[++parser_position]]){  
+            }
+
+            switch(js[parser_position]){
+                case '"':
+                    goto parse_string;
+                case '-': 
+                case '0': 
+                case '1': 
+                case '2': 
+                case '3': 
+                case '4':
+                case '5': 
+                case '6': 
+                case '7': 
+                case '8': 
+                case '9':
+                    goto parse_number;
+                case '{':
+                    goto parse_object;
+                case '[':
+                    goto parse_array;
+                case 't':
+                    goto parse_true;
+                case 'f':
+                    goto parse_false;
+                case 'n':
+                    goto parse_null;
+                default:
+                    mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
+            }
+
+        }else{
+            //TODO: provide more info (string and position)
+            mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
+        }
+        
+    }else{
+        ++super_token_size;
+        //The string is not an attribute, so we could
+        // have another value, or close the current object/array
+        goto process_end_of_token;
+    }
+                     
+//=========================================================================
+//                        Parsing a Comma ','
+//=========================================================================
+parse_comma:
+    //When we get a comma inside an object we need to set
+    //the super from the attribute to the parent
+    //{ a : 1 , b : 2}
+    //  p     x 
+    //p   //Need to move p here so that the parent of 'b'
+    // is the opening '{', not 'a'
+    //
+    //mexPrintf(",\n");
+    if (super_token_is_string){
+        //This shouldn't be an interesting value ...
+        //Should always be 1 (an attribute has 1 value)
+        //Could harcode this and remove this line
+        //Need better tests ...
+        super_token->size = super_token_size;
+
+        super_token_index = super_token->parent;
+        super_token = &tokens[super_token_index];
+        super_token_size = super_token->size;
+    }
+
+    while (is_whitespace[js[++parser_position]]){  
+    }
+    //primitive required
+    switch (js[parser_position]){
+        case '-': 
+        case '0': 
+        case '1': 
+        case '2': 
+        case '3': 
+        case '4':
+        case '5': 
+        case '6': 
+        case '7': 
+        case '8': 
+        case '9':
+            goto parse_number;
+        case 'n':
+            goto parse_null;
+        case 't':
+            goto parse_true;
+        case 'f':
+            goto parse_false;
+        case '"':
+            goto parse_string;
+        case '{':
+            goto parse_object;
+        case '[':
+            goto parse_array;
+        default:
+            //mexPrintf("Current Position: %d\n",parser_position);
+            mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma"); 
+
+    }
+    
+//=========================================================================
+//                        Parsing a Number '-0123458789'
+//=========================================================================
+    
+
+parse_number:
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+    super_token_size++;
+
+    token = &tokens[next_token_index++];
+    token->size   = 1;
+    token->type   = JSMN_NUMBER;
+    token->start  = parser_position;
+    token->parent = super_token_index;
+
+    *values++ = string_to_double(js+parser_position,&pEndNumber);
+
+    //TODO: Check pEndNumber
+    //If pEndNumber = parser->pos then we have a bad char
+
+    //Note, this is off by 1, which is good
+    //when put into Matlab
+    parser_position = token->end = (int)(pEndNumber - js);                      
+    token->token_after_close = next_token_index;
+    parser_position--; //backtrack so we terminate on the #
+
+    goto process_end_of_token;
+
+
+//=========================================================================
+//                        Parsing a Null 'null'
+//=========================================================================    
+parse_null:
+    super_token_size++;
+
+    token = &tokens[next_token_index++];
+    token->type   = JSMN_NUMBER;
+    token->start  = parser_position;
+    //TODO: Error check null - make optional with compile flag
+    parser_position  += 3; //advance to final 'l' in 'null'
+    //1 based indexing ...
+    token->end    = parser_position+1;
+    token->size   = 1;
+    token->parent = super_token_index;                     
+    token->token_after_close = next_token_index;
+    *values++ = MX_NAN;
+
+    goto process_end_of_token;
+
+//=========================================================================
+//                        Parsing a True 'true'
+//========================================================================    
+
+parse_true:
+    //------------  Start of True Token  --------------
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+    super_token_size++;
+
+    token = &tokens[next_token_index++];
+    token->type   = JSMN_LOGICAL;
+    token->start  = parser_position;
+    //TODO: Error check true - make optional with compile flag
+    parser_position  += 3; //advance to final 'e' in 'true'
+    //1 based indexing ...
+    token->end    = parser_position+1;
+    token->size   = 1;
+    token->parent = super_token_index;                    
+    token->token_after_close = next_token_index;
+    *values++ = 1;
+
+    goto process_end_of_token;
+
+//=========================================================================
+//                        Parsing a False 'false'
+//=========================================================================                 
+parse_false:
+    //------------  Start of False Token  --------------
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+    super_token_size++;
+
+    token = &tokens[next_token_index++];
+    token->type   = JSMN_LOGICAL;
+    token->start  = parser_position;
+    //TODO: Error check true - make optional with compile flag
+    parser_position  += 4; //advance to final 'e' in 'false'
+    //1 based indexing ...
+    token->end    = parser_position+1;
+    token->size   = 1;
+    token->parent = super_token_index;
+    token->token_after_close = next_token_index;
+    *values++  = 0;
+
+    goto process_end_of_token;
+                                
+//=============================================================
+//                  End of Token Handling    
+//=============================================================
+//
+//TODO: process_end_of_value would be a better name
+//
+process_end_of_token:
+        while (is_whitespace[js[++parser_position]]){
+        }
+
+        switch(js[parser_position]){
+            case ',':
+               goto parse_comma; 
+            case '}':
+               if (super_token_is_string){
+                  goto close_object; 
+               }else{
+                  mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close object '}' is not matched with an open object");   
+               }
             case ']':
-            close_array:
-                
-                //Grabs the last token, why aren't we grabbing the parent
-                //token?
-                //[ ]
-                //p x
-                //
-                //[ 7, 8, 9 ]
-                //1 2  3  4 
-                //p       x
-                //
-                //[ [ 7, 8, 9] ] // Note in this case we wouldn't have 
-                //a token for the first close
-                //1 2 3  4  5
+               //TODO: Check that we've opened an array
+               if (super_token->type == JSMN_ARRAY){
+                  goto close_array;
+               }else{
+                  mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close array ']' is not matched with an open object"); 
+               }
+            default :   
+                mexErrMsgIdAndTxt("jsmn_mex:invalid_token","String value must be followed by a comma or a closing token");
+        }
 
-                super_token->token_after_close = next_token_index;
-                //This is Matlab based, we should add on a flag for this ...
-                super_token->end = parser_position + 1;
-                super_token->size = super_token_size;
-                
-                if(super_token->parent == -1){
+ process_end_of_file:
+     while (is_whitespace[js[++parser_position]]){  
+        }
 
-                    while (is_whitespace[js[++parser_position]]){  
-                    }
+        if (!(js[parser_position] == '\0')){
+            mexErrMsgIdAndTxt("jsmn_mex:invalid_end","non-whitespace characters found after end of root token close");
+        }
+        return next_token_index;
                     
-                    if (!(js[parser_position] == '\0')){
-                        mexErrMsgIdAndTxt("jsmn_mex:invalid_end","non-whitespace characters found after end of root token close");
-                    }
-                    return next_token_index;
-                }else{
-                    super_token_index = super_token->parent;
-                    super_token = &tokens[super_token_index];
-                    super_token_size = super_token->size;
-                    super_token_is_string = super_token->type == JSMN_STRING;
-                    
-                    goto process_end_of_token;
-
-                }
                 
-                mexPrintf("close array, I should never run\n");
-                
-				break;
-                //-----------   End of Close Array     --------------------
-                
-
-            //---------------------------------------------------------
-            //-----------  Start parsing of String --------------------
-            //---------------------------------------------------------
-                
-			case '\"':
-            parse_string_label:
-
-                if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                
-                token = &tokens[next_token_index++];
-        	    token->type   = JSMN_STRING;
-         	    //TODO: For Matlab we could add 2 instead of 1
-           	    token->start  = parser_position+1;
-                //token->end  <= defined in loop
-                //token->size <= not currently defined ...
-         	    token->parent = super_token_index;
-                token->token_after_close = next_token_index;
-
-                *values++ = 0;
-                
-                parse_string(js,token,&parser_position,len);
-                
-                super_token_size++;
-                
-                //TODO: We may wish to make this a variable as well
-                if (super_token->type == JSMN_OBJECT){
-                    //Then this is an attribute, move past : and parse
-                    while (is_whitespace[js[++parser_position]]){  
-                    }
-                    
-                    if (js[parser_position] == ':'){
-                        //Make the attribute string the super token
-                        super_token->size = super_token_size;
-                        super_token = token;
-                        super_token_is_string = true;
-                        super_token_size = 0;
-                        super_token_index = next_token_index - 1; 
-                        
-                        //TODO: Have switch for value
-                        
-                        
-                        while (is_whitespace[js[++parser_position]]){  
-                        }
-                        
-                        switch(js[parser_position]){
-                            case '"':
-                                goto parse_string_label;
-                            case '-': 
-                            case '0': 
-                            case '1': 
-                            case '2': 
-                            case '3': 
-                            case '4':
-                            case '5': 
-                            case '6': 
-                            case '7': 
-                            case '8': 
-                            case '9':
-                                goto parse_number;
-                            case '{':
-                                goto parse_object;
-                            case '[':
-                                goto parse_array;
-                            case 't':
-                                goto parse_true;
-                            case 'f':
-                                goto parse_false;
-                            case 'n':
-                                goto parse_null;
-                            default:
-                                mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
-                        }
- 
-                    }else{
-                        //TODO: provide more info
-                        mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
-                    }         
-                }else{
-                    //The string is not an attribute, so we could
-                    // have another value, or close the current object/array
-                    goto process_end_of_token;
-                }
-                
-                mexPrintf("close string, I should never run\n");
-                
-				break;
-                
-                
-            //-------------------------------------------------------------    
-            //--------      Start of Parsing Whitespace    ---------------
-            //-------------------------------------------------------------
-            case ' '  :
-            case '\n' :
-			case '\t' : 
-            case '\r' :
-				break;
-            //--------      End of Parsing Whitespace    ---------------
-            //We've changed so that we explicitly get the colon after
-            //any attribute
-// // // // // 			case ':':
-// // // // //                 //Here we are moving from a key to the attribute
-// // // // //                 //We make the attribute the parent for future things
-// // // // //                 
-// // // // //                 //TODO: Store size with parent
-// // // // //                 
-// // // // //                 
-// // // // //                 super_token = &tokens[next_token_index - 1];
-// // // // //                 super_token_is_string = true;
-// // // // //                 super_token_size = 0;
-// // // // // 				super_token_index = next_token_index - 1;
-// // // // // 				break;
-			case ',':
-            parse_comma:
-                //When we get a comma inside an object we need to set
-                //the super from the attribute to the parent
-                //{ a : 1 , b : 2}
-                //  p     x 
-                //p   //Need to move p here so that the parent of 'b'
-                // is the opening '{', not 'a'
-                //
-                //mexPrintf(",\n");
-                if (super_token_is_string){
-                    //This shouldn't be an interesting value ...
-                    //Should always be 1
-                    super_token->size = super_token_size;
-                    
-                    super_token_index = super_token->parent;
-                    super_token = &tokens[super_token_index];
-                    super_token_size = super_token->size;
-                }
-                
-                while (is_whitespace[js[++parser_position]]){  
-                }
-                //primitive required
-                switch (js[parser_position]){
-                	case '-': 
-                    case '0': 
-                    case '1': 
-                    case '2': 
-                    case '3': 
-                    case '4':
-                    case '5': 
-                    case '6': 
-                    case '7': 
-                    case '8': 
-                    case '9':
-                        goto parse_number;
-                    case 'n':
-                        goto parse_null;
-                    case 't':
-                        goto parse_true;
-                    case 'f':
-                        goto parse_false;
-                    case '"':
-                        goto parse_string_label;
-                    case '{':
-                        goto parse_object;
-                    case '[':
-                        goto parse_array;
-                    default:
-                        //mexPrintf("Current Position: %d\n",parser_position);
-                        mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma"); 
-                    
-                }
-                
-                
-				break;
-			case '-': 
-            case '0': 
-            case '1': 
-            case '2': 
-            case '3': 
-            case '4':
-			case '5': 
-            case '6': 
-            case '7': 
-            case '8': 
-            case '9':
-            parse_number:
-            	if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                super_token_size++;
-                
-                token = &tokens[next_token_index++];
-                token->size   = 1;
-                token->type   = JSMN_NUMBER;
-                token->start  = parser_position;
-                token->parent = super_token_index;
-
-                *values++ = string_to_double(js+parser_position,&pEndNumber);
-
-                //TODO: Check pEndNumber
-                //If pEndNumber = parser->pos then we have a bad char
-
-                //Note, this is off by 1, which is good
-                //when put into Matlab
-                parser_position = token->end = (int)(pEndNumber - js);                      
-                token->token_after_close = next_token_index;
-                parser_position--; //backtrack so we terminate on the #
-                
-                goto process_end_of_token;
-                
-				break;
-                
-            //-------        End of Number Parsing       --------------
-            case 'n' :
-            parse_null:
-                super_token_size++;
-                
-                token = &tokens[next_token_index++];
-                token->type   = JSMN_NUMBER;
-                token->start  = parser_position;
-                //TODO: Error check null - make optional with compile flag
-                parser_position  += 3; //advance to final 'l' in 'null'
-                //1 based indexing ...
-                token->end    = parser_position+1;
-                token->size   = 1;
-                token->parent = super_token_index;                     
-                token->token_after_close = next_token_index;
-                *values++ = MX_NAN;
-                
-                goto process_end_of_token;
-                
-                //mexPrintf("Values: %f",*values);
-                break;
-            //-------        End of Null Parsing       --------------
-			case 't':
-            parse_true:
-                //------------  Start of True Token  --------------
-                if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                super_token_size++;
-                
-                token = &tokens[next_token_index++];
-                token->type   = JSMN_LOGICAL;
-                token->start  = parser_position;
-                //TODO: Error check true - make optional with compile flag
-                parser_position  += 3; //advance to final 'e' in 'true'
-                //1 based indexing ...
-                token->end    = parser_position+1;
-                token->size   = 1;
-                token->parent = super_token_index;                    
-                token->token_after_close = next_token_index;
-                *values++ = 1;
-                
-                goto process_end_of_token;
-                
-                break;
-            case 'f':
-            parse_false:
-                //------------  Start of False Token  --------------
-                if (next_token_index >= num_tokens) {
-                    refill_parser(parser,parser_position,next_token_index,super_token_index);
-                    return JSMN_ERROR_NOMEM;
-                }
-                super_token_size++;
-                
-                token = &tokens[next_token_index++];
-                token->type   = JSMN_LOGICAL;
-                token->start  = parser_position;
-                //TODO: Error check true - make optional with compile flag
-                parser_position  += 4; //advance to final 'e' in 'false'
-                //1 based indexing ...
-                token->end    = parser_position+1;
-                token->size   = 1;
-                token->parent = super_token_index;
-                token->token_after_close = next_token_index;
-                *values++  = 0;
-                
-                goto process_end_of_token;
-                
-                break;
-                //-------        End of Logical Parsing      --------------
-
-
-			//---------  Unexpected Character  ---------
-			default:
-                //TODO: Provide more info ...
-                mexErrMsgIdAndTxt("jsmn_mex:invalid_token_character","Invalided token character found"); 
-//                 mexPrintf("Invalid Char: %c\n",js[parser_position]);
-//             	mexPrintf("Location: %d\n",parser_position);
-                
-				return JSMN_ERROR_INVALID_TOKEN_CHAR;
-                
-                
-            //=============================================================
-            //                  End of Token Handling    
-            //=============================================================    
-            process_end_of_token:
-                    while (is_whitespace[js[++parser_position]]){
-                    }
-                    
-                    switch(js[parser_position]){
-                        case ',':
-                           goto parse_comma; 
-                        case '}':
-                           if (super_token_is_string){
-                              goto close_object; 
-                           }else{
-                              mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close object '}' is not matched with an open object");   
-                           }
-                        case ']':
-                           //TODO: Check that we've opened an array
-                           if (super_token->type == JSMN_ARRAY){
-                              goto close_array;
-                           }else{
-                              mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close array ']' is not matched with an open object"); 
-                           }
-                        default :   
-                            mexErrMsgIdAndTxt("jsmn_mex:invalid_token","String value must be followed by a comma or a closing token");
-                    }
-                
-                
-		}
-	}
+// 		}
+// 	}
 
     mexErrMsgIdAndTxt("jsmn_mex:failed_to_close","Opening object or array was not closed before end of the string");
     

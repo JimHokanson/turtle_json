@@ -22,37 +22,6 @@
 #define ERROR_INVALID_ARGUMENT 3
 #define ERROR_MALLOC 4
 
-// enum jsmnerr {
-// 	/* Not enough tokens were provided */
-// 	JSMN_ERROR_NOMEM = -1,
-// 	/* Invalid character inside JSON string */
-// 	JSMN_ERROR_INVAL = -2,
-// 	/* The string is not a full JSON packet, more bytes expected */
-// 	JSMN_ERROR_PART = -3
-// };
-//
-// char *json_str;
-
-void error(const unsigned int e) {
-    switch (e) {
-        case JSMN_ERROR_INVAL:
-            mexErrMsgIdAndTxt("jsmn_mex:invalid_chars","Invalid character inside a JSON string.");
-        case JSMN_ERROR_INVALID_TOKEN_CHAR:
-            mexErrMsgIdAndTxt("jsmn_mex:invalid_chars","Invalid token character inside the JSON input string.");
-        case JSMN_ERROR_PART:
-            mexErrMsgIdAndTxt("jsmn_mex:incomplete_input","Input string is not a full JSON packet, more bytes expected.");
-        case ERROR_MINRHS:
-            mexErrMsgIdAndTxt("MATLAB:minrhs","Not enough input arguments.");
-        case ERROR_MAXRHS:
-            mexErrMsgIdAndTxt("MATLAB:maxrhs","Too many input arguments.");
-        case ERROR_INVALID_ARGUMENT:
-            mexErrMsgIdAndTxt("jsmn_mex:InvalidArgument","Requires string input.");
-        case ERROR_MALLOC:
-            mexErrMsgIdAndTxt("jsmn_mex:malloc","Insufficient free heap space.");
-    }
-}
-
-
 //  mex jsmn_mex.c jsmn.c
 
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
@@ -62,14 +31,17 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  str = fileread(file_path);
     //  token_info = jsmn_mex(str)
     //
+    //
     //  Outputs:
     //  --------
     //  token_info
     //      - see wrapping Matlab function
     
-    int n_tokens_allocated;
-    int n_new_tokens_to_allocate;
-    int n_tokens_used;
+    mwSize n_tokens_allocated;
+    mwSize n_tokens_to_allocate;
+    mwSize n_tokens_used;
+    mwSize n_reallocations = 0;
+    
     int parse_result;
     char *json_string;
     jsmn_parser p;
@@ -77,9 +49,11 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     double *values;
     size_t string_byte_length;
     
-    //Input Checking
+    //Input Handling
     //---------------------------------------------------------------------
-    //TODO: Check the # of inputs
+    if (!(nrhs == 1 || nrhs == 2)){
+        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of inputs ...");
+    }
     
     if (mxIsUint8(prhs[0])){
         json_string = (char *)mxGetData(prhs[0]);
@@ -91,7 +65,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         //0,1,2,3
         //1,2,3,4
         if (json_string[string_byte_length] != 0){
-            mexErrMsgIdAndTxt("jsmn_mex:bad_uint8_input","Currently uint8 should be padded with a zero");
+            mexErrMsgIdAndTxt("jsmn_mex:bad_uint8_input","Currently uint8 should be padded with a trailing zero");
         }
     }else if (mxIsClass(prhs[0],"char")){
         json_string = mxArrayToString(prhs[0]);
@@ -106,26 +80,37 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
     }
     
+    if (nrhs == 2){
+        if (mxIsDouble(prhs[1])){
+            n_tokens_to_allocate = (mwSize )mxGetScalar(prhs[1]);
+        }else{
+            mexErrMsgIdAndTxt("jsmn_mex:input_type","2nd input type must be a double");    
+        }
+        
+        //This could be an error ...
+        if (n_tokens_to_allocate <= 0){
+            n_tokens_to_allocate = 100;
+        }
+    } else {
+        n_tokens_to_allocate = (string_byte_length/12);
+        
+        //This should be changed to not exceed the # of input characters
+        if (n_tokens_to_allocate <= 0){
+            n_tokens_to_allocate = 100;
+        }
+    }
     
     //Allocation of the # of tokens
-    //-------------------------------------------------
-    
-    //This is a rough guess
-    //We might eventually want to change this if you have LOTS of strings
-    //
-    //TODO: Make this a user input
-    n_tokens_allocated = (string_byte_length/6);
-    if (n_tokens_allocated < 100){
-        n_tokens_allocated = 100;
-    }
-    //mexPrintf("N tokens allocated: %d\n",n_tokens_allocated);
-    t = mxMalloc(n_tokens_allocated*sizeof(jsmntok_t));
-    values = mxMalloc(n_tokens_allocated*8);
-    if (t == NULL) error(ERROR_MALLOC);
+    //----------------------------------------------------
+    t = mxMalloc(n_tokens_to_allocate*sizeof(jsmntok_t));
+    values = mxMalloc(n_tokens_to_allocate*sizeof(double));
+    n_tokens_allocated = n_tokens_to_allocate;
     
     jsmn_init(&p);
     
     while (1) {
+        //The main function call
+        //------------------------------------------
         parse_result = jsmn_parse(&p,json_string,string_byte_length,t,n_tokens_allocated,values);
         n_tokens_used = parse_result;
         
@@ -133,34 +118,38 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             //Then we are all set
             break;
         }else if (parse_result != JSMN_ERROR_NOMEM){
-            error(parse_result);
+            mexErrMsgIdAndTxt("jsmn_mex:unrecognized_error","Code error, non-recognized error returned to jsmn_mex");  
         } //else - not enough memory, reallocate below
 
+        n_reallocations += 1;
+        
         //Reallocation
         //---------------------------------------
+        //How much should we increase by?
+        //
+        //  n_tokens_allocated*(total_string_length/current_position)
+        //
+        //  This however will break if we have a really long token at the
+        //  beginning followed by a lot of dense tokens
+        //
+        //  TODO: determine a better approach for this ...
+        
+        
         //I'm not thrilled with this approach but I think it will work
-        n_new_tokens_to_allocate = (int)(1.2 * ((double)string_byte_length/p.pos) * n_tokens_allocated);
-        if (n_new_tokens_to_allocate < n_tokens_allocated){
-            mexPrintf("Tokens no increase: %d \n",n_new_tokens_to_allocate);
-            n_new_tokens_to_allocate = 2*n_tokens_allocated;
-            if (n_new_tokens_to_allocate > string_byte_length){
-                n_new_tokens_to_allocate = string_byte_length;
-            }
+        n_tokens_to_allocate = (mwSize )(1.2 * ((double)string_byte_length/p.pos) * n_tokens_allocated);
+        
+        if (n_tokens_to_allocate == n_tokens_allocated){
+            n_tokens_to_allocate = 2*n_tokens_allocated;
         }
-        //mexPrintf("Reallocating to %d tokens\n",n_new_tokens_to_allocate);
         
-        t = mxRealloc(t,n_new_tokens_to_allocate*sizeof(jsmntok_t));
-        values = mxRealloc(values,n_new_tokens_to_allocate*8);
-        
-        if (t == NULL) error(ERROR_MALLOC);
-        n_tokens_allocated = n_new_tokens_to_allocate;
+        t = mxRealloc(t,n_tokens_to_allocate*sizeof(jsmntok_t));
+        values = mxRealloc(values,n_tokens_to_allocate*8);
+        n_tokens_allocated = n_tokens_to_allocate;
     }
-    //mexPrintf("Finished %d\n",n_tokens_allocated);
-    //mexPrintf("N tokens used %d\n",n_tokens_used);
     
-    if (mxIsClass(prhs[0],"char"))
+    if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
-    
+    }
     
     plhs[0] = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
     mxSetData(plhs[0], t);
