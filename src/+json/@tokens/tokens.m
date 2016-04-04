@@ -69,6 +69,7 @@ classdef tokens
             %   json.stringToTokens
             %   json.fileToTokens
             
+            in.n_tokens = 0;
             in.raw_string = -1;
             in = sl.in.processVarargin(in,varargin);
             
@@ -78,16 +79,29 @@ classdef tokens
                 obj.file_string = char(uint8_data);
                 obj.d0 = toc(t0);
                 t1 = tic;
-                [token_info,num] = jsmn_mex(uint8_data);
+                if in.n_tokens
+                    result = jsmn_mex(uint8_data,in.n_tokens);
+                else
+                    result = jsmn_mex(uint8_data);
+                end
                 obj.d1 = toc(t1);
             else
                 t0 = tic;
                 obj.file_string = in.raw_string;
                 obj.d0 = toc(t0);
                 t1 = tic;
-                [token_info,num] = jsmn_mex(in.raw_string);
+                if in.n_tokens
+                    result = jsmn_mex(in.raw_string,in.n_tokens);
+                else
+                    result = jsmn_mex(in.raw_string);
+                end
                 obj.d1 = toc(t1);
             end
+            
+            token_info = result.info;
+            num = result.values;
+            
+            %[token_info,num]
             
             t2 = tic;
             %NOTE: We're not changing the parent which is currently 0 based

@@ -16,7 +16,7 @@ file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,10);
 t3 = tic;
 for i = 1:10
-	jt = json.tokens(file_path);
+	jt = json.tokens(file_path,'n_tokens',7787391);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end

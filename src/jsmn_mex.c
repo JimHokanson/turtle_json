@@ -37,6 +37,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  token_info
     //      - see wrapping Matlab function
     
+    mxArray *output_info;
+    mxArray *output_values;
+    
     mwSize n_tokens_allocated;
     mwSize n_tokens_to_allocate;
     mwSize n_tokens_used;
@@ -151,14 +154,24 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mxFree(json_string);
     }
     
-    plhs[0] = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
-    mxSetData(plhs[0], t);
-    mxSetM(plhs[0], sizeof(jsmntok_t)/4);
-    mxSetN(plhs[0], n_tokens_used);
+    //Output population
+    //---------------------------------------------------------    
+    output_info = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
+    mxSetData(output_info, t);
+    mxSetM(output_info, sizeof(jsmntok_t)/4);
+    mxSetN(output_info, n_tokens_used);
     
-    plhs[1] = mxCreateNumericArray(0, 0, mxDOUBLE_CLASS, mxREAL);
-    mxSetData(plhs[1], values);
-    mxSetM(plhs[1], 1);
-    mxSetN(plhs[1], n_tokens_used);
+    output_values = mxCreateNumericArray(0, 0, mxDOUBLE_CLASS, mxREAL);
+    mxSetData(output_values, values);
+    mxSetM(output_values, 1);
+    mxSetN(output_values, n_tokens_used);
+    
+    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    mxAddField(plhs[0],"info");
+    mxSetField(plhs[0],0,"info",output_info);
+    mxAddField(plhs[0],"values");
+    mxSetField(plhs[0],0,"values",output_values);
+    
+    
     
 }
