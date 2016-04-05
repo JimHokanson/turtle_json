@@ -75,7 +75,7 @@ classdef tokens
             
             if in.raw_string == -1
                 t0 = tic;
-                uint8_data = [sl.io.fileRead(file_path,'*uint8') 0];
+                uint8_data = read_to_uint8(file_path);
                 obj.file_string = char(uint8_data);
                 obj.d0 = toc(t0);
                 t1 = tic;
@@ -98,23 +98,24 @@ classdef tokens
                 obj.d1 = toc(t1);
             end
             
-            token_info = result.info;
-            num = result.values;
+% % % %             token_info = result.info;
+% % % %             num = result.values;
             
             %[token_info,num]
             
-            t2 = tic;
-            %NOTE: We're not changing the parent which is currently 0 based
-            %Ideally we could pass this into the parser ...
-            %2) start
-            token_info(2,:) = token_info(2,:)+1; %off by 1, might change code
-            %6) 
-            token_info(6,:) = token_info(6,:)+1; %same here, this could change
-            %temp = token_info(7:8,:);
-            obj.numeric_data = num;
-            obj.d2 = toc(t2);
+% %             t2 = tic;
+% %             %NOTE: We're not changing the parent which is currently 0 based
+% %             %Ideally we could pass this into the parser ...
+% %             %2) start
+% %             token_info(2,:) = token_info(2,:)+1; %off by 1, might change code
+% %             %6) 
+% %             token_info(6,:) = token_info(6,:)+1; %same here, this could change
+% %             %temp = token_info(7:8,:);
+% %             
+% %             obj.d2 = toc(t2);
             
-            obj.info = token_info;
+            obj.numeric_data = result.values;
+            obj.info = result.info;
             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
             obj.ns_per_token = 1e9*obj.d1/length(obj.numeric_data);
         end

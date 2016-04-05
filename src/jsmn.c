@@ -432,6 +432,7 @@ void jsmn_init(jsmn_parser *parser) {
 	parser->pos = -1;
 	parser->toknext = 0;
 	parser->toksuper = -1;
+    parser->is_key = false;
 }
 
 
@@ -439,14 +440,16 @@ void jsmn_init(jsmn_parser *parser) {
 void refill_parser(jsmn_parser *parser,    
         unsigned int parser_position,
         unsigned int next_token_index,
-        int super_token_index){
+        int super_token_index,
+        int is_key){
     
     
-    //refill_parser(parser,parser_position,next_token_index,super_token_index)
+    //refill_parser(parser,parser_position,next_token_index,super_token_index,false)
     
     parser->pos = parser_position;
     parser->toknext = next_token_index;
     parser->toksuper = super_token_index;
+    parser->is_key = is_key;
 }
 
 //Parse JSON string and fill tokens.
@@ -532,7 +535,11 @@ int jsmn_parse(jsmn_parser *parser,
     
         switch(js[parser_position]){
         case '"':
-            goto parse_string;
+            if (parser->is_key){
+                goto parse_key;
+            }else{
+                goto parse_string;
+            }
         case '-': 
         case '0': 
         case '1': 
@@ -568,7 +575,7 @@ int jsmn_parse(jsmn_parser *parser,
 //========================================================================= 
 parse_object:
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
 
@@ -577,11 +584,11 @@ parse_object:
     token = &tokens[next_token_index++];
 
     token->type   = JSMN_OBJECT;
-    token->start  = parser_position;
-    token->end    = -1;
+    token->start  = parser_position+1;
+    //token->end    = -1;
     //token->size //Handled below
     token->parent = super_token_index;
-    token->token_after_close = -1;
+    //token->token_after_close = -1;
 
     *values++ = 0;
 
@@ -605,6 +612,9 @@ parse_object:
             //Found first attribute
             goto parse_key;
         case '}':
+            
+            //TODO: We could throw some code in here ...
+            
             //We have an empty object
             goto close_object;
         default:
@@ -617,18 +627,18 @@ parse_object:
 //=========================================================================   
 parse_array:
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     //Initialization
     //-----------------------------
     token = &tokens[next_token_index++];
 
-    token->end    = -1;
+    //token->end    = -1;
     //token->size   = 0; Handled below
-    token->token_after_close = -1;
+    //token->token_after_close = -1;
     token->type   = JSMN_ARRAY;
-    token->start  = parser_position;
+    token->start  = parser_position+1;
     token->parent = super_token_index;
 
     *values++ = 0;
@@ -700,6 +710,8 @@ close_object:
        super_token = &tokens[super_token_index];
     } //else{ empty object }
 
+    
+    
     //Note, we don't handle size because size is only incremented
     //by attributes
     //super_token->size = super_token_size;
@@ -707,7 +719,7 @@ close_object:
     //Now we should be at the '{', but we still
     //need to move up to its parent since we are closing
     //the object as well, not just the attribute
-    super_token->token_after_close = next_token_index;
+    super_token->token_after_close = next_token_index+1;
     super_token->end = parser_position + 1;
 
     if(super_token->parent == -1){
@@ -727,8 +739,7 @@ close_object:
 //                         Closing an Array   ']'   
 //========================================================================= 
 close_array:
-    super_token->token_after_close = next_token_index;
-    //This is Matlab based, we should add on a flag for this ...
+    super_token->token_after_close = next_token_index+1;
     super_token->end = parser_position + 1;
     super_token->size = super_token_size;
 
@@ -750,18 +761,17 @@ close_array:
 parse_key:
 
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,1);
         return JSMN_ERROR_NOMEM;
     }
     
     token = &tokens[next_token_index++];
     token->type   = JSMN_STRING; //Different type?
-    //TODO: For Matlab we could add 2 instead of 1
-    token->start  = parser_position+1;
+    token->start  = parser_position+2;
     //token->end  <= defined in loop
     //token->size <= not currently defined ...
     token->parent = super_token_index;
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
 
     *values++ = 0;
 
@@ -822,18 +832,17 @@ parse_key:
 parse_string:
 
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
 
     token = &tokens[next_token_index++];
     token->type   = JSMN_STRING;
-    //TODO: For Matlab we could add 2 instead of 1
-    token->start  = parser_position+1;
+    token->start  = parser_position+2;
     //token->end  <= defined in loop
     //token->size <= not currently defined ...
     token->parent = super_token_index;
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
 
     *values++ = 0;
 
@@ -923,7 +932,7 @@ parse_comma:
 
 parse_number:
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
@@ -931,7 +940,7 @@ parse_number:
     token = &tokens[next_token_index++];
     token->size   = 1;
     token->type   = JSMN_NUMBER;
-    token->start  = parser_position;
+    token->start  = parser_position+1;
     token->parent = super_token_index;
 
     *values++ = string_to_double(js+parser_position,&pEndNumber);
@@ -942,7 +951,7 @@ parse_number:
     //Note, this is off by 1, which is good
     //when put into Matlab
     parser_position = token->end = (int)(pEndNumber - js);                      
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
     parser_position--; //backtrack so we terminate on the #
 
     goto process_end_of_token;
@@ -952,18 +961,22 @@ parse_number:
 //                        Parsing a Null 'null'
 //=========================================================================    
 parse_null:
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
+        return JSMN_ERROR_NOMEM;
+    }    
     super_token_size++;
 
     token = &tokens[next_token_index++];
     token->type   = JSMN_NUMBER;
-    token->start  = parser_position;
+    token->start  = parser_position+1;
     //TODO: Error check null - make optional with compile flag
     parser_position  += 3; //advance to final 'l' in 'null'
     //1 based indexing ...
     token->end    = parser_position+1;
     token->size   = 1;
     token->parent = super_token_index;                     
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
     *values++ = MX_NAN;
 
     goto process_end_of_token;
@@ -975,21 +988,21 @@ parse_null:
 parse_true:
     //------------  Start of True Token  --------------
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
 
     token = &tokens[next_token_index++];
     token->type   = JSMN_LOGICAL;
-    token->start  = parser_position;
+    token->start  = parser_position+1;
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
     //1 based indexing ...
     token->end    = parser_position+1;
     token->size   = 1;
     token->parent = super_token_index;                    
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
     *values++ = 1;
 
     goto process_end_of_token;
@@ -1000,21 +1013,21 @@ parse_true:
 parse_false:
     //------------  Start of False Token  --------------
     if (next_token_index >= num_tokens) {
-        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        refill_parser(parser,parser_position,next_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
 
     token = &tokens[next_token_index++];
     token->type   = JSMN_LOGICAL;
-    token->start  = parser_position;
+    token->start  = parser_position+1;
     //TODO: Error check true - make optional with compile flag
     parser_position  += 4; //advance to final 'e' in 'false'
     //1 based indexing ...
     token->end    = parser_position+1;
     token->size   = 1;
     token->parent = super_token_index;
-    token->token_after_close = next_token_index;
+    token->token_after_close = next_token_index+1;
     *values++  = 0;
 
     goto process_end_of_token;

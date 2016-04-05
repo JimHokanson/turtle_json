@@ -7,7 +7,21 @@ for i = 1:1
   
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\canada.json'; 
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\citm_catalog.json'; 
-file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\1.json'; 
+file_path = 'H:\example_data\1.json'; 
+
+tic; 
+for i = 1:10
+wtf = read_to_uint8(file_path); 
+end
+toc;
+
+tic; 
+for i = 1:10
+wtf = sl.io.fileRead(file_path,'*uint8');
+end
+toc;
+
+
 
 file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
 file_name = 'testfile_new.wcon';
@@ -16,7 +30,7 @@ file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,10);
 t3 = tic;
 for i = 1:10
-%     jt = json.tokens(file_path);
+    %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'n_tokens',7787391);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
@@ -38,7 +52,9 @@ fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 %0.359798, 0.15692, 1.58492 //Complete state machine
 %0.375252, 0.16457, 1.66198
 %
-%0.442107, 0.155828, 1.57115 //Fixed a bug 
+%0.442107, 0.155828, 1.57115 //Fixed a bug
+%
+%0.2764, 0.168005, 1.69757 //Removed c to Matlab discrepancies
 
 %No math
 %0.4,

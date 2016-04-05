@@ -1,5 +1,7 @@
 function output = get_parsed_data(obj,varargin)
 
+%This is old ...
+
 in.collapse_array = true;
 in = sl.in.processVarargin(in,varargin);
 

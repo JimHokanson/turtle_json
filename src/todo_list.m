@@ -5,6 +5,18 @@
 4) Change parser variable names
 5) Remove pointless value setting (i.e. initialization to -1)
 
+
+
+%Ugly hack to speed things up:
+%- create separate pathways for objects and array processing
+
+
+
+
+
+
+
+
 super_tokens
 1) start
 2) end

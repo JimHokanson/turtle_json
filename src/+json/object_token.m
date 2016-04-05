@@ -11,9 +11,19 @@ classdef object_token
         attribute_indices
     end
     
-    properties
+    properties (Dependent)
         attribute_types
         attribute_sizes
+    end
+    
+    methods
+        function value = get.attribute_types(obj)
+            %TODO: replace with strings
+            value = obj.parse_object.info(1,obj.attribute_indices);
+        end
+        function value = get.attribute_sizes(obj)
+            value = obj.parse_object.info(4,obj.attribute_indices);
+        end
     end
     
     properties (Hidden)
@@ -55,11 +65,25 @@ classdef object_token
             obj.attribute_names = a_names;
         end
         function output = get_token(obj,name)
-           I = obj.map(name);
-           full_name = [obj.full_name '.' name];
-           index = obj.attribute_indices(I);
-           type = obj.parse_object.info(1,index);
-           output = json.array_token(name,full_name,index,obj.parse_object);
+            I = obj.map(name);
+            full_name = [obj.full_name '.' name];
+            index = obj.attribute_indices(I);
+            
+            p = obj.parse_object;
+            
+            type = p.info(1,index);
+            
+            switch type
+                case 1
+                    error('Not yet implemented');
+                case 2
+                    output = json.array_token(name,full_name,index,p);
+                case 3
+                    output = h__parse_string(p.file_string,p.info,index);
+                otherwise
+                    error('Not yet implemented')
+            end
+            
         end
     end
     

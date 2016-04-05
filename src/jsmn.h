@@ -59,6 +59,7 @@ typedef struct {
 	unsigned int pos; /* offset in the JSON string */
 	unsigned int toknext; /* next token to allocate */
 	int toksuper; /* superior token node, object, array, or attribute */
+    int is_key;
 } jsmn_parser;
 
 /**
