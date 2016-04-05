@@ -6,6 +6,7 @@ classdef tokens
     
     properties
        file_string
+       types
        info
        %1) Type
        %2) Start
@@ -14,10 +15,10 @@ classdef tokens
        %5) Parent Index - 0 based 
        %6) Next Object - 0 based
        
+       
        numeric_data
        d0
        d1
-       d2
        chars_per_token
        ns_per_token
     end
@@ -69,6 +70,7 @@ classdef tokens
             %   json.stringToTokens
             %   json.fileToTokens
             
+            in.chars_per_token = 0;
             in.n_tokens = 0;
             in.raw_string = -1;
             in = sl.in.processVarargin(in,varargin);
@@ -81,6 +83,8 @@ classdef tokens
                 t1 = tic;
                 if in.n_tokens
                     result = jsmn_mex(uint8_data,in.n_tokens);
+                elseif in.chars_per_token
+                    result = jsmn_mex(uint8_data,length(obj.file_string)/in.chars_per_token);
                 else
                     result = jsmn_mex(uint8_data);
                 end
@@ -92,11 +96,16 @@ classdef tokens
                 t1 = tic;
                 if in.n_tokens
                     result = jsmn_mex(in.raw_string,in.n_tokens);
+                elseif in.chars_per_token
+                    result = jsmn_mex(in.raw_string,length(obj.file_string)/in.chars_per_token);
                 else
                     result = jsmn_mex(in.raw_string);
                 end
                 obj.d1 = toc(t1);
             end
+            
+            obj.types = result.types;
+            
             
 % % % %             token_info = result.info;
 % % % %             num = result.values;

@@ -17,14 +17,14 @@ extern "C" {
  * 	o String
  * 	o Other primitive: number, boolean (true/false) or null
  */
-typedef enum {
-	JSMN_UNDEFINED = 0,
-	JSMN_OBJECT = 1,
-	JSMN_ARRAY = 2,
-	JSMN_STRING = 3,
-	JSMN_NUMBER = 4,
-    JSMN_LOGICAL = 5
-} jsmntype_t;
+//typedef enum {
+#define JSMN_UNDEFINED 0
+#define JSMN_OBJECT 1
+#define JSMN_ARRAY 2
+#define JSMN_STRING 3
+#define JSMN_NUMBER 4
+#define JSMN_LOGICAL 5
+//} jsmntype_t;
 
 enum jsmnerr {
 	/* Not enough tokens were provided */
@@ -43,7 +43,7 @@ enum jsmnerr {
  * @param		end		end position in JSON data string
  */
 typedef struct {
-	jsmntype_t type;
+	//jsmntype_t type;
 	int start;
 	int end;
 	int size;
@@ -57,7 +57,7 @@ typedef struct {
  */
 typedef struct {
 	unsigned int pos; /* offset in the JSON string */
-	unsigned int toknext; /* next token to allocate */
+	int toknext; /* next token to allocate */
 	int toksuper; /* superior token node, object, array, or attribute */
     int is_key;
 } jsmn_parser;

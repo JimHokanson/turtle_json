@@ -33,6 +33,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     mxArray *output_info;
     mxArray *output_values;
+    mxArray *output_types;
     
     mwSize n_tokens_allocated;
     mwSize n_tokens_to_allocate;
@@ -49,7 +50,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     jsmntok_t *t;
     double *values;
-    uint8_t *type;
+    uint8_t *types;
     
     
     
@@ -106,6 +107,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //----------------------------------------------------
     t = mxMalloc(n_tokens_to_allocate*sizeof(jsmntok_t));
     values = mxMalloc(n_tokens_to_allocate*sizeof(double));
+    types = mxMalloc(n_tokens_to_allocate);
     n_tokens_allocated = n_tokens_to_allocate;
     
     jsmn_init(&p);
@@ -113,7 +115,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     while (1) {
         //The main function call
         //------------------------------------------
-        parse_result = jsmn_parse(&p,json_string,string_byte_length,t,n_tokens_allocated,values);
+        parse_result = jsmn_parse(&p,json_string,string_byte_length,t,n_tokens_allocated,values,types);
         n_tokens_used = parse_result;
         
         if (parse_result >= 0){
@@ -144,8 +146,11 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
             n_tokens_to_allocate = 2*n_tokens_allocated;
         }
         
+        //mexPrintf("Trying to reallocate\n");
+        
         t = mxRealloc(t,n_tokens_to_allocate*sizeof(jsmntok_t));
         values = mxRealloc(values,n_tokens_to_allocate*8);
+        types = mxRealloc(types,n_tokens_to_allocate);
         n_tokens_allocated = n_tokens_to_allocate;
     }
     
@@ -165,11 +170,18 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxSetM(output_values, 1);
     mxSetN(output_values, n_tokens_used);
     
+    output_types = mxCreateNumericArray(0, 0, mxUINT8_CLASS, mxREAL);
+    mxSetData(output_types, types);
+    mxSetM(output_types, 1);
+    mxSetN(output_types, n_tokens_used);    
+    
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     mxAddField(plhs[0],"info");
     mxSetField(plhs[0],0,"info",output_info);
     mxAddField(plhs[0],"values");
     mxSetField(plhs[0],0,"values",output_values);
+    mxAddField(plhs[0],"types");
+    mxSetField(plhs[0],0,"types",output_types);
     
     
     

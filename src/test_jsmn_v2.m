@@ -27,15 +27,15 @@ file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analys
 file_name = 'testfile_new.wcon';
 file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
 file_path = fullfile(file_root,file_name);
-d1_all = zeros(1,10);
+d1_all = zeros(1,20);
 t3 = tic;
-for i = 1:10
+for i = 1:20
     %jt = json.tokens(file_path);
-	jt = json.tokens(file_path,'n_tokens',7787391);
+	jt = json.tokens(file_path,'chars_per_token',10);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
-fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
+fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
 %0.48724, 0.275296, 2.8141
 %0.492493, 0.277961, 2.8222
 %0.483474, 0.264727, 2.71777
@@ -55,6 +55,9 @@ fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 %0.442107, 0.155828, 1.57115 //Fixed a bug
 %
 %0.2764, 0.168005, 1.69757 //Removed c to Matlab discrepancies
+%
+%
+%
 
 %No math
 %0.4,
