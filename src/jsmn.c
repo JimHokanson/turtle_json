@@ -382,8 +382,8 @@ void parse_string_helper(const char *js, jsmntok_t *token, unsigned int *input_p
         //---------------------------------------------
         /* Backslash: Quoted symbol expected */
         if (c == '\\' && parser_position + 1 < len) {
-            parser_position++;
-            switch (js[parser_position]) {
+            //parser_position++;
+            switch (js[parser_position++]) {
                 /* Allowed escaped symbols */
                 case '\"':
                 case '/' :
@@ -422,7 +422,7 @@ void parse_string_helper(const char *js, jsmntok_t *token, unsigned int *input_p
         }
     }
     
-    mexErrMsgIdAndTxt("wtf:wtf16","Unable to find ");
+    mexErrMsgIdAndTxt("jsmn_mex:unterminated_string","Unable to find a terminating string quote");
 }
 
 
@@ -560,6 +560,7 @@ int jsmn_parse(jsmn_parser *parser,
         }    
         
     }
+    //----------------- End of (re)initialization -------------------------
     
     
 //=========================================================================
@@ -602,7 +603,7 @@ parse_object:
     switch (js[parser_position]){
         case '"':
             //Found first attribute
-            goto parse_string;
+            goto parse_key;
         case '}':
             //We have an empty object
             goto close_object;
@@ -744,6 +745,78 @@ close_array:
     }
 
 //=========================================================================
+//                        Parsing an attribute
+//=========================================================================
+parse_key:
+
+    if (next_token_index >= num_tokens) {
+        refill_parser(parser,parser_position,next_token_index,super_token_index);
+        return JSMN_ERROR_NOMEM;
+    }
+    
+    token = &tokens[next_token_index++];
+    token->type   = JSMN_STRING; //Different type?
+    //TODO: For Matlab we could add 2 instead of 1
+    token->start  = parser_position+1;
+    //token->end  <= defined in loop
+    //token->size <= not currently defined ...
+    token->parent = super_token_index;
+    token->token_after_close = next_token_index;
+
+    *values++ = 0;
+
+    parse_string_helper(js,token,&parser_position,len);
+    
+    while (is_whitespace[js[++parser_position]]){  
+    }
+
+    if (js[parser_position] == ':'){
+        //Make the attribute string the super token
+        super_token->size = ++super_token_size;
+        super_token = token;
+        super_token_is_string = true;
+        super_token_size = 0;
+        super_token_index = next_token_index - 1; 
+
+        //Advance now to the next token
+        while (is_whitespace[js[++parser_position]]){  
+        }
+
+        switch(js[parser_position]){
+            case '"':
+                goto parse_string;
+            case '-': 
+            case '0': 
+            case '1': 
+            case '2': 
+            case '3': 
+            case '4':
+            case '5': 
+            case '6': 
+            case '7': 
+            case '8': 
+            case '9':
+                goto parse_number;
+            case '{':
+                goto parse_object;
+            case '[':
+                goto parse_array;
+            case 't':
+                goto parse_true;
+            case 'f':
+                goto parse_false;
+            case 'n':
+                goto parse_null;
+            default:
+                mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
+        }
+    }else{
+        //TODO: provide more info (string and position)
+        mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
+    }
+    
+    
+//=========================================================================
 //                        Parsing a String '"'
 //========================================================================= 
 parse_string:
@@ -766,66 +839,10 @@ parse_string:
 
     parse_string_helper(js,token,&parser_position,len);
 
-    
-
-    //TODO: We may wish to make this a variable as well
-    if (super_token->type == JSMN_OBJECT){
-        //Then this is an attribute, move past : and parse
-        while (is_whitespace[js[++parser_position]]){  
-        }
-
-        if (js[parser_position] == ':'){
-            //Make the attribute string the super token
-            super_token->size = ++super_token_size;
-            super_token = token;
-            super_token_is_string = true;
-            super_token_size = 0;
-            super_token_index = next_token_index - 1; 
-
-            //Advance now to the next token
-            while (is_whitespace[js[++parser_position]]){  
-            }
-
-            switch(js[parser_position]){
-                case '"':
-                    goto parse_string;
-                case '-': 
-                case '0': 
-                case '1': 
-                case '2': 
-                case '3': 
-                case '4':
-                case '5': 
-                case '6': 
-                case '7': 
-                case '8': 
-                case '9':
-                    goto parse_number;
-                case '{':
-                    goto parse_object;
-                case '[':
-                    goto parse_array;
-                case 't':
-                    goto parse_true;
-                case 'f':
-                    goto parse_false;
-                case 'n':
-                    goto parse_null;
-                default:
-                    mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
-            }
-
-        }else{
-            //TODO: provide more info (string and position)
-            mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
-        }
-        
-    }else{
-        ++super_token_size;
-        //The string is not an attribute, so we could
-        // have another value, or close the current object/array
-        goto process_end_of_token;
-    }
+    ++super_token_size;
+    //The string is not an attribute, so we could
+    // have another value, or close the current object/array
+    goto process_end_of_token;
                      
 //=========================================================================
 //                        Parsing a Comma ','
@@ -839,6 +856,10 @@ parse_comma:
     // is the opening '{', not 'a'
     //
     //mexPrintf(",\n");
+    
+    while (is_whitespace[js[++parser_position]]){  
+    }
+    
     if (super_token_is_string){
         //This shouldn't be an interesting value ...
         //Should always be 1 (an attribute has 1 value)
@@ -847,42 +868,52 @@ parse_comma:
         super_token->size = super_token_size;
 
         super_token_index = super_token->parent;
-        super_token = &tokens[super_token_index];
-        super_token_size = super_token->size;
-    }
-
-    while (is_whitespace[js[++parser_position]]){  
-    }
-    //primitive required
-    switch (js[parser_position]){
-        case '-': 
-        case '0': 
-        case '1': 
-        case '2': 
-        case '3': 
-        case '4':
-        case '5': 
-        case '6': 
-        case '7': 
-        case '8': 
-        case '9':
-            goto parse_number;
-        case 'n':
-            goto parse_null;
-        case 't':
-            goto parse_true;
-        case 'f':
-            goto parse_false;
-        case '"':
-            goto parse_string;
-        case '{':
-            goto parse_object;
-        case '[':
-            goto parse_array;
-        default:
-            //mexPrintf("Current Position: %d\n",parser_position);
-            mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma"); 
-
+        super_token       = &tokens[super_token_index];
+        super_token_size  = super_token->size;
+        
+        if (js[parser_position] == '"'){
+            goto parse_key;    
+        }else{
+//             mexPrintf("Position: %d\n",parser_position);
+//             mexPrintf("Char 1: %c\n",js[parser_position-3]);
+//             mexPrintf("Char 1: %c\n",js[parser_position-2]);
+//             mexPrintf("Char 1: %c\n",js[parser_position-1]);
+//             mexPrintf("Char 1: %c\n",js[parser_position]);
+//             mexPrintf("Char 1: %c\n",js[parser_position+1]);
+            mexErrMsgIdAndTxt("jsmn_mex:no_key","Key expected");
+        }
+        
+    }else{
+        //primitive required
+        switch (js[parser_position]){
+            case '-': 
+            case '0': 
+            case '1': 
+            case '2': 
+            case '3': 
+            case '4':
+            case '5': 
+            case '6': 
+            case '7': 
+            case '8': 
+            case '9':
+                goto parse_number;
+            case 'n':
+                goto parse_null;
+            case 't':
+                goto parse_true;
+            case 'f':
+                goto parse_false;
+            case '"':
+                goto parse_string;
+            case '{':
+                goto parse_object;
+            case '[':
+                goto parse_array;
+            default:
+                //mexPrintf("Current Position: %d\n",parser_position);
+                mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");
+        }
     }
     
 //=========================================================================

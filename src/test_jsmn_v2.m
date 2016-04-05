@@ -16,6 +16,7 @@ file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,10);
 t3 = tic;
 for i = 1:10
+%     jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'n_tokens',7787391);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
@@ -36,7 +37,8 @@ fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 %
 %0.359798, 0.15692, 1.58492 //Complete state machine
 %0.375252, 0.16457, 1.66198
-
+%
+%0.442107, 0.155828, 1.57115 //Fixed a bug 
 
 %No math
 %0.4,

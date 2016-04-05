@@ -12,17 +12,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "matrix.h"
+
+#include "stdint.h"  //uint_8
 #include "mex.h"
 #include "jsmn.h"
 
-//Error code borrowed from:
-//  http://www.mathworks.com/matlabcentral/fileexchange/55972-json-encode---decode
-#define ERROR_MINRHS 1 // NYI
-#define ERROR_MAXRHS 2 // NYI
-#define ERROR_INVALID_ARGUMENT 3
-#define ERROR_MALLOC 4
-
-//  mex jsmn_mex.c jsmn.c
 
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 {
@@ -46,11 +40,18 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mwSize n_reallocations = 0;
     
     int parse_result;
+    
     char *json_string;
+    size_t string_byte_length;
+    
     jsmn_parser p;
+    
+    
     jsmntok_t *t;
     double *values;
-    size_t string_byte_length;
+    uint8_t *type;
+    
+    
     
     //Input Handling
     //---------------------------------------------------------------------
@@ -60,13 +61,11 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     if (mxIsUint8(prhs[0])){
         json_string = (char *)mxGetData(prhs[0]);
+        //We've padded with 0
         string_byte_length = mxGetNumberOfElements(prhs[0])-1;
         if (string_byte_length <= 1){
             mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
         }
-        //TODO: Check that the last character is a 0
-        //0,1,2,3
-        //1,2,3,4
         if (json_string[string_byte_length] != 0){
             mexErrMsgIdAndTxt("jsmn_mex:bad_uint8_input","Currently uint8 should be padded with a trailing zero");
         }
