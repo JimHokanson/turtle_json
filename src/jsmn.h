@@ -4,6 +4,7 @@
 //NYI
 //#define JSMN_ONE_BASED_INDICES 1
 
+#include <stdint.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -69,15 +70,16 @@ void jsmn_init(jsmn_parser *parser);
 
 void refill_parser(jsmn_parser *parser,    
         unsigned int parser_position,
-        unsigned int next_token_index,
-        int super_token_index);
+        int next_token_index,
+        int super_token_index,
+        int is_key);
 
 /**
  * Run JSON parser. It parses a JSON data string into and array of tokens, each describing
  * a single JSON object.
  */
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
-		jsmntok_t *tokens, unsigned int num_tokens, double *values);
+		jsmntok_t *tokens, unsigned int num_tokens, double *values , uint8_t *types);
 
 #ifdef __cplusplus
 }

@@ -22,8 +22,11 @@ end
 toc;
 
 
-
+if ismac
+file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';
+else
 file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
+end
 file_name = 'testfile_new.wcon';
 file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
 file_path = fullfile(file_root,file_name);
