@@ -41,6 +41,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
 
 	//Read file contents into buffer
 	fread(buffer, fileLen, 1, file);
+    buffer[fileLen] = 0;
 	fclose(file);
 
 	//Do what ever with buffer
