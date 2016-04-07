@@ -45,7 +45,7 @@ enum jsmnerr {
  */
 typedef struct {
 	//jsmntype_t type;
-	int start;
+	//int start;
 	int end;
 	int size;
 	int parent;
@@ -79,7 +79,7 @@ void refill_parser(jsmn_parser *parser,
  * a single JSON object.
  */
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
-		jsmntok_t *tokens, unsigned int num_tokens, double *values , uint8_t *types);
+		jsmntok_t *tokens, unsigned int num_tokens, double *values , uint8_t *types, int *starts);
 
 #ifdef __cplusplus
 }

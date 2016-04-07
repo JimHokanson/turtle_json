@@ -353,7 +353,7 @@ double string_to_double(const char *p,char **char_offset) {
 //                  String Parsing
 //-------------------------------------------------------------------------
 //-------------------------------------------------------------------------
-void parse_string_helper(const char *js, jsmntok_t *token, unsigned int *input_parser_position, size_t len){
+void parse_string_helper(const char *js, unsigned int *input_parser_position, size_t len){
     
     //TODO: This function needs work
     
@@ -373,7 +373,7 @@ void parse_string_helper(const char *js, jsmntok_t *token, unsigned int *input_p
             //We're pointing to the " in c
             //which in Matlab points to the character before
             //c
-            token->end = parser_position;
+            
             *input_parser_position = parser_position;
             return;
             //goto parse_string_end;
@@ -462,7 +462,8 @@ int jsmn_parse(jsmn_parser *parser,
         jsmntok_t *tokens, 
         unsigned int num_tokens,
         double *values,
-        uint8_t *types) {
+        uint8_t *types,
+        int *starts) {
     
     /*
      *  Inputs
@@ -512,8 +513,12 @@ int jsmn_parse(jsmn_parser *parser,
         
         //Need + 1 because we do:
         //*types++; so we are constantly point 1 ahead ...
-        types = &types[current_token_index] + 1;
+        //assign 1st value (current_token_index == 0) then
+        //point to 2
+        //types = &types[current_token_index] + 1;
         values = &values[current_token_index] + 1;
+        
+        //starts = &starts[current_token_index];
         
         //mexPrintf("wtf: %d\n",types-types_array);
         //mexPrintf("wtf2: %d\n",current_token_index);
@@ -606,16 +611,21 @@ parse_object:
     //-----------------------------
     token = &tokens[++current_token_index];
 
-    *types++ = JSMN_OBJECT;
+    //*types++ = JSMN_OBJECT;
+    
+    types[current_token_index] = JSMN_OBJECT;
     
     //token->type   = JSMN_OBJECT;
-    token->start  = parser_position+1;
+    //token->start  = parser_position+1;
+    starts[current_token_index] = parser_position+1;
+    
     //token->end    = -1;
     //token->size //Handled below
     token->parent = super_token_index;
     //token->token_after_close = -1;
 
     *values++ = 0;
+    
 
     //Update parent to reflect that it has 1 more child
     super_token->size = ++super_token_size;
@@ -666,8 +676,13 @@ parse_array:
     //token->size   = 0; Handled below
     //token->token_after_close = -1;
     //token->type   = JSMN_ARRAY;
-    *types++ = JSMN_ARRAY;
-    token->start  = parser_position+1;
+    //*types++ = JSMN_ARRAY;
+    types[current_token_index] = JSMN_ARRAY;
+    
+    //token->start  = parser_position+1;
+    starts[current_token_index] = parser_position+1;
+    
+    
     token->parent = super_token_index;
 
     *values++ = 0;
@@ -807,9 +822,13 @@ parse_key:
     token = &tokens[++current_token_index];
     //token->type   = JSMN_STRING; //Different type?
     
-    *types++ = JSMN_STRING;
+    //*types++ = JSMN_STRING;
+    types[current_token_index] = JSMN_STRING;
     
-    token->start  = parser_position+2;
+    
+    //token->start  = parser_position+2;
+    starts[current_token_index] = parser_position+2;
+    
     //token->end  <= defined in loop
     //token->size <= not currently defined ...
     token->parent = super_token_index;
@@ -817,7 +836,8 @@ parse_key:
 
     *values++ = 0;
 
-    parse_string_helper(js,token,&parser_position,len);
+    parse_string_helper(js,&parser_position,len);  
+    token->end = parser_position;
     
     while (is_whitespace[js[++parser_position]]){  
     }
@@ -880,9 +900,15 @@ parse_string:
     }
 
     token = &tokens[++current_token_index];
-    *types++ = JSMN_STRING;
+    //*types++ = JSMN_STRING;
+    types[current_token_index] = JSMN_STRING;
+    
+    
     //token->type   = JSMN_STRING;
-    token->start  = parser_position+2;
+    //token->start  = parser_position+2;
+    
+    starts[current_token_index] = parser_position+2;
+    
     //token->end  <= defined in loop
     //token->size <= not currently defined ...
     token->parent = super_token_index;
@@ -890,8 +916,9 @@ parse_string:
 
     *values++ = 0;
 
-    parse_string_helper(js,token,&parser_position,len);
-
+    parse_string_helper(js,&parser_position,len);
+    token->end = parser_position;
+    
     ++super_token_size;
     //The string is not an attribute, so we could
     // have another value, or close the current object/array
@@ -985,13 +1012,21 @@ parse_number:
     }
     super_token_size++;
 
+    //mexPrintf("Current token index: %d\n",current_token_index);
+    
     token = &tokens[++current_token_index];
     token->size   = 1;
     //token->type   = JSMN_NUMBER;
+
     
-    *types++ = JSMN_NUMBER;
     
-    token->start  = parser_position+1;
+    //*types++ = JSMN_NUMBER;
+    types[current_token_index] = JSMN_NUMBER;
+    
+    //token->start  = parser_position+1;
+    
+    starts[current_token_index] = parser_position+1;
+    
     token->parent = super_token_index;
 
     *values++ = string_to_double(js+parser_position,&pEndNumber);
@@ -1020,10 +1055,14 @@ parse_null:
 
     token = &tokens[++current_token_index];
     //token->type   = JSMN_NUMBER;
-    *types++ = JSMN_NUMBER;
+    //*types++ = JSMN_NUMBER;
+    
+    types[current_token_index] = JSMN_NUMBER;
+    
+    //token->start  = parser_position+1;
+    starts[current_token_index] = parser_position+1;
     
     
-    token->start  = parser_position+1;
     //TODO: Error check null - make optional with compile flag
     parser_position  += 3; //advance to final 'l' in 'null'
     //1 based indexing ...
@@ -1050,10 +1089,13 @@ parse_true:
     token = &tokens[++current_token_index];
     //token->type   = JSMN_LOGICAL;
     
-    *types++ = JSMN_LOGICAL;
+    //*types++ = JSMN_LOGICAL;
+    types[current_token_index] = JSMN_LOGICAL;
     
+    //token->start  = parser_position+1;
     
-    token->start  = parser_position+1;
+    starts[current_token_index] = parser_position+1;
+    
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
     //1 based indexing ...
@@ -1079,10 +1121,14 @@ parse_false:
     token = &tokens[++current_token_index];
     //token->type   = JSMN_LOGICAL;
     
-    *types++ = JSMN_LOGICAL;
+    //*types++ = JSMN_LOGICAL;
+    types[current_token_index] = JSMN_LOGICAL;
     
     
-    token->start  = parser_position+1;
+    //token->start  = parser_position+1;
+    
+    starts[current_token_index] = parser_position+1;
+    
     //TODO: Error check true - make optional with compile flag
     parser_position  += 4; //advance to final 'e' in 'false'
     //1 based indexing ...
