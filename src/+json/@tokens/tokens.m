@@ -8,6 +8,8 @@ classdef tokens
        file_string
        types
        info
+       starts
+       ends
        %1) Type
        %2) Start
        %3) End
@@ -105,6 +107,8 @@ classdef tokens
             end
             
             obj.types = result.types;
+            obj.starts = result.starts;
+            obj.ends = result.ends;
             
             
 % % % %             token_info = result.info;

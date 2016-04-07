@@ -463,7 +463,8 @@ int jsmn_parse(jsmn_parser *parser,
         unsigned int num_tokens,
         double *values,
         uint8_t *types,
-        int *starts) {
+        int *starts,
+        int *ends) {
     
     /*
      *  Inputs
@@ -764,8 +765,12 @@ close_object:
     //need to move up to its parent since we are closing
     //the object as well, not just the attribute
     super_token->token_after_close = current_token_index+2;
-    super_token->end = parser_position + 1;
-
+    
+    
+    //super_token->end = parser_position + 1;
+    ends[super_token_index] = parser_position + 1;
+    
+    
     if(super_token->parent == -1){
         goto process_end_of_file;
     }else{
@@ -784,7 +789,10 @@ close_object:
 //========================================================================= 
 close_array:
     super_token->token_after_close = current_token_index+2;
-    super_token->end  = parser_position + 1;
+    
+    //super_token->end  = parser_position + 1;
+    ends[super_token_index] = parser_position + 1;
+    
     super_token->size = super_token_size;
 
     //mexPrintf("SuperTokenIndex: %d\n",super_token_index);
@@ -837,7 +845,7 @@ parse_key:
     *values++ = 0;
 
     parse_string_helper(js,&parser_position,len);  
-    token->end = parser_position;
+    ends[current_token_index] = parser_position;
     
     while (is_whitespace[js[++parser_position]]){  
     }
@@ -917,7 +925,8 @@ parse_string:
     *values++ = 0;
 
     parse_string_helper(js,&parser_position,len);
-    token->end = parser_position;
+    //token->end = parser_position;
+    ends[current_token_index] = parser_position;
     
     ++super_token_size;
     //The string is not an attribute, so we could
@@ -1036,7 +1045,9 @@ parse_number:
 
     //Note, this is off by 1, which is good
     //when put into Matlab
-    parser_position = token->end = (int)(pEndNumber - js);                      
+    parser_position = (int)(pEndNumber - js);  
+    ends[current_token_index] = parser_position;
+    
     token->token_after_close = current_token_index+2;
     parser_position--; //backtrack so we terminate on the #
 
@@ -1066,7 +1077,8 @@ parse_null:
     //TODO: Error check null - make optional with compile flag
     parser_position  += 3; //advance to final 'l' in 'null'
     //1 based indexing ...
-    token->end    = parser_position+1;
+    //token->end    = parser_position+1;
+    ends[current_token_index] = parser_position+1;
     token->size   = 1;
     token->parent = super_token_index;                     
     token->token_after_close = current_token_index+2;
@@ -1099,7 +1111,8 @@ parse_true:
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
     //1 based indexing ...
-    token->end    = parser_position+1;
+    //token->end    = parser_position+1;
+    ends[current_token_index] = parser_position+1;
     token->size   = 1;
     token->parent = super_token_index;                    
     token->token_after_close = current_token_index+2;
@@ -1126,13 +1139,15 @@ parse_false:
     
     
     //token->start  = parser_position+1;
-    
     starts[current_token_index] = parser_position+1;
     
     //TODO: Error check true - make optional with compile flag
     parser_position  += 4; //advance to final 'e' in 'false'
     //1 based indexing ...
-    token->end    = parser_position+1;
+    //token->end    = parser_position+1;
+    
+    ends[current_token_index] = parser_position+1;
+    
     token->size   = 1;
     token->parent = super_token_index;
     token->token_after_close = current_token_index+2;

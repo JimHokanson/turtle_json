@@ -35,6 +35,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxArray *output_values;
     mxArray *output_types;
     mxArray *output_starts;
+    mxArray *output_ends;
     
     mwSize n_tokens_allocated;
     mwSize n_tokens_to_allocate;
@@ -53,6 +54,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     double *values;
     uint8_t *types;
     int *starts;
+    int *ends;
     
     
     
@@ -111,6 +113,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     values = mxMalloc(n_tokens_to_allocate*sizeof(double));
     types = mxMalloc(n_tokens_to_allocate);
     starts = mxMalloc(n_tokens_to_allocate*sizeof(int));
+    ends = mxMalloc(n_tokens_to_allocate*sizeof(int));
     
     n_tokens_allocated = n_tokens_to_allocate;
     
@@ -119,7 +122,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     while (1) {
         //The main function call
         //------------------------------------------
-        parse_result = jsmn_parse(&p,json_string,string_byte_length,t,n_tokens_allocated,values,types,starts);
+        parse_result = jsmn_parse(&p,json_string,string_byte_length,t,n_tokens_allocated,values,types,starts,ends);
         n_tokens_used = parse_result;
         
         if (parse_result >= 0){
@@ -156,6 +159,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         values = mxRealloc(values,n_tokens_to_allocate*8);
         types = mxRealloc(types,n_tokens_to_allocate);
         starts = mxRealloc(starts,n_tokens_to_allocate*sizeof(int));
+        ends = mxRealloc(ends,n_tokens_to_allocate*sizeof(int));
         
         n_tokens_allocated = n_tokens_to_allocate;
     }
@@ -181,10 +185,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxSetM(output_types, 1);
     mxSetN(output_types, n_tokens_used);  
     
-        output_starts = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
+    output_starts = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
     mxSetData(output_starts, starts);
     mxSetM(output_starts, 1);
-    mxSetN(output_starts, n_tokens_used);    
+    mxSetN(output_starts, n_tokens_used);
+    
+    output_ends = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
+    mxSetData(output_ends, ends);
+    mxSetM(output_ends, 1);
+    mxSetN(output_ends, n_tokens_used);  
     
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
@@ -196,6 +205,8 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxSetField(plhs[0],0,"types",output_types);
     mxAddField(plhs[0],"starts");
     mxSetField(plhs[0],0,"starts",output_starts);
+    mxAddField(plhs[0],"ends");
+    mxSetField(plhs[0],0,"ends",output_ends);
     
     
     
