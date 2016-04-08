@@ -139,15 +139,26 @@ classdef tokens
             obj.ns_per_token = 1e9*obj.d1/length(obj.numeric_data);
         end
         function root = get_root_token(obj)
-            j = obj.info;
-            if j(1,1) == 1
-                root = json.object_token('root','root',1,obj);
-            elseif j(1,1) == 2
-                error('Not yet implemented')
+            j = obj.types;
+            switch obj.types(1)
+                case 1
+                    root = json.object_token('root','root',1,obj);
+            	case 2
+                    error('Not yet implemented')
                 %output = parse_array(str,j,1,numeric_data,in);
-            else
-                error('Unexpected parent object')
+                otherwise
+                    error('Unexpected parent object')
             end 
+        end
+        function output = viewOldInfo(obj,indices)
+           output = [num2cell(obj.types(indices));
+               num2cell(obj.starts(indices));
+               num2cell(obj.ends(indices));
+               num2cell(obj.sizes(indices));
+               num2cell(obj.parents(indices));
+               num2cell(obj.tokens_after_close(indices));
+               num2cell(obj.numeric_data(indices))];
+           output = [{'type','start','end','size','parent','token_after_close','value'}' output];
         end
     end
     
