@@ -7,9 +7,12 @@ classdef tokens
     properties
        file_string
        types
-       info
+       %info
        starts
        ends
+       sizes
+       parents
+       tokens_after_close
        %1) Type
        %2) Start
        %3) End
@@ -109,6 +112,9 @@ classdef tokens
             obj.types = result.types;
             obj.starts = result.starts;
             obj.ends = result.ends;
+            obj.sizes = result.sizes;
+            obj.parents = result.parents;
+            obj.tokens_after_close = result.tokens_after_close;
             
             
 % % % %             token_info = result.info;
@@ -128,7 +134,7 @@ classdef tokens
 % %             obj.d2 = toc(t2);
             
             obj.numeric_data = result.values;
-            obj.info = result.info;
+            %obj.info = result.info;
             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
             obj.ns_per_token = 1e9*obj.d1/length(obj.numeric_data);
         end

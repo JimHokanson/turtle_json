@@ -43,14 +43,14 @@ enum jsmnerr {
  * @param		start	start position in JSON data string
  * @param		end		end position in JSON data string
  */
-typedef struct {
-	//jsmntype_t type;
-	//int start;
-	//int end;
-	int size;
-	int parent;
-    int token_after_close; //
-} jsmntok_t;
+// typedef struct {
+// 	//jsmntype_t type;
+// 	//int start;
+// 	//int end;
+// 	//int size;
+// 	//int parent;
+//     //int token_after_close; //
+// } jsmntok_t;
 
 /**
  * JSON parser. Contains an array of token blocks available. Also stores
@@ -78,8 +78,9 @@ void refill_parser(jsmn_parser *parser,
  * Run JSON parser. It parses a JSON data string into and array of tokens, each describing
  * a single JSON object.
  */
-int jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
-		jsmntok_t *tokens, unsigned int num_tokens, double *values , uint8_t *types, int *starts, int *ends);
+int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, 
+        unsigned int num_tokens, double *values , uint8_t *types, 
+        int *starts, int *ends, int *sizes, int *parents, int *tokens_after_close);
 
 #ifdef __cplusplus
 }
