@@ -81,7 +81,7 @@ classdef object_token
                 case 2
                     output = json.array_token(name,full_name,index,p);
                 case 3
-                    output = h__parse_string(p.file_string,index);
+                    output = h__parse_string(p.file_string,p,index);
                 otherwise
                     error('Not yet implemented')
             end

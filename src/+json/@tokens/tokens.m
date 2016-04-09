@@ -151,14 +151,15 @@ classdef tokens
             end 
         end
         function output = viewOldInfo(obj,indices)
-           output = [num2cell(obj.types(indices));
+           output = [num2cell(indices);
+               num2cell(obj.types(indices));
                num2cell(obj.starts(indices));
                num2cell(obj.ends(indices));
                num2cell(obj.sizes(indices));
                num2cell(obj.parents(indices));
                num2cell(obj.tokens_after_close(indices));
                num2cell(obj.numeric_data(indices))];
-           output = [{'type','start','end','size','parent','token_after_close','value'}' output];
+           output = [{'indices','type','start','end','size','parent','token_after_close','value'}' output];
         end
     end
     
