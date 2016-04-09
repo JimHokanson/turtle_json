@@ -57,7 +57,7 @@ enum jsmnerr {
  * the string being parsed now and current position in that string
  */
 typedef struct {
-	unsigned int position; /* offset in the JSON string */
+	int position; /* offset in the JSON string */
 	int current_token; /* index of current token */
 	int super_token; /* index of super token: object, array, or attribute */
     int is_key;
@@ -69,7 +69,7 @@ typedef struct {
 void jsmn_init(jsmn_parser *parser);
 
 void refill_parser(jsmn_parser *parser,    
-        unsigned int parser_position,
+        int parser_position,
         int current_token_index,
         int super_token_index,
         int is_key);

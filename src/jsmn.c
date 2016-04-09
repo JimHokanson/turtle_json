@@ -101,6 +101,10 @@ const double p1e_18[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 const double p1e_19[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000000001,0.0000000000000000002,0.0000000000000000003,0.0000000000000000004,0.0000000000000000005,0.0000000000000000006,0.0000000000000000007,0.0000000000000000008,0.0000000000000000009};
 const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000000001,0.00000000000000000002,0.00000000000000000003,0.00000000000000000004,0.00000000000000000005,0.00000000000000000006,0.00000000000000000007,0.00000000000000000008,0.00000000000000000009};
 
+//*p++                  js[parser_position++]    
+//*p   ==========       js[parser_position]
+//++p  ==========       ++parser_position
+
 double string_to_double(const char *p,char **char_offset) {
 
     /*
@@ -351,12 +355,12 @@ double string_to_double(const char *p,char **char_offset) {
 //=========================================================================
 //                          String Parsing
 //=========================================================================
-void parse_string_helper(const char *js, unsigned int *input_parser_position, size_t len){
+void parse_string_helper(const char *js, int *input_parser_position, size_t len){
     
     //TODO: This function needs work
     
     //      parse_string_helper(js,token,parser_position)
-    unsigned int parser_position = *input_parser_position;
+    int parser_position = *input_parser_position;
     char c;
     int i;
     
@@ -437,7 +441,7 @@ void jsmn_init(jsmn_parser *parser) {
 
 //TODO: Implement this so that the parser is valid upon return
 void refill_parser(jsmn_parser *parser,    
-        unsigned int parser_position,
+        int parser_position,
         int current_token_index,
         int super_token_index,
         int is_key){
@@ -479,7 +483,7 @@ int jsmn_parse(jsmn_parser *parser,
     
     //Parser local variables
     //--------------------------------------
-    unsigned int parser_position = parser->position;
+    int parser_position = parser->position;
     int current_token_index = parser->current_token;
     int super_token_index = parser->super_token;
     

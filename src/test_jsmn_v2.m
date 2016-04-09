@@ -17,7 +17,7 @@ for i = 1:10
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
-fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all)/2)
+fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
 
 
 tic; 

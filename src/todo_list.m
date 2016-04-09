@@ -6,7 +6,7 @@
 5) Remove pointless value setting (i.e. initialization to -1)
 6) create key type
 7) multiline macro refill check
-8) remove extra posiition variable in # parsing
+8) TRIED - NO GO remove extra posiition variable in # parsing
 
 %Ugly hack to speed things up:
 %- create separate pathways for objects and array processing
