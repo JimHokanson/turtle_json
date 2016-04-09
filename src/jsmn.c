@@ -428,26 +428,26 @@ void parse_string_helper(const char *js, unsigned int *input_parser_position, si
 //Parser initialization
 //----------------------------------
 void jsmn_init(jsmn_parser *parser) {
-	parser->pos = -1;
-	parser->toknext = 0;
-	parser->toksuper = -1;
-    parser->is_key = false;
+	parser->position      = -1;
+	parser->current_token = -1;
+	parser->super_token   = -1;
+    parser->is_key        = false;   
 }
 
 
 //TODO: Implement this so that the parser is valid upon return
 void refill_parser(jsmn_parser *parser,    
         unsigned int parser_position,
-        int next_token_index,
+        int current_token_index,
         int super_token_index,
         int is_key){
     
     
     //refill_parser(parser,parser_position,next_token_index,super_token_index,false)
     
-    parser->pos = parser_position;
-    parser->toknext = next_token_index;
-    parser->toksuper = super_token_index;
+    parser->position = parser_position;
+    parser->current_token = current_token_index;
+    parser->super_token = super_token_index;
     parser->is_key = is_key;
 }
 
@@ -479,10 +479,10 @@ int jsmn_parse(jsmn_parser *parser,
     
     //Parser local variables
     //--------------------------------------
-    unsigned int parser_position;
-    int next_token_index;
-    int current_token_index;
-    int super_token_index;
+    unsigned int parser_position = parser->position;
+    int current_token_index = parser->current_token;
+    int super_token_index = parser->super_token;
+    
     int num_tokens_minus_1 = num_tokens-1;
     
     //Frequently accessed super token attributes
@@ -492,45 +492,14 @@ int jsmn_parse(jsmn_parser *parser,
     //This was moved to a variable specifically for large arrays
     int super_token_size;
     
+    
 	char c;
     char *pEndNumber;
     
-    //jsmntype_t type;
-//     jsmntok_t null_super[1];
-//     jsmntok_t *token;
-//     jsmntok_t *super_token;
-    
-    //uint8_t *types_array = types;
-    
-    //parser back to local variables
-    parser_position   = parser->pos;
-    next_token_index  = parser->toknext;
-    super_token_index = parser->toksuper;
-    
-    current_token_index = next_token_index-1;
-    
     //reinitialize super if we've reallocated memory for the parser
-    if (super_token_index != -1){
-        
-        //Need + 1 because we do:
-        //*types++; so we are constantly point 1 ahead ...
-        //assign 1st value (current_token_index == 0) then
-        //point to 2
-        //types = &types[current_token_index] + 1;
-        //values = &values[current_token_index] + 1;
-        
-        //starts = &starts[current_token_index];
-        
-        //mexPrintf("wtf: %d\n",types-types_array);
-        //mexPrintf("wtf2: %d\n",current_token_index);
-        
-        //super_token = &tokens[super_token_index];
-        
+    if (super_token_index != -1){        
         super_token_is_string = types[super_token_index] == JSMN_STRING;
     }else{
-        //TODO: We should find the first character and make sure
-        //that it is [ or {
-        //super_token = null_super;
         super_token_is_string = false;
     }
 
@@ -619,7 +588,7 @@ parse_opening_object:
     if (current_token_index >= num_tokens_minus_1) {
         //mexPrintf("Object Position: %d\n",parser_position);
 
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     ++current_token_index;
@@ -687,7 +656,7 @@ parse_opening_array:
     if (current_token_index >= num_tokens_minus_1) {
         //mexPrintf("Array Position: %d\n",parser_position);
 
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     ++current_token_index;
@@ -861,7 +830,7 @@ parse_key:
     if (current_token_index >= num_tokens_minus_1) {
         //mexPrintf("Key Position: %d\n",parser_position);
 
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,1);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,1);
         return JSMN_ERROR_NOMEM;
     }
     ++current_token_index;
@@ -948,7 +917,7 @@ parse_string:
 
     if (current_token_index >= num_tokens_minus_1) {
         //mexPrintf("String Position: %d\n",parser_position);
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
 
@@ -1075,7 +1044,7 @@ parse_number:
 //         mexPrintf("Number Position: %d\n",parser_position);
 //         mexPrintf("Current TOken pos: %d\n",current_token_index);
 //         mexPrintf("p diff: %d\n",types-types_array);
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
@@ -1124,7 +1093,7 @@ parse_number:
 //=========================================================================    
 parse_null:
     if (current_token_index >= num_tokens_minus_1) {
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }    
     super_token_size++;
@@ -1165,7 +1134,7 @@ parse_null:
 parse_true:
     //------------  Start of True Token  --------------
     if (current_token_index >= num_tokens_minus_1) {
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
@@ -1207,7 +1176,7 @@ parse_true:
 parse_false:
     //------------  Start of False Token  --------------
     if (current_token_index >= num_tokens_minus_1) {
-        refill_parser(parser,parser_position,current_token_index+1,super_token_index,0);
+        refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;

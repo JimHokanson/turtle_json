@@ -158,7 +158,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         
         
         //I'm not thrilled with this approach but I think it will work
-        n_tokens_to_allocate = (mwSize )(1.2 * ((double)string_byte_length/p.pos) * n_tokens_allocated);
+        n_tokens_to_allocate = (mwSize )(1.2 * ((double)string_byte_length/p.position) * n_tokens_allocated);
         
         if (n_tokens_to_allocate == n_tokens_allocated){
             n_tokens_to_allocate = 2*n_tokens_allocated;
