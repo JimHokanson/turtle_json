@@ -348,11 +348,9 @@ double string_to_double(const char *p,char **char_offset) {
 
 
 
-//-------------------------------------------------------------------------
-//-------------------------------------------------------------------------
-//                  String Parsing
-//-------------------------------------------------------------------------
-//-------------------------------------------------------------------------
+//=========================================================================
+//                          String Parsing
+//=========================================================================
 void parse_string_helper(const char *js, unsigned int *input_parser_position, size_t len){
     
     //TODO: This function needs work
@@ -502,7 +500,7 @@ int jsmn_parse(jsmn_parser *parser,
 //     jsmntok_t *token;
 //     jsmntok_t *super_token;
     
-    uint8_t *types_array = types;
+    //uint8_t *types_array = types;
     
     //parser back to local variables
     parser_position   = parser->pos;
@@ -519,7 +517,7 @@ int jsmn_parse(jsmn_parser *parser,
         //assign 1st value (current_token_index == 0) then
         //point to 2
         //types = &types[current_token_index] + 1;
-        values = &values[current_token_index] + 1;
+        //values = &values[current_token_index] + 1;
         
         //starts = &starts[current_token_index];
         
@@ -528,7 +526,7 @@ int jsmn_parse(jsmn_parser *parser,
         
         //super_token = &tokens[super_token_index];
         
-        super_token_is_string = types_array[super_token_index] == JSMN_STRING;
+        super_token_is_string = types[super_token_index] == JSMN_STRING;
     }else{
         //TODO: We should find the first character and make sure
         //that it is [ or {
@@ -642,8 +640,8 @@ parse_opening_object:
     //token->parent = super_token_index;
     parents[current_token_index] = super_token_index;
     //token->token_after_close = -1;
-
-    *values++ = 0;
+    values[current_token_index] = 0;
+    //*values++ = 0;
     
 
     //Update parent to reflect that it has 1 more child
@@ -711,8 +709,8 @@ parse_opening_array:
     //token->parent = super_token_index;
     
     parents[current_token_index] = super_token_index;
-
-    *values++ = 0;
+    values[current_token_index] = 0;
+    //*values++ = 0;
 
     //Need to update the super token size
     
@@ -812,7 +810,7 @@ close_object:
         //super_token = &tokens[super_token_index];
         //super_token_size = super_token->size;
         super_token_size      = sizes[super_token_index];
-        super_token_is_string = types_array[super_token_index] == JSMN_STRING;
+        super_token_is_string = types[super_token_index] == JSMN_STRING;
 
         goto process_end_of_token;
     } 
@@ -847,7 +845,7 @@ close_array:
 //         mexPrintf("Sup index: %d\n",super_token_index);
 //         mexPrintf("Sup type: %d\n",types_array[super_token_index]);
         
-        super_token_is_string = types_array[super_token_index] == JSMN_STRING;
+        super_token_is_string = types[super_token_index] == JSMN_STRING;
 
 //         mexPrintf("Sup is string: %d\n",super_token_is_string);
         
@@ -886,8 +884,8 @@ parse_key:
     //We want to point to the 
     //token->token_after_close = current_token_index+2;
     //tokens_after_close[current_token_index] = current_token_index+2;
-
-    *values++ = 0;
+    values[current_token_index] = 0;
+    //*values++ = 0;
 
     parse_string_helper(js,&parser_position,len);  
     ends[current_token_index] = parser_position;
@@ -972,8 +970,8 @@ parse_string:
     
     //token->token_after_close = current_token_index+1;
     tokens_after_close[current_token_index] = current_token_index+1;
-    
-    *values++ = 0;
+    values[current_token_index] = 0;
+    //*values++ = 0;
 
     parse_string_helper(js,&parser_position,len);
     //token->end = parser_position;
@@ -1102,8 +1100,9 @@ parse_number:
     //token->parent = super_token_index;
     parents[current_token_index] = super_token_index;
 
-    *values++ = string_to_double(js+parser_position,&pEndNumber);
-
+    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
+    //values[current_token_index] = 0;
+    
     //TODO: Check pEndNumber
     //If pEndNumber = parser->pos then we have a bad char
 
@@ -1155,7 +1154,7 @@ parse_null:
     
     //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    *values++ = MX_NAN;
+    values[current_token_index] = MX_NAN;
 
     goto process_end_of_token;
 
@@ -1198,7 +1197,7 @@ parse_true:
     
     //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    *values++ = 1;
+    values[current_token_index] = 1;
 
     goto process_end_of_token;
 
@@ -1239,7 +1238,7 @@ parse_false:
     
     //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    *values++  = 0;
+    values[current_token_index] = 0;
 
     goto process_end_of_token;
                                 
@@ -1264,7 +1263,7 @@ process_end_of_token:
                }
             case ']':
                //TODO: Check that we've opened an array
-               if (types_array[super_token_index] == JSMN_ARRAY){
+               if (types[super_token_index] == JSMN_ARRAY){
                   goto close_array;
                }else{
 //             mexPrintf("Types: %d\n",types_array[0]);

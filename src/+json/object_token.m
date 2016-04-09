@@ -65,7 +65,7 @@ classdef object_token
             obj.attribute_indices = a_indices;
             obj.attribute_names = a_names;
         end
-        function output = get_token(obj,name)
+        function output = getToken(obj,name)
             
             %TODO: Surround with try catch on invalid key name
             I = obj.map(name);
@@ -75,15 +75,13 @@ classdef object_token
             
             p = obj.p;
             
-            type = p.info(1,index);
-            
-            switch type
+            switch p.types(index);
                 case 1
-                    error('Not yet implemented');
+                    output = json.object_token(name,full_name,index,p);
                 case 2
                     output = json.array_token(name,full_name,index,p);
                 case 3
-                    output = h__parse_string(p.file_string,p.info,index);
+                    output = h__parse_string(p.file_string,index);
                 otherwise
                     error('Not yet implemented')
             end

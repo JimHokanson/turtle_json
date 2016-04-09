@@ -138,7 +138,7 @@ classdef tokens
             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
             obj.ns_per_token = 1e9*obj.d1/length(obj.numeric_data);
         end
-        function root = get_root_token(obj)
+        function root = getRoot(obj)
             j = obj.types;
             switch obj.types(1)
                 case 1
