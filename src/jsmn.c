@@ -119,7 +119,7 @@ double string_to_double(const char *p,char **char_offset) {
     double value = 0;
     double exponent_value;
     bool negate;
-    int n_numeric_chars_plus_1;
+    int64_t n_numeric_chars_plus_1;
     char *number_start;
     
     if (*p == '-'){
@@ -492,19 +492,17 @@ int jsmn_parse(jsmn_parser *parser,
     //Frequently accessed super token attributes
     //------------------------------------------
     //This is true when inside an attribute
-    bool super_token_is_string; 
+    bool super_token_is_key; 
     //This was moved to a variable specifically for large arrays
     int super_token_size;
     
-    
-	char c;
     char *pEndNumber;
     
     //reinitialize super if we've reallocated memory for the parser
     if (super_token_index != -1){        
-        super_token_is_string = types[super_token_index] == JSMN_STRING;
+        super_token_is_key = types[super_token_index] == JSMN_KEY;
     }else{
-        super_token_is_string = false;
+        super_token_is_key = false;
     }
 
     //Initialization
@@ -516,10 +514,8 @@ int jsmn_parse(jsmn_parser *parser,
         switch (js[parser_position]) {
             case '{':
                 goto parse_opening_object;
-                break;
             case '[':
                 goto parse_opening_array;
-                break;
             default:
                 mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
                     
@@ -604,7 +600,7 @@ parse_opening_object:
     //Now make this the super token
     //-----------------------------
     super_token_size = 0;
-    super_token_is_string = false;
+    super_token_is_key = false;
     super_token_index = current_token_index;
     
     while (is_whitespace[js[++parser_position]]){  
@@ -645,7 +641,7 @@ parse_opening_array:
     //Now make this the super token
     //-------------------------------
     super_token_size = 0;
-    super_token_is_string = false;
+    super_token_is_key = false;
     super_token_index = current_token_index;
 
     while (is_whitespace[js[++parser_position]]){  
@@ -696,7 +692,7 @@ close_object:
 
     //Closing the attribute
     //----------------------
-    //if (super_token_is_string){
+    //if (super_token_is_key){
        //ends, for a key this is defined as the end of the string
        sizes[super_token_index] = super_token_size; //useless, == 1
        tokens_after_close[super_token_index] = current_token_index+2;
@@ -707,7 +703,7 @@ close_object:
 
     //} //else{ empty object }
 
-//TODO: place in here close empty object - will allow removal of super_token_is_string
+//TODO: place in here close empty object - will allow removal of super_token_is_key
 //-------------------------------------------------------------------------------------
 close_empty_object:
     
@@ -720,7 +716,7 @@ close_empty_object:
     }else{
         super_token_index     = parents[super_token_index];
         super_token_size      = sizes[super_token_index];
-        super_token_is_string = types[super_token_index] == JSMN_STRING;
+        super_token_is_key = types[super_token_index] == JSMN_KEY;
 
         goto process_end_of_value;
     } 
@@ -734,7 +730,7 @@ close_array:
     //super_token->token_after_close = current_token_index+2;
     
     
-    ends[super_token_index] = parser_position + 1;
+    ends[super_token_index]  = parser_position + 1;
     sizes[super_token_index] = super_token_size;
     tokens_after_close[super_token_index] = current_token_index+2;
     
@@ -743,7 +739,7 @@ close_array:
     }else{
         super_token_index     = parents[super_token_index];
         super_token_size      = sizes[super_token_index];
-        super_token_is_string = types[super_token_index] == JSMN_STRING;
+        super_token_is_key = types[super_token_index] == JSMN_KEY;
         
         goto process_end_of_value;
 
@@ -760,7 +756,7 @@ parse_key:
     }
     
     ++current_token_index;
-    types[current_token_index] = JSMN_STRING;
+    types[current_token_index]  = JSMN_KEY;
     starts[current_token_index] = parser_position+2;
     
     parse_string_helper(js,&parser_position,len);  
@@ -778,7 +774,7 @@ parse_key:
         //Make the attribute string the super token
         sizes[super_token_index] = ++super_token_size;
         
-        super_token_is_string = true;
+        super_token_is_key = true;
         super_token_size = 0;
         super_token_index = current_token_index;
 
@@ -867,7 +863,7 @@ parse_comma:
     
     //TODO: We could have 1 version for within arrays and another
     //for within objects ...
-    if (super_token_is_string){
+    if (super_token_is_key){
         //ends, for a key this is defined as the end of the string
         sizes[super_token_index] = super_token_size; //always 1 ...
         tokens_after_close[super_token_index] = current_token_index+2;
@@ -875,7 +871,7 @@ parse_comma:
 
         super_token_index = parents[super_token_index];
         super_token_size  = sizes[super_token_index];
-        super_token_is_string = false;
+        super_token_is_key = false;
         
         if (js[parser_position] == '"'){
             goto parse_key;    
@@ -1022,7 +1018,7 @@ process_end_of_value:
             case ',':
                goto parse_comma; 
             case '}':
-               if (super_token_is_string){
+               if (super_token_is_key){
                   goto close_object; 
                }else{
                   mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close object '}' is not matched with an open object");   

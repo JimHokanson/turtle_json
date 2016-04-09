@@ -31,7 +31,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  token_info
     //      - see wrapping Matlab function
     
-//     mxArray *output_info;
     mxArray *output_values;
     mxArray *output_types;
     mxArray *output_starts;
@@ -39,6 +38,16 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxArray *output_sizes;
     mxArray *output_parents;
     mxArray *output_tokens_after_close;
+    
+    double *values;
+    uint8_t *types;
+    int *starts;
+    int *ends;
+    int *sizes;
+    int *parents;
+    int *tokens_after_close;
+    
+    //mxArray *output_strings;
     
     mwSize n_tokens_allocated;
     mwSize n_tokens_to_allocate;
@@ -51,21 +60,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     size_t string_byte_length;
     
     jsmn_parser p;
-    
-    
-    //jsmntok_t *t;
-    
-    
-    
-    double *values;
-    uint8_t *types;
-    int *starts;
-    int *ends;
-    int *sizes;
-    int *parents;
-    int *tokens_after_close;
-    
-    
+
     
     //Input Handling
     //---------------------------------------------------------------------

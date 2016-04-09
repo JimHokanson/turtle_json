@@ -1,18 +1,23 @@
 function output = get_parsed_data(obj,varargin)
 
-%This is old ...
-
 in.collapse_array = true;
 in = sl.in.processVarargin(in,varargin);
 
-str = obj.file_string;
-numeric_data = obj.numeric_data;
-j = obj.info;
+s = struct;
+s.types = obj.types;
+s.starts = obj.starts;
+s.ends = obj.ends;
+s.sizes = obj.sizes;
+s.parents = obj.parents;
+s.tokens_after_close = obj.tokens_after_close;
+s.numeric_data = obj.numeric_data;
+s.strings = obj.strings;
 
-if j(1,1) == 1
-    output = parse_object(str,j,1,numeric_data,in);
-elseif j(1,1) == 2
-    output = parse_array(str,j,1,numeric_data,in);
+
+if s.types(1) == 1
+    output = parse_object(s,in);
+elseif s.types(1) == 2
+    output = parse_array(s,in);
 else
     error('Unexpected parent object')
 end

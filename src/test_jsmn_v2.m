@@ -8,16 +8,17 @@ for i = 1:1
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\canada.json'; 
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\citm_catalog.json'; 
 
-file_path = 'H:\example_data\1.json'; 
-d1_all = zeros(1,10);
+file_path = 'H:\example_data\1.json';
+N = 2;
+d1_all = zeros(1,N);
 t3 = tic;
-for i = 1:10
+for i = 1:N
     %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'chars_per_token',10);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
-fprintf('%g, %g, %g\n',toc(t3)/10,min(d1_all),sum(d1_all))
+fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
 
 
 tic; 

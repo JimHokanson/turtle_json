@@ -22,8 +22,10 @@ classdef tokens
        
        
        numeric_data
+       strings
        d0
        d1
+       d2
        chars_per_token
        ns_per_token
     end
@@ -109,34 +111,36 @@ classdef tokens
                 obj.d1 = toc(t1);
             end
             
+            
+            t2 = tic;
+            %This will eventually change to going in the code ...
+            %For now I want to expose other code like it has already been
+            %computed
+            string_types_I = find(result.types == 3 | result.types == 6);
+            n_strings = length(string_types_I);
+            n_tokens = length(result.types);
+            local_strings = cell(1,n_tokens);
+            local_starts = result.starts;
+            local_ends   = result.ends;
+            local_file_string = obj.file_string;
+            for iString = 1:n_strings
+                cur_I = string_types_I(iString);
+                local_strings{cur_I} = local_file_string(local_starts(cur_I):local_ends(cur_I));
+            end
+            obj.d2 = toc(t2);
+            obj.strings = local_strings;
+            
+            
             obj.types = result.types;
             obj.starts = result.starts;
             obj.ends = result.ends;
             obj.sizes = result.sizes;
             obj.parents = result.parents;
             obj.tokens_after_close = result.tokens_after_close;
-            
-            
-% % % %             token_info = result.info;
-% % % %             num = result.values;
-            
-            %[token_info,num]
-            
-% %             t2 = tic;
-% %             %NOTE: We're not changing the parent which is currently 0 based
-% %             %Ideally we could pass this into the parser ...
-% %             %2) start
-% %             token_info(2,:) = token_info(2,:)+1; %off by 1, might change code
-% %             %6) 
-% %             token_info(6,:) = token_info(6,:)+1; %same here, this could change
-% %             %temp = token_info(7:8,:);
-% %             
-% %             obj.d2 = toc(t2);
-            
             obj.numeric_data = result.values;
-            %obj.info = result.info;
+            
             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
-            obj.ns_per_token = 1e9*obj.d1/length(obj.numeric_data);
+            obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
         end
         function root = getRoot(obj)
             j = obj.types;
@@ -152,14 +156,15 @@ classdef tokens
         end
         function output = viewOldInfo(obj,indices)
            output = [num2cell(indices);
-               num2cell(obj.types(indices));
+               json.TYPES(obj.types(indices));
                num2cell(obj.starts(indices));
                num2cell(obj.ends(indices));
                num2cell(obj.sizes(indices));
                num2cell(obj.parents(indices));
                num2cell(obj.tokens_after_close(indices));
-               num2cell(obj.numeric_data(indices))];
-           output = [{'indices','type','start','end','size','parent','token_after_close','value'}' output];
+               num2cell(obj.numeric_data(indices));
+               obj.strings(indices)];
+           output = [{'indices','type','start','end','size','parent','token_after_close','value','string'}' output];
         end
     end
     
