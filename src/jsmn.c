@@ -718,7 +718,7 @@ close_object:
         super_token_size      = sizes[super_token_index];
         super_token_is_string = types[super_token_index] == JSMN_STRING;
 
-        goto process_end_of_token;
+        goto process_end_of_value;
     } 
                 
                 
@@ -741,7 +741,7 @@ close_array:
         super_token_size      = sizes[super_token_index];
         super_token_is_string = types[super_token_index] == JSMN_STRING;
         
-        goto process_end_of_token;
+        goto process_end_of_value;
 
     }
 
@@ -843,7 +843,7 @@ parse_string:
     
     //The string is not an attribute, so we could
     // have another value, or close the current object/array
-    goto process_end_of_token;
+    goto process_end_of_value;
                      
 //=========================================================================
 //                        Parsing a Comma ','
@@ -918,51 +918,24 @@ parse_comma:
 
 parse_number:
     if (current_token_index >= num_tokens_minus_1) {
-//         mexPrintf("Number Position: %d\n",parser_position);
-//         mexPrintf("Current TOken pos: %d\n",current_token_index);
-//         mexPrintf("p diff: %d\n",types-types_array);
         refill_parser(parser,parser_position,current_token_index,super_token_index,0);
         return JSMN_ERROR_NOMEM;
     }
     super_token_size++;
     ++current_token_index;
-
-    //mexPrintf("Current token index: %d\n",current_token_index);
-    
-    //token = &tokens[++current_token_index];
-    //token->size   = 1;
-    sizes[current_token_index] = 1;
-    //token->type   = JSMN_NUMBER;
-
-    
-    
-    //*types++ = JSMN_NUMBER;
     types[current_token_index] = JSMN_NUMBER;
-    
-    //token->start  = parser_position+1;
-    
     starts[current_token_index] = parser_position+1;
-    
-    //token->parent = super_token_index;
+    sizes[current_token_index] = 1;
     parents[current_token_index] = super_token_index;
-
-    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
-    //values[current_token_index] = 0;
     
-    //TODO: Check pEndNumber
-    //If pEndNumber = parser->pos then we have a bad char
-
-    //Note, this is off by 1, which is good
-    //when put into Matlab
+    
+    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
     parser_position = (int)(pEndNumber - js);  
     ends[current_token_index] = parser_position;
-    
-    //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    
     parser_position--; //backtrack so we terminate on the #
 
-    goto process_end_of_token;
+    goto process_end_of_value;
 
 
 //=========================================================================
@@ -975,34 +948,17 @@ parse_null:
     }    
     super_token_size++;
     ++current_token_index;
-
-    //token = &tokens[++current_token_index];
-    //token->type   = JSMN_NUMBER;
-    //*types++ = JSMN_NUMBER;
-    
-    types[current_token_index] = JSMN_NUMBER;
-    
-    //token->start  = parser_position+1;
-    starts[current_token_index] = parser_position+1;
-    
-    
-    //TODO: Error check null - make optional with compile flag
+    types[current_token_index]   = JSMN_NUMBER;
+    starts[current_token_index]  = parser_position+1;
+    //TODO: Check null
     parser_position  += 3; //advance to final 'l' in 'null'
-    //1 based indexing ...
-    //token->end    = parser_position+1;
     ends[current_token_index] = parser_position+1;
-    
-    //token->size   = 1;
-    sizes[current_token_index] = 1;
-    
-    //token->parent = super_token_index;
+    sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
-    
-    //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    values[current_token_index] = MX_NAN;
+    values[current_token_index]  = MX_NAN;
 
-    goto process_end_of_token;
+    goto process_end_of_value;
 
 //=========================================================================
 //                        Parsing a True 'true'
@@ -1016,36 +972,17 @@ parse_true:
     }
     super_token_size++;
     ++current_token_index;
-
-    //token = &tokens[++current_token_index];
-    //token->type   = JSMN_LOGICAL;
-    
-    //*types++ = JSMN_LOGICAL;
-    types[current_token_index] = JSMN_LOGICAL;
-    
-    //token->start  = parser_position+1;
-    
-    starts[current_token_index] = parser_position+1;
-    
+    types[current_token_index]   = JSMN_LOGICAL;
+    starts[current_token_index]  = parser_position+1;
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
-    //1 based indexing ...
-    //token->end    = parser_position+1;
-    ends[current_token_index] = parser_position+1;
-    
-    
-    //token->size   = 1;
-    sizes[current_token_index] = 1;
-    
-    //token->parent = super_token_index; 
+    ends[current_token_index]    = parser_position+1;
+    sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
-    
-    
-    //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    values[current_token_index] = 1;
+    values[current_token_index]  = 1;
 
-    goto process_end_of_token;
+    goto process_end_of_value;
 
 //=========================================================================
 //                        Parsing a False 'false'
@@ -1058,43 +995,22 @@ parse_false:
     }
     super_token_size++;
     ++current_token_index;
-    
-    //token = &tokens[++current_token_index];
-    //token->type   = JSMN_LOGICAL;
-    
-    //*types++ = JSMN_LOGICAL;
-    types[current_token_index] = JSMN_LOGICAL;
-    
-    
-    //token->start  = parser_position+1;
-    starts[current_token_index] = parser_position+1;
-    
-    //TODO: Error check true - make optional with compile flag
+    types[current_token_index]   = JSMN_LOGICAL;
+    starts[current_token_index]  = parser_position+1;
+    //TODO: Error check true 
     parser_position  += 4; //advance to final 'e' in 'false'
-    //1 based indexing ...
-    //token->end    = parser_position+1;
-    
-    ends[current_token_index] = parser_position+1;
-    
-    //token->size   = 1;
-    sizes[current_token_index] = 1;
-    
-    //token->parent = super_token_index;
+    ends[current_token_index]    = parser_position+1;
+    sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
-    
-    //token->token_after_close = current_token_index+2;
     tokens_after_close[current_token_index] = current_token_index+2;
-    values[current_token_index] = 0;
+    values[current_token_index]  = 0;
 
-    goto process_end_of_token;
+    goto process_end_of_value;
                                 
 //=============================================================
-//                  End of Token Handling    
+//                  End of Value Handling    
 //=============================================================
-//
-//TODO: process_end_of_value would be a better name
-//
-process_end_of_token:
+process_end_of_value:
         while (is_whitespace[js[++parser_position]]){
         }
 
@@ -1108,87 +1024,29 @@ process_end_of_token:
                   mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close object '}' is not matched with an open object");   
                }
             case ']':
-               //TODO: Check that we've opened an array
                if (types[super_token_index] == JSMN_ARRAY){
                   goto close_array;
-               }else{
-//             mexPrintf("Types: %d\n",types_array[0]);
-//             mexPrintf("Types: %d\n",types_array[1]);
-//             mexPrintf("Types: %d\n",types_array[2]);
-//             mexPrintf("Types: %d\n",types_array[3]);
-//             mexPrintf("Types: %d\n",types_array[4]);
-//             mexPrintf("Types: %d\n",types_array[5]);
-//             mexPrintf("Types: %d\n",types[0]);
-//             mexPrintf("Types: %d\n",types[1]);
-//             mexPrintf("Types: %d\n",types[2]);
-//             mexPrintf("Types: %d\n",types[3]);
-//             mexPrintf("Types: %d\n",types[4]);
-//             mexPrintf("Types: %d\n",types[5]);
-//             
-//             mexPrintf("STI: %d\n",super_token_index);       
-//             mexPrintf("Position: %d\n",parser_position);
-//             mexPrintf("Char 1: %c\n",js[parser_position-3]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-2]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-1]);
-//             mexPrintf("Char 1: %c\n",js[parser_position]);
-//             mexPrintf("Char 1: %c\n",js[parser_position+1]);
-                  
+               }else{                  
                   mexErrMsgIdAndTxt("jsmn_mex:invalid_close","close array ']' is not matched with an open array"); 
                }
             default :  
-                
-//                                         mexPrintf("STI: %d\n",super_token_index);       
-//             mexPrintf("Position: %d\n",parser_position);
-//             mexPrintf("Char 1: %c\n",js[parser_position-3]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-2]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-1]);
-//             mexPrintf("Char 1: %c\n",js[parser_position]);
-//             mexPrintf("Char 1: %c\n",js[parser_position+1]);
-                
-                
                 mexErrMsgIdAndTxt("jsmn_mex:invalid_token","String value must be followed by a comma or a closing token");
         }
 
+ //========================================================================
+ //                         Process End of File
+ //========================================================================
+ //At this point the super_token_index is -1 meaning we've closed the 
+ //opening object or array. Proceed to the end of file throwing an error
+ //if something besides whitespace is found.
  process_end_of_file:
      while (is_whitespace[js[++parser_position]]){  
         }
 
-        if (!(js[parser_position] == '\0')){
-            
-//                         mexPrintf("STI: %d\n",super_token_index);       
-//             mexPrintf("Position: %d\n",parser_position);
-//             mexPrintf("Char 1: %c\n",js[parser_position-3]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-2]);
-//             mexPrintf("Char 1: %c\n",js[parser_position-1]);
-//             mexPrintf("Char 1: %c\n",js[parser_position]);
-//             mexPrintf("Char 1: %c\n",js[parser_position+1]);
-            
-            
+        if (!(js[parser_position] == '\0')){            
             mexErrMsgIdAndTxt("jsmn_mex:invalid_end","non-whitespace characters found after end of root token close");
         }
-        return current_token_index+1;
-                    
-                
-// 		}
-// 	}
-
-    mexErrMsgIdAndTxt("jsmn_mex:failed_to_close","Opening object or array was not closed before end of the string");
-    
-    /* ERROR CHECKING ONLY
-     //TODO: Replace with open counts for { and [
-    //I think this is just a check at the end, can we remove
-    //this or just replace it with a counter or some depth measurement?
-    for (i = next_token_index - 1; i >= 0; i--) {
-        if (tokens[i].start != -1 && tokens[i].end == -1) {
-            return JSMN_ERROR_PART;
-        }
-    }
-     */
-    
-    //TODO: Put in an error
-    
-    //0 based indexing, next token 1 means a count of 1 token
-	
+     return current_token_index+1;
     
 }
 

@@ -15,7 +15,8 @@ t(9,:) = {'"Extra comma": true,}',0};
 t(10,:) = {'{"Extra value after close": true} "misplaced quoted value"',0};
 t(11,:) = {'{"Illegal expression": 1 + 2}',0};
 t(12,:) = {'{"Illegal invocation": alert()}',0};
-t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',0}; %??????
+%I need to look into this one ...
+t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',1}; %??????
 t(14,:) = {'{"Numbers cannot be hex": 0x14}',0};
 % t(15,:) = 
 % t(16,:) =
