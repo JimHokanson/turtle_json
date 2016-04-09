@@ -610,7 +610,7 @@ parse_opening_object:
         case '"':
             goto parse_key;
         case '}':
-            goto close_object;
+            goto close_empty_object;
         default:
             mexErrMsgIdAndTxt("jsmn_mex:invalid_start","An attribute or closing '}' needs to follow '{'");
     }
@@ -692,7 +692,7 @@ close_object:
 
     //Closing the attribute
     //----------------------
-    if (super_token_is_string){
+    //if (super_token_is_string){
        //ends, for a key this is defined as the end of the string
        sizes[super_token_index] = super_token_size; //useless, == 1
        tokens_after_close[super_token_index] = current_token_index+2;
@@ -701,11 +701,11 @@ close_object:
        super_token_index = parents[super_token_index];
        
 
-    } //else{ empty object }
+    //} //else{ empty object }
 
 //TODO: place in here close empty object - will allow removal of super_token_is_string
 //-------------------------------------------------------------------------------------
-//close_empty_object:
+close_empty_object:
     
     ends[super_token_index] = parser_position + 1;
     //sizes - only incremented at keys
