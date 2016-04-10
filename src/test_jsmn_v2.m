@@ -1,5 +1,6 @@
 function test_jsmn_v2
 
+%setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
 
 t = tic;
 %profile on
@@ -69,7 +70,7 @@ fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
 %
 %0.442107, 0.155828, 1.57115 //Fixed a bug
 %
-%0.2764, 0.168005, 1.69757 //Removed c to Matlab discrepancies
+%0.2764, 0.168005, 1.69757 //Removed c to Matlab discrepancies (BIG FIX)
 %
 %
 %

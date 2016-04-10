@@ -30,5 +30,5 @@ void refill_parser(jsmn_parser *parser,
         int last_function_type);
 
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, 
-        unsigned int num_tokens, double *values , uint8_t *types, 
+        int num_tokens, double *values , uint8_t *types, 
         int *starts, int *ends, int *sizes, int *parents, int *tokens_after_close);

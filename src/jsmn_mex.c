@@ -3,8 +3,15 @@
  *      http://zserge.com/jsmn.html
  *
  *  Compile via:
- *      mex jsmn_mex.c jsmn.c -O
+ *      mex jsmn_mex.c jsmn.c -O 
+ *      
+ *      //Not useful ... mex COMPFLAGS="$COMPFLAGS /arch:AVX /fp:fast" jsmn_mex.c jsmn.c -O 
  *      mex OPTIMFLAGS="/Ox" jsmn_mex.c jsmn.c
+ *
+ *      mex jsmn_mex.c jsmn.c COMPFLAGS="$COMPFLAGS -O3"
+ *      
+ *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
+ *
  */
 
 //TODO: These may not all be needed ...
