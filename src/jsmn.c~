@@ -368,24 +368,22 @@ double string_to_double_no_math(const char *p,char **char_offset) {
     char *number_start;
     
     if (*p == '-'){
+        ++p;
         negate = true;    
     }else{
-        //n digits is 1 already
         negate = false;
     }
 
     number_start = p;
-    while (is_number_array[*(++p)]) {  
+    while (is_number_array[*p++]) {  
     }
-    
-    //mexPrintf("what char: %c\n",*p);
     
     if (*p == '.'){
         ++p;
-        //mexPrintf("Got dot\n");
-        while (is_number_array[*(++p)]) {  
+        mexPrintf("Got dot\n")
+        while (is_number_array[*p++]) {  
         }
-        //mexPrintf("what char: %c\n",*p);
+        
     }
 
     
@@ -403,7 +401,7 @@ double string_to_double_no_math(const char *p,char **char_offset) {
         }
         
         number_start = p;
-        while (is_number_array[*(++p)]) {  
+        while (is_number_array[*p++]) {  
         }
 
     }
