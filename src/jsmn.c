@@ -367,12 +367,12 @@ double string_to_double_no_math(const char *p,char **char_offset) {
     int64_t n_numeric_chars_plus_1;
     char *number_start;
     
-    if (*p == '-'){
-        negate = true;    
-    }else{
-        //n digits is 1 already
-        negate = false;
-    }
+//     if (*p == '-'){
+//         negate = true;    
+//     }else{
+//         //n digits is 1 already
+//         negate = false;
+//     }
 
     number_start = p;
     while (is_number_array[*(++p)]) {  
@@ -382,10 +382,8 @@ double string_to_double_no_math(const char *p,char **char_offset) {
     
     if (*p == '.'){
         ++p;
-        //mexPrintf("Got dot\n");
         while (is_number_array[*(++p)]) {  
         }
-        //mexPrintf("what char: %c\n",*p);
     }
 
     
@@ -394,18 +392,13 @@ double string_to_double_no_math(const char *p,char **char_offset) {
         switch (*p){
             case '-':
                 ++p;
-                negate = true;
                 break;
             case '+':
                 ++p;
-            default:
-                negate = false;
         }
         
-        number_start = p;
         while (is_number_array[*(++p)]) {  
         }
-
     }
     
     *char_offset = p;
@@ -429,7 +422,7 @@ void parse_string_helper(const char *js, int *input_parser_position, size_t len)
     
     //Looping over the string ...
     //---------------------------------------------------------
-    while (c = js[++parser_position]) {
+    while ((c = js[++parser_position])) {
         
         /* Quote: end of string */
         if (c == '\"') {
@@ -675,7 +668,7 @@ parse_object_in_array:
     types[current_token_index]   = JSMN_OBJECT;
     starts[current_token_index]  = parser_position+1;
     //ends - defined later
-    //size - defined later
+    sizes[current_token_index]   = 0;
     parents[current_token_index] = super_token_index;
     //token_after_close - defined later
     //values - not defined
@@ -712,7 +705,7 @@ parse_object_of_key:
     types[current_token_index]   = JSMN_OBJECT;
     starts[current_token_index]  = parser_position+1;
     //ends - defined later
-    //size - defined later
+    sizes[current_token_index]   = 0;
     parents[current_token_index] = super_token_index;
     //token_after_close - defined later
     //values - not defined
