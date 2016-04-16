@@ -47,11 +47,27 @@ d1_all = zeros(1,20);
 t3 = tic;
 for i = 1:20
     %jt = json.tokens(file_path);
-	jt = json.tokens(file_path,'chars_per_token',10);
+	jt = json.tokens(file_path,'chars_per_token',5);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
+
+profile on
+N = 2;
+t3 = tic;
+for i = 1:N
+% % %     %jt = json.tokens(file_path);
+% % % 	jt = json.tokens(file_path,'chars_per_token',5);
+% % %     d1_all(i) = jt.d1;
+    sobj = jt.get_parsed_data();
+end
+fprintf('%g\n',toc(t3)/N)
+profile off
+profile viewer
+
+
+
 %0.48724, 0.275296, 2.8141
 %0.492493, 0.277961, 2.8222
 %0.483474, 0.264727, 2.71777
@@ -72,8 +88,10 @@ fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
 %
 %0.2764, 0.168005, 1.69757 //Removed c to Matlab discrepancies (BIG FIX)
 %
+%0.2745, 0.127264, 1.29634 - no number resolving
 %
-%
+%0.293459, 0.164545, 1.67481 - strings resolved in the function, math is back
+
 
 %No math
 %0.4,

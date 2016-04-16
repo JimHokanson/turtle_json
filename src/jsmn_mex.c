@@ -38,6 +38,32 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  token_info
     //      - see wrapping Matlab function
     
+    //TODO: https://www.mathworks.com/matlabcentral/newsreader/view_thread/160022
+    // mxArray **mxStrings; // 
+    // mxStrings = (mxArray **) mxMalloc( mxStringsSize * sizeof(mxArray
+    // mxStrings = (mxArray **) mxRealloc(mxStrings,(mxStringsSize += 5) * sizeof(mxArray *));
+    
+    //mxStrings[largestStringIndex] = mxCreateString( stringBase );
+    
+    /*
+     // Create the cell matrix and fill with the gathered mxArray strings
+
+    cellRows = largestStringIndex + 1;
+    cellColumns = 1;
+    plhs[0] = mxCreateCellMatrix(cellRows, cellColumns);
+    for( i=0; i<cellRows; i++)
+        mxSetCell(plhs[0], i, mxStrings[i] );
+    
+// Free the memory for the mxArray pointer array. Note that this
+doesn't free the
+// mxArrays that these pointers point to ... this only frees the array
+of pointers
+// that were used to keep track of them temorarily.
+
+    mxFree( mxStrings );
+}
+*/
+    
     mxArray *output_values;
     mxArray *output_types;
     mxArray *output_starts;
@@ -45,6 +71,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxArray *output_sizes;
     mxArray *output_parents;
     mxArray *output_tokens_after_close;
+    mxArray *output_strings;
     
     double *values;
     uint8_t *types;
@@ -120,13 +147,16 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     //Allocation of the # of tokens
     //----------------------------------------------------
-    values = mxMalloc(n_tokens_to_allocate*sizeof(double));
-    types = mxMalloc(n_tokens_to_allocate);
-    starts = mxMalloc(n_tokens_to_allocate*sizeof(int));
-    ends = mxMalloc(n_tokens_to_allocate*sizeof(int));
-    sizes = mxMalloc(n_tokens_to_allocate*sizeof(int));
+    values  = mxMalloc(n_tokens_to_allocate*sizeof(double));
+    types   = mxMalloc(n_tokens_to_allocate);
+    starts  = mxMalloc(n_tokens_to_allocate*sizeof(int));
+    ends    = mxMalloc(n_tokens_to_allocate*sizeof(int));
+    sizes   = mxMalloc(n_tokens_to_allocate*sizeof(int));
     parents = mxMalloc(n_tokens_to_allocate*sizeof(int));
     tokens_after_close = mxMalloc(n_tokens_to_allocate*sizeof(int));
+    
+    output_strings = mxCreateCellMatrix(1,n_tokens_to_allocate);
+    
     
     n_tokens_allocated = n_tokens_to_allocate;
     
@@ -135,7 +165,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     while (1) {
         //The main function call
         //------------------------------------------
-        parse_result = jsmn_parse(&p,json_string,string_byte_length,n_tokens_allocated,values,types,starts,ends,sizes,parents,tokens_after_close);
+        parse_result = jsmn_parse(&p,json_string,string_byte_length,n_tokens_allocated,values,types,starts,ends,sizes,parents,tokens_after_close, output_strings);
         n_tokens_used = parse_result;
         
         if (parse_result >= 0){
@@ -167,16 +197,19 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         }
         
         //mexPrintf("Trying to reallocate\n");
-                values = mxRealloc(values,n_tokens_to_allocate*8);
+        values = mxRealloc(values,n_tokens_to_allocate*8);
         types = mxRealloc(types,n_tokens_to_allocate);
         starts = mxRealloc(starts,n_tokens_to_allocate*sizeof(int));
         ends = mxRealloc(ends,n_tokens_to_allocate*sizeof(int));
         sizes = mxRealloc(sizes,n_tokens_to_allocate*sizeof(int));
         parents = mxRealloc(parents,n_tokens_to_allocate*sizeof(int));
         tokens_after_close = mxRealloc(tokens_after_close,n_tokens_to_allocate*sizeof(int));
+        mxSetN(output_strings,n_tokens_to_allocate);
         
         n_tokens_allocated = n_tokens_to_allocate;
     }
+    
+    
     
     if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
@@ -224,10 +257,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxSetM(output_tokens_after_close, 1);
     mxSetN(output_tokens_after_close, n_tokens_used);
     
+    mxSetN(output_strings,n_tokens_used);
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
-//     mxAddField(plhs[0],"info");
-//     mxSetField(plhs[0],0,"info",output_info);
     mxAddField(plhs[0],"values");
     mxSetField(plhs[0],0,"values",output_values);
     mxAddField(plhs[0],"types");
@@ -242,5 +274,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     mxSetField(plhs[0],0,"parents",output_parents);
     mxAddField(plhs[0],"tokens_after_close");
     mxSetField(plhs[0],0,"tokens_after_close",output_tokens_after_close);
-    
+    mxAddField(plhs[0],"strings");
+    mxSetField(plhs[0],0,"strings",output_strings);
 }

@@ -6,6 +6,10 @@
 #include "stdint.h"  //uint_8
 
 
+//Possible changes:
+//1) remove start and end
+//2) 
+
 /*
 temp = cell(1,256);
 temp(:)={'false'};
@@ -360,33 +364,16 @@ double string_to_double_no_math(const char *p,char **char_offset) {
      *  attempt to make something as fast possible. I welcome a faster
      *  approach!
      */
-    
-    double value = 0;
-    double exponent_value;
-    bool negate;
-    int64_t n_numeric_chars_plus_1;
-    char *number_start;
-    
-//     if (*p == '-'){
-//         negate = true;    
-//     }else{
-//         //n digits is 1 already
-//         negate = false;
-//     }
 
-    number_start = p;
     while (is_number_array[*(++p)]) {  
     }
-    
-    //mexPrintf("what char: %c\n",*p);
-    
+        
     if (*p == '.'){
         ++p;
         while (is_number_array[*(++p)]) {  
         }
     }
 
-    
     if (*p == 'E' || *p == 'e') {
         ++p;
         switch (*p){
@@ -403,7 +390,7 @@ double string_to_double_no_math(const char *p,char **char_offset) {
     
     *char_offset = p;
     
-    return value;
+    return 0;
 }
 
 
@@ -411,20 +398,27 @@ double string_to_double_no_math(const char *p,char **char_offset) {
 //=========================================================================
 //                          String Parsing
 //=========================================================================
-void parse_string_helper(const char *js, int *input_parser_position, size_t len){
+void parse_string_helper(const char *js, int current_token_index, int *input_parser_position, size_t len, mxArray *output_strings){
     
     //TODO: This function needs work
     
     //      parse_string_helper(js,token,parser_position)
+    
+    //TODO: http://www.mathworks.com/matlabcentral/answers/71173-passing-unicode-string-from-c-mex-function-to-matlab
+    
+    mxArray *mx_output_string;
     int parser_position = *input_parser_position;
     char c;
     int i;
+    char *output_str;
+    int start_position = parser_position+1;
+    int n_chars;
+    mwSize dims[1] = {10};
     
     //Looping over the string ...
     //---------------------------------------------------------
     while ((c = js[++parser_position])) {
         
-        /* Quote: end of string */
         if (c == '\"') {
             //Again, this is Matlab based, add flag and
             //handle accordingly ...
@@ -432,6 +426,34 @@ void parse_string_helper(const char *js, int *input_parser_position, size_t len)
             //which in Matlab points to the character before
             //c
             
+            //http://www.mathworks.com/matlabcentral/newsreader/view_thread/301249
+            
+            n_chars = parser_position - start_position + 1;
+            
+            ////mx_output_string = mxCreateCharArray(1,dims);
+            
+            //Approach 1
+            //---------------------------------
+            //This would require a char conversion later
+//             mx_output_string = mxCreateNumericArray(0, 0, mxUINT16_CLASS, mxREAL);
+//             output_str = mxMalloc(n_chars);
+//             mxSetM(mx_output_string, 1);
+//             mxSetN(mx_output_string, n_chars);
+//             mxSetData(mx_output_string, output_str);
+            
+            //Aproach 2
+            //---------
+            //memcopy and setting of value
+            
+            n_chars = parser_position - start_position + 1;
+            output_str = mxMalloc(n_chars);
+            memcpy(output_str,&js[start_position],n_chars);
+            output_str[n_chars-1] = 0;
+            
+            mx_output_string = mxCreateString(output_str);
+
+            mxSetCell(output_strings, current_token_index, mx_output_string);
+
             *input_parser_position = parser_position;
             return;
             //goto parse_string_end;
@@ -455,6 +477,8 @@ void parse_string_helper(const char *js, int *input_parser_position, size_t len)
                     break;
                     /* Allows escaped symbol \uXXXX */
                 case 'u':
+                    //TODO: Make this an error ...
+                    //I don't know that we could properly handle this ...
                     parser_position++;
                     for(i = 0; i < 4 && parser_position < len; i++) {
                         /* If it isn't a hex character we have an error */
@@ -494,8 +518,8 @@ void jsmn_init(jsmn_parser *parser) {
     parser->last_function_type = -1;   
 }
 
-
-//TODO: Implement this so that the parser is valid upon return
+//We work with the parser variables directly
+//Here we 
 void refill_parser(jsmn_parser *parser,    
         int parser_position,
         int current_token_index,
@@ -503,7 +527,7 @@ void refill_parser(jsmn_parser *parser,
         int last_function_type){
     
     
-    //refill_parser(parser,parser_position,next_token_index,super_token_index,false)
+    //  refill_parser(parser,parser_position,next_token_index,super_token_index,false)
     
     parser->position = parser_position;
     parser->current_token = current_token_index;
@@ -524,7 +548,8 @@ int jsmn_parse(jsmn_parser *parser,
         int *ends,
         int *sizes,
         int *parents,
-        int *tokens_after_close) {
+        int *tokens_after_close,
+        mxArray *output_strings) {
     
     /*
      *  Inputs
@@ -879,7 +904,7 @@ parse_key:
     types[current_token_index]  = JSMN_KEY;
     starts[current_token_index] = parser_position+2;
     
-    parse_string_helper(js,&parser_position,len);  
+    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);  
     ends[current_token_index] = parser_position;
     
     //sizes - not defined
@@ -946,12 +971,12 @@ parse_string_of_key:
     types[current_token_index]  = JSMN_STRING;    
     starts[current_token_index] = parser_position+2;
     
-    parse_string_helper(js,&parser_position,len);
+    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);
     ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
     parents[current_token_index] = super_token_index;
-    tokens_after_close[current_token_index] = current_token_index+1;
+    tokens_after_close[current_token_index] = current_token_index+2;
     //values - not defined
 
     goto process_end_of_key_value;
@@ -973,12 +998,12 @@ parse_string_in_array:
     types[current_token_index]  = JSMN_STRING;    
     starts[current_token_index] = parser_position+2;
     
-    parse_string_helper(js,&parser_position,len);
+    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);
     ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
     parents[current_token_index] = super_token_index;
-    tokens_after_close[current_token_index] = current_token_index+1;
+    tokens_after_close[current_token_index] = current_token_index+2;
     //values - not defined
     
     goto process_end_of_array_value;    
@@ -1067,7 +1092,10 @@ parse_number_of_key:
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     
-    values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
+    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
+    //values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
+    
+    
     parser_position = (int)(pEndNumber - js);  
     ends[current_token_index] = parser_position;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1094,8 +1122,9 @@ parse_number_in_array:
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     
+    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
+    //values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
     
-    values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
     parser_position = (int)(pEndNumber - js);  
     ends[current_token_index] = parser_position;
     tokens_after_close[current_token_index] = current_token_index+2;

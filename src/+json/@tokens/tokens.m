@@ -25,7 +25,6 @@ classdef tokens
        strings
        d0
        d1
-       d2
        chars_per_token
        ns_per_token
     end
@@ -112,23 +111,23 @@ classdef tokens
             end
             
             
-            t2 = tic;
-            %This will eventually change to going in the code ...
-            %For now I want to expose other code like it has already been
-            %computed
-            string_types_I = find(result.types == 3 | result.types == 6);
-            n_strings = length(string_types_I);
-            n_tokens = length(result.types);
-            local_strings = cell(1,n_tokens);
-            local_starts = result.starts;
-            local_ends   = result.ends;
-            local_file_string = obj.file_string;
-            for iString = 1:n_strings
-                cur_I = string_types_I(iString);
-                local_strings{cur_I} = local_file_string(local_starts(cur_I):local_ends(cur_I));
-            end
-            obj.d2 = toc(t2);
-            obj.strings = local_strings;
+%             t2 = tic;
+%             %This will eventually change to going in the code ...
+%             %For now I want to expose other code like it has already been
+%             %computed
+%             string_types_I = find(result.types == 3 | result.types == 6);
+%             n_strings = length(string_types_I);
+%             n_tokens = length(result.types);
+%             local_strings = cell(1,n_tokens);
+%             local_starts = result.starts;
+%             local_ends   = result.ends;
+%             local_file_string = obj.file_string;
+%             for iString = 1:n_strings
+%                 cur_I = string_types_I(iString);
+%                 local_strings{cur_I} = local_file_string(local_starts(cur_I):local_ends(cur_I));
+%             end
+%             obj.d2 = toc(t2);
+%             obj.strings = local_strings;
             
             
             obj.types = result.types;
@@ -138,15 +137,16 @@ classdef tokens
             obj.parents = result.parents;
             obj.tokens_after_close = result.tokens_after_close;
             obj.numeric_data = result.values;
+            obj.strings = result.strings;
             
             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
             obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
         end
-        function root = getRoot(obj)
-            j = obj.types;
+        function root = getRootInfo(obj)
             switch obj.types(1)
                 case 1
-                    root = json.object_token('root','root',1,obj);
+                    %name,full_name,index,parse_object
+                    root = json.token_info.object_token_info('root','root',1,obj);
             	case 2
                     error('Not yet implemented')
                 %output = parse_array(str,j,1,numeric_data,in);

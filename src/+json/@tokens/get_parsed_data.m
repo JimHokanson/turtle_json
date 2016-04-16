@@ -63,6 +63,9 @@ if n_items == 0
    return
 end
 
+% output = [];
+% return;
+
 types = s.types;
 
 %1) object- go to full loop

@@ -53,31 +53,44 @@ classdef array_token
         end
         function output = getObjectArray(obj)
             
-           p = obj.p;
+           local_p = obj.p;
            I = obj.index+1;
-           tokens_after_close = p.tokens_after_close;
+           tokens_after_close = local_p.tokens_after_close;
            n_objects = obj.n_elements;
            temp_output = cell(1,n_objects);
            for iObject = 1:n_objects
-              name = sprintf('(%d)',iObject);
-              full_name = [obj.full_name name]; 
-              temp_output{iObject} = json.object_token(name,full_name,I,p); 
+              local_name = sprintf('(%d)',iObject);
+              local_full_name = [obj.full_name local_name]; 
+              temp_output{iObject} = json.object_token(local_name,local_full_name,I,local_p); 
               I = tokens_after_close(I); 
            end
            
            output = [temp_output{:}];
         end
-        function output = getNumericArray(obj,dims)
-           
-            if nargin == 0
-                dims = 1;
-            end
-            
-            if dims == 1
-               keyboard 
-            end
-            output = [];
+        function output = get1dNumericArray(obj)
+           %TODO: Add on optional error check ... 
+           start_index = obj.index + 1;
+           end_index   = obj.index + obj.n_elements;
+           output      = obj.p.numeric_data(start_index:end_index);
         end
+        function get2dNumericArray(obj)
+           error('Not yet implemented') 
+        end
+        function getArrayOfNumericArrays(obj)
+           error('Not yet implemented')  
+        end
+        
+%         function output = getNumericArray(obj,dims)
+%            
+%             if nargin == 0
+%                 dims = 1;
+%             end
+%             
+%             if dims == 1
+%                keyboard 
+%             end
+%             output = [];
+%         end
     end
     
 end

@@ -1,5 +1,6 @@
 #include <stdint.h> //uint8
 #include <stddef.h>
+#include "mex.h"
 
 #define JSMN_UNDEFINED 0
 #define JSMN_OBJECT 1
@@ -31,4 +32,4 @@ void refill_parser(jsmn_parser *parser,
 
 int jsmn_parse(jsmn_parser *parser, const char *js, size_t len, 
         int num_tokens, double *values , uint8_t *types, 
-        int *starts, int *ends, int *sizes, int *parents, int *tokens_after_close);
+        int *starts, int *ends, int *sizes, int *parents, int *tokens_after_close, mxArray *output_strings);
