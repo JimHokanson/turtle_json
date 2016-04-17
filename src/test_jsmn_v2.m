@@ -14,8 +14,8 @@ N = 2;
 d1_all = zeros(1,N);
 t3 = tic;
 for i = 1:N
-    %jt = json.tokens(file_path);
-	jt = json.tokens(file_path,'chars_per_token',10);
+    jt = json.tokens(file_path);
+	%jt = json.tokens(file_path,'chars_per_token',10);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
@@ -46,12 +46,14 @@ file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,20);
 t3 = tic;
 for i = 1:20
-    %jt = json.tokens(file_path);
-	jt = json.tokens(file_path,'chars_per_token',5);
+    jt = json.tokens(file_path);
+	%jt = json.tokens(file_path,'chars_per_token',5);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
+
+
 
 profile on
 N = 2;

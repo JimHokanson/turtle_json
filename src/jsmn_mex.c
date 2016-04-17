@@ -72,9 +72,13 @@ of pointers
     mxArray *output_parents;
     mxArray *output_tokens_after_close;
     mxArray *output_strings;
+    mxArray **mxStrings;
+    //mxArray wtf[2];
+    
     
     double *values;
     uint8_t *types;
+    int i;
     int *starts;
     int *ends;
     int *sizes;
@@ -154,9 +158,7 @@ of pointers
     sizes   = mxMalloc(n_tokens_to_allocate*sizeof(int));
     parents = mxMalloc(n_tokens_to_allocate*sizeof(int));
     tokens_after_close = mxMalloc(n_tokens_to_allocate*sizeof(int));
-    
-    output_strings = mxCreateCellMatrix(1,n_tokens_to_allocate);
-    
+    mxStrings = (mxArray **) mxMalloc( n_tokens_to_allocate * sizeof(mxArray *));
     
     n_tokens_allocated = n_tokens_to_allocate;
     
@@ -165,7 +167,7 @@ of pointers
     while (1) {
         //The main function call
         //------------------------------------------
-        parse_result = jsmn_parse(&p,json_string,string_byte_length,n_tokens_allocated,values,types,starts,ends,sizes,parents,tokens_after_close, output_strings);
+        parse_result = jsmn_parse(&p,json_string,string_byte_length,n_tokens_allocated,values,types,starts,ends,sizes,parents,tokens_after_close, mxStrings);
         n_tokens_used = parse_result;
         
         if (parse_result >= 0){
@@ -204,23 +206,23 @@ of pointers
         sizes = mxRealloc(sizes,n_tokens_to_allocate*sizeof(int));
         parents = mxRealloc(parents,n_tokens_to_allocate*sizeof(int));
         tokens_after_close = mxRealloc(tokens_after_close,n_tokens_to_allocate*sizeof(int));
-        mxSetN(output_strings,n_tokens_to_allocate);
+        mxStrings = (mxArray **) mxRealloc(mxStrings,n_tokens_to_allocate * sizeof(mxArray *)); 
         
         n_tokens_allocated = n_tokens_to_allocate;
     }
     
+    output_strings = mxCreateCellMatrix(1, n_tokens_used);
+    for( i=0; i<n_tokens_used; i++){
+        if (types[i] == JSMN_STRING || types[i] == JSMN_KEY){
+            mxSetCell(output_strings, i, mxStrings[i]);
+        }
+    }
     
+    mxFree(mxStrings);
     
     if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
     }
-    
-    //Output population
-    //---------------------------------------------------------    
-//     output_info = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
-//     mxSetData(output_info, t);
-//     mxSetM(output_info, sizeof(jsmntok_t)/4);
-//     mxSetN(output_info, n_tokens_used);
     
     output_values = mxCreateNumericArray(0, 0, mxDOUBLE_CLASS, mxREAL);
     mxSetData(output_values, values);

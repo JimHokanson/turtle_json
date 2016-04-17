@@ -8,7 +8,17 @@
 
 //Possible changes:
 //1) remove start and end
-//2) 
+//2) fast parse strings by only looking for '"' then backtrack to verify
+//  Note that \" may not be " as in "test string\\"
+//3) for keys, use a hash map and only parse individual elements, and point
+//everything to those elements
+//4) Move to an array of depths and parents
+//
+//  This would remove a memory requirement but would add a check for
+//  sufficient depth availability ...
+//
+//  - indices are parents
+//  - single scalar 'depth' to track depth
 
 /*
 temp = cell(1,256);
@@ -398,7 +408,7 @@ double string_to_double_no_math(const char *p,char **char_offset) {
 //=========================================================================
 //                          String Parsing
 //=========================================================================
-void parse_string_helper(const char *js, int current_token_index, int *input_parser_position, size_t len, mxArray *output_strings){
+void parse_string_helper(const char *js, int current_token_index, int *input_parser_position, size_t len, mxArray **mxStrings){
     
     //TODO: This function needs work
     
@@ -406,7 +416,6 @@ void parse_string_helper(const char *js, int current_token_index, int *input_par
     
     //TODO: http://www.mathworks.com/matlabcentral/answers/71173-passing-unicode-string-from-c-mex-function-to-matlab
     
-    mxArray *mx_output_string;
     int parser_position = *input_parser_position;
     char c;
     int i;
@@ -450,10 +459,8 @@ void parse_string_helper(const char *js, int current_token_index, int *input_par
             memcpy(output_str,&js[start_position],n_chars);
             output_str[n_chars-1] = 0;
             
-            mx_output_string = mxCreateString(output_str);
-
-            mxSetCell(output_strings, current_token_index, mx_output_string);
-
+            mxStrings[current_token_index] = mxCreateString(output_str);
+            
             *input_parser_position = parser_position;
             return;
             //goto parse_string_end;
@@ -549,7 +556,7 @@ int jsmn_parse(jsmn_parser *parser,
         int *sizes,
         int *parents,
         int *tokens_after_close,
-        mxArray *output_strings) {
+        mxArray **mxStrings) {
     
     /*
      *  Inputs
@@ -903,8 +910,8 @@ parse_key:
     
     types[current_token_index]  = JSMN_KEY;
     starts[current_token_index] = parser_position+2;
-    
-    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);  
+        
+    parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);  
     ends[current_token_index] = parser_position;
     
     //sizes - not defined
@@ -971,7 +978,7 @@ parse_string_of_key:
     types[current_token_index]  = JSMN_STRING;    
     starts[current_token_index] = parser_position+2;
     
-    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);
+    parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);
     ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
@@ -998,7 +1005,7 @@ parse_string_in_array:
     types[current_token_index]  = JSMN_STRING;    
     starts[current_token_index] = parser_position+2;
     
-    parse_string_helper(js,current_token_index,&parser_position,len,output_strings);
+    parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);
     ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
