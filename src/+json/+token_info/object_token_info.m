@@ -86,6 +86,14 @@ classdef object_token_info
                     error('Unrecognized token type: %d',local_p.types(local_index))
             end
         end
+        function output = getParsedToken(obj,name)
+            %TODO: I think I want a method that explicitly merges
+            %these two lines, getTokenIndex
+            I = h__getMapIndex(obj,name);
+            local_index = obj.attribute_indices(I);
+            
+            output = obj.p.get_parsed_data('index',local_index);
+        end
         function output = getArrayToken(obj,name)
             I = h__getMapIndex(obj,name);
             
@@ -97,6 +105,12 @@ classdef object_token_info
             local_p = obj.p; 
             output = json.token_info.array_token_info(name,local_full_name,local_index,local_p);
         end
+        function output = getNumericToken(obj,name)
+                      I = h__getMapIndex(obj,name); 
+           local_index = obj.attribute_indices(I);
+           %TODO: Check type
+           output = obj.p.numeric_data(local_index); 
+        end
         function output = getTokenString(obj,name)
            %
            %    Use this to retrieve a string token. This function also
@@ -106,6 +120,18 @@ classdef object_token_info
            local_index = obj.attribute_indices(I);
            %TODO: Check type
            output = obj.p.strings{local_index};
+        end
+        function output = getStringOrCellstr(obj,name)
+           I = h__getMapIndex(obj,name); 
+           local_index = obj.attribute_indices(I);
+           if obj.p.types(local_index) == 2
+               %array
+               %TODO: We can avoid the object creation ...
+               temp = json.token_info.array_token_info('','',local_index,obj.p);
+               output = temp.getCellstr();
+           else
+               output = obj.p.strings{local_index};
+           end
         end
     end
     

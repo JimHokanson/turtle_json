@@ -46,8 +46,8 @@ file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,20);
 t3 = tic;
 for i = 1:20
-    jt = json.tokens(file_path);
-	%jt = json.tokens(file_path,'chars_per_token',5);
+    %jt = json.tokens(file_path);
+	jt = json.tokens(file_path,'chars_per_token',5);
     d1_all(i) = jt.d1;
     %sobj = jt.get_parsed_data();
 end

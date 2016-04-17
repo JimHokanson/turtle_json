@@ -73,17 +73,38 @@ classdef array_token_info
         % % % % %                    error('Not yet supported')
         % % % % %            end
         % % % % %         end
+        function output = getCellstr(obj)
+           %TODO: Add on optional error check ...  
+           start_index = obj.index + 1;
+           end_index   = obj.index + obj.n_elements;
+           output      = obj.p.strings(start_index:end_index); 
+        end
         function output = get1dNumericArray(obj)
            %TODO: Add on optional error check ... 
            start_index = obj.index + 1;
            end_index   = obj.index + obj.n_elements;
            output      = obj.p.numeric_data(start_index:end_index);
+           
+% % %            if any(obj.p.types(start_index:end_index) ~= 4)
+% % %               error('Not all values were numeric') 
+% % %            end
         end
-        function get2dNumericArray(obj)
+        function output = get2dNumericArray(obj)
            error('Not yet implemented') 
         end
-        function getArrayOf1dNumericArrays(obj)
-           error('Not yet implemented')  
+        function output = getArrayOf1dNumericArrays(obj)
+           output = cell(1,obj.n_elements);
+           array_I = obj.index + 1;
+
+           local_numeric_data = obj.p.numeric_data;
+           local_tokens_after_close = obj.p.tokens_after_close;
+           for iCell = 1:obj.n_elements
+              end_I = local_tokens_after_close(array_I)-1;
+              output{iCell} = local_numeric_data(array_I+1:end_I);
+              array_I = local_tokens_after_close(array_I);
+           end
+%            keyboard 
+%            error('Not yet implemented')  
         end
         function output = getObjectArray(obj)
             %

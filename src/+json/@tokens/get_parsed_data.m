@@ -1,5 +1,9 @@
 function output = get_parsed_data(obj,varargin)
 
+%   json.tokens.get_parsed_data
+
+
+in.index = 1;
 in.collapse_array = true;
 in = sl.in.processVarargin(in,varargin);
 
@@ -14,10 +18,10 @@ s.numeric_data = obj.numeric_data;
 s.strings = obj.strings;
 
 
-if s.types(1) == 1
-    output = parse_object(1,s,in);
+if s.types(in.index) == 1
+    output = parse_object(in.index,s,in);
 elseif s.types(1) == 2
-    output = parse_array(1,s,in);
+    output = parse_array(in.index,s,in);
 else
     error('Unexpected parent object')
 end
