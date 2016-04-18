@@ -5,9 +5,17 @@ classdef tokens
     %
     
     properties
-       file_string
+       file_string %string of the file
+       %We might not hold onto this ...
+       
        types
-       %info
+       %1 - object
+       %2 - array
+       %3 - string
+       %4 - numeric
+       %5 - logical
+       %6 - key (of an object, string)
+       
        starts
        ends
        sizes
