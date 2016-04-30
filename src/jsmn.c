@@ -5,6 +5,35 @@
 #include <math.h>
 #include "stdint.h"  //uint_8
 
+#define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
+#define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+
+enum STATES {
+    S_OPEN_OBJECT_IN_KEY,
+	S_OPEN_OBJECT_IN_ARRAY,
+	S_CLOSE_KEY_AND_OBJECT,
+	S_CLOSE_EMPTY_OBJECT,
+	S_OPEN_ARRAY_IN_KEY,
+	S_OPEN_ARRAY_IN_ARRAY,
+	S_CLOSE_ARRAY,
+	S_CLOSE_EMPTY_ARRAY,
+	S_PARSE_KEY,
+	S_PARSE_STRING_IN_KEY,
+	S_PARSE_STRING_IN_ARRAY,
+	S_PARSE_NUMBER_IN_KEY,
+	S_PARSE_NUMBER_IN_ARRAY,
+	S_PARSE_NULL_IN_KEY,
+	S_PARSE_NULL_IN_ARRAY,
+	S_PARSE_TRUE_IN_KEY,
+	S_PARSE_TRUE_IN_ARRAY,
+	S_PARSE_FALSE_IN_KEY,
+	S_PARSE_FALSE_IN_ARRAY,
+	S_PARSE_END_OF_VALUE_IN_ARRAY,
+	S_PARSE_END_OF_KEY,
+	S_PARSE_END_OF_FILE,
+    S_ERROR_OPEN_OBJECT,
+    S_ERROR_OPEN_ARRAY
+};
 
 //Possible changes:
 //1) remove start and end
@@ -363,7 +392,7 @@ double string_to_double(const char *p,char **char_offset) {
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
-
+//TODO: Allow looking for closer - verify math later
 double string_to_double_no_math(const char *p,char **char_offset) {
 
     /*
@@ -404,6 +433,9 @@ double string_to_double_no_math(const char *p,char **char_offset) {
 }
 
 
+void seek_string_end(const char *js){
+    //TODO
+}
 
 //=========================================================================
 //                          String Parsing
@@ -454,12 +486,12 @@ void parse_string_helper(const char *js, int current_token_index, int *input_par
             //---------
             //memcopy and setting of value
             
-            n_chars = parser_position - start_position + 1;
-            output_str = mxMalloc(n_chars);
-            memcpy(output_str,&js[start_position],n_chars);
-            output_str[n_chars-1] = 0;
-            
-            mxStrings[current_token_index] = mxCreateString(output_str);
+//             n_chars = parser_position - start_position + 1;
+//             output_str = mxMalloc(n_chars);
+//             memcpy(output_str,&js[start_position],n_chars);
+//             output_str[n_chars-1] = 0;
+//             
+//             mxStrings[current_token_index] = mxCreateString(output_str);
             
             *input_parser_position = parser_position;
             return;
@@ -522,7 +554,8 @@ void jsmn_init(jsmn_parser *parser) {
 	parser->position      = -1;
 	parser->current_token = -1;
 	parser->super_token   = -1;
-    parser->last_function_type = -1;   
+    parser->last_function_type = -1;
+    parser->n_numbers = 0;
 }
 
 //We work with the parser variables directly
@@ -545,18 +578,7 @@ void refill_parser(jsmn_parser *parser,
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
-int jsmn_parse(jsmn_parser *parser, 
-        const char *js, 
-        size_t len, 
-        int num_tokens,
-        double *values,
-        uint8_t *types,
-        int *starts,
-        int *ends,
-        int *sizes,
-        int *parents,
-        int *tokens_after_close,
-        mxArray **mxStrings) {
+int jsmn_parse(const char *js, size_t string_byte_length) {
     
     /*
      *  Inputs
@@ -566,26 +588,349 @@ int jsmn_parse(jsmn_parser *parser,
      *  js :
      *    The JSON string to parse
      */
+
+     int objects_or_arrays_i = -1;
+     int keys_i = -1;
+     int strings_i = -1;
+     int numeric_i = -1;
+     
+     int objects_or_arrays_max_i = 1000;
+     int keys_max_i = 1000;
+     int strings_max_i = 1000;
+     int numeric_max_i = 1000;
     
-    const double MX_NAN = mxGetNaN();
+	 enum STATES next_state;
+     int MAX_DEPTH = 200;
     
-    //Parser local variables
-    //--------------------------------------
-    int parser_position = parser->position;
-    int current_token_index = parser->current_token;
-    int super_token_index = parser->super_token;
+     int parent_types[MAX_DEPTH+1];
+     int parent_indices[MAX_DEPTH+1];
+     int parent_sizes[MAX_DEPTH+1];
+     int current_depth = 0;
     
-    int num_tokens_minus_1 = num_tokens-1;
+     int parser_position = 0;
+     int current_token_index = -1;
+     int n_tokens_to_allocate;
+     uint8_t *main_types;
+     int *main_indices;
     
-    //Frequently accessed super token attributes
-    //------------------------------------------
-    //This is true when inside an attribute
-    bool super_token_is_key; 
-    //This was moved to a variable specifically for large arrays
-    int super_token_size;
+     n_tokens_to_allocate = ceil(string_byte_length/2);
+     main_types = mxMalloc(n_tokens_to_allocate);
+     main_indices = mxMalloc(n_tokens_to_allocate*sizeof(int));
+     
+    SKIP_WHITESPACE
+
+    switch (js[parser_position]) {
+        case '{':
+			next_state = S_OPEN_OBJECT_IN_KEY;
+        case '[':
+            next_state = S_OPEN_ARRAY_IN_KEY;
+        default:
+            mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
+
+    }
     
-    char *pEndNumber;
+         int parent_indices[MAX_DEPTH+1];
+     int parent_sizes[MAX_DEPTH+1];
+     int current_depth = 0;
     
+     int parser_position = 0;
+     int current_token_index = -1;
+     int n_tokens_to_allocate;
+     uint8_t *main_types;
+     int *main_indices;
+	
+	while (1){
+		switch(next_state){
+            //=============================================================
+            case S_OPEN_OBJECT_IN_ARRAY:
+                parent_sizes[current_depth] +=1;
+                
+                //Fall Through --------------------
+		    case S_OPEN_OBJECT_IN_KEY:
+			
+                ++current_token_index;
+                main_types[current_token_index] = TYPE_OBJECT;
+                main_indices[current_token_index] = ++objects_or_arrays_i;
+                
+                if (objects_or_arrays_i > objects_or_arrays_max_i){
+                    //TODO: Resize
+                    
+                }
+                
+                if (current_depth == MAX_DEPTH){
+                    ERROR_DEPTH
+                }else{
+                    ++current_depth;
+                    parent_types[current_depth] = TYPE_OBJECT;
+                    parent_indices[current_depth] = objects_or_arrays_i;
+                    parent_sizes[current_depth] = 0;
+                }
+                
+                SKIP_WHITESPACE
+                
+			    switch (js[parser_position]){
+					case '"':
+						next_state = S_PARSE_KEY;
+					case '}':
+						next_state = S_CLOSE_EMPTY_OBJECT;
+					default:
+						next_state = S_ERROR_OPEN_OBJECT;
+				}
+                
+			break;
+            //=============================================================
+			case S_CLOSE_KEY_AND_OBJECT:
+                //TODO: set token close
+                --current_depth;
+                
+                //Fall Through ------  closing the object
+			case S_CLOSE_EMPTY_OBJECT:
+                
+                //TODO: Insert logic for object
+                //token close
+                //set count
+                
+                if(current_depth == 1){
+                    next_state = S_PARSE_END_OF_FILE;
+                }else{
+                    --current_depth;
+                    if (main_types[current_depth] == JSMN_KEY){
+                        next_state = S_PARSE_END_OF_KEY;
+                    }
+                    else{
+                        next_state = S_PARSE_END_OF_VALUE_IN_ARRAY;
+                    }     
+                }   
+                
+			break;
+            case S_OPEN_ARRAY_IN_ARRAY:
+                parent_sizes[current_depth] +=1;
+			
+                //Fall Through -------------------------------
+            case S_OPEN_ARRAY_IN_KEY:
+                ++current_token_index;
+                
+                main_types[current_token_index] = TYPE_ARRAY;
+                main_indices[current_token_index] = ++objects_or_arrays_i;
+                
+                if (objects_or_arrays_i > objects_or_arrays_max_i){
+                    //TODO: Resize
+                    
+                }
+                
+                if (current_depth == MAX_DEPTH){
+                    ERROR_DEPTH
+                }else{
+                    ++current_depth;
+                    parent_types[current_depth] = TYPE_ARRAY;
+                    parent_indices[current_depth] = objects_or_arrays_i;
+                    parent_sizes[current_depth] = 0;
+                }
+                
+                SKIP_WHITESPACE
+                
+                switch(js[parser_position]){
+                    case '"':
+                        next_state = S_PARSE_STRING_IN_ARRAY;
+                    case '-': 
+                    case '0': 
+                    case '1': 
+                    case '2': 
+                    case '3': 
+                    case '4':
+                    case '5': 
+                    case '6': 
+                    case '7': 
+                    case '8': 
+                    case '9':
+                        next_state = S_PARSE_NUMBER_IN_ARRAY;
+                    case '{':
+                        next_state = S_OPEN_OBJECT_IN_ARRAY;
+                    case '[':
+                        next_state = S_OPEN_ARRAY_IN_ARRAY;
+                    case ']':
+                        next_state = S_CLOSE_ARRAY;
+                    case 't':
+                        next_state = S_PARSE_TRUE_IN_ARRAY;
+                    case 'f':
+                        next_state = S_PARSE_FALSE_IN_ARRAY;
+                    case 'n':
+                        next_state = S_PARSE_NULL_IN_ARRAY;
+                    default:
+                        next_state = S_ERROR_OPEN_ARRAY;
+                }
+                
+            break;
+			case S_CLOSE_ARRAY:
+            
+                //TODO: Insert logic for object
+                //token close
+                //set count    
+                
+             	if(current_depth == 1){
+                    next_state = S_PARSE_END_OF_FILE;
+                }else{
+                    --current_depth;
+                    if (main_types[current_depth] == JSMN_KEY){
+                        next_state = S_PARSE_END_OF_KEY;
+                    }
+                    else{
+                        next_state = S_PARSE_END_OF_VALUE_IN_ARRAY;
+                    }     
+                }  
+
+            break;
+            case S_PARSE_KEY:
+                parent_sizes[current_depth] +=1;
+                ++current_token_index;
+            
+                main_types[current_token_index] = TYPE_KEY;
+                main_indices[current_token_index] = ++keys_i;
+            
+                
+                //TODO: Change below ....
+                if (keys_i > keys_max_i){
+                    //TODO: Resize
+                }
+                
+                if (current_depth == MAX_DEPTH){
+                    ERROR_DEPTH
+                }else{
+                    ++current_depth;
+                    parent_types[current_depth] = TYPE_KEY;
+                    parent_indices[current_depth] = keys_i;
+                }
+                
+                
+                //TODO: Set start
+                //
+                
+                
+                //TODO: Change advance 
+                
+                
+                SKIP_WHITESPACE
+                
+                if (js[parser_position] == ':'){
+
+                    super_token_index = current_token_index;
+
+                    //Advance now to the next token
+                    while (is_whitespace[js[++parser_position]]){  
+                    }
+
+                    switch(js[parser_position]){
+                        case '"':
+                            goto parse_string_of_key;
+                        case '-': 
+                        case '0': 
+                        case '1': 
+                        case '2': 
+                        case '3': 
+                        case '4':
+                        case '5': 
+                        case '6': 
+                        case '7': 
+                        case '8': 
+                        case '9':
+                            goto parse_number_of_key;
+                        case '{':
+                            goto parse_object_of_key;
+                        case '[':
+                            goto parse_array_of_key;
+                        case 't':
+                            goto parse_true_of_key;
+                        case 'f':
+                            goto parse_false_of_key;
+                        case 'n':
+                            goto parse_null_of_key;
+                        default:
+                            mexErrMsgIdAndTxt("jsmn_mex:missing_attribute_value","Character following attribute opening ':' was not recognized");
+                    }
+                }else{
+                    //TODO: provide more info (string and position)
+                    mexErrMsgIdAndTxt("jsmn_mex:attribute_missing_colon","Object attribute not followed by a colon");
+                } 
+                
+            break;
+			case S_PARSE_STRING_IN_KEY:
+            
+            break;
+			case S_PARSE_STRING_IN_ARRAY:
+            
+            break;
+			case S_PARSE_NUMBER_IN_KEY:
+                
+            break;
+			case S_PARSE_NUMBER_IN_ARRAY:
+                
+            break;
+			case S_PARSE_NULL_IN_KEY:
+                
+            break;    
+			case S_PARSE_NULL_IN_ARRAY:
+			
+            break;
+            case S_PARSE_TRUE_IN_KEY:
+			
+            break;
+            case S_PARSE_TRUE_IN_ARRAY:
+			
+            break;
+            case S_PARSE_FALSE_IN_KEY:
+			
+            break;
+            case S_PARSE_FALSE_IN_ARRAY:
+			
+            break;
+            case S_PARSE_END_OF_VALUE_IN_ARRAY:
+			
+            break;
+            case S_PARSE_END_OF_KEY:
+			
+            break;
+            case S_PARSE_END_OF_FILE:
+                
+            goto finish_main;
+                
+		}
+	
+	}
+  
+finish_main:
+    
+     
+//         int num_tokens,
+//         double *values,
+//         uint8_t *types,
+//         int *sizes,
+//         int *parents,
+//         int *tokens_after_close,
+//         mxArray **mxStrings
+    
+    
+    
+
+    
+// // //     const double MX_NAN = mxGetNaN();
+// // //     
+// // //     //Parser local variables
+// // //     //--------------------------------------
+// // //     int parser_position = parser->position;
+// // //     int current_token_index = parser->current_token;
+// // //     int super_token_index = parser->super_token;
+// // //     
+// // //     int num_tokens_minus_1 = num_tokens-1;
+// // //     
+// // //     //Frequently accessed super token attributes
+// // //     //------------------------------------------
+// // //     //This is true when inside an attribute
+// // //     bool super_token_is_key; 
+// // //     //This was moved to a variable specifically for large arrays
+// // //     int super_token_size;
+// // //     
+// // //     char *pEndNumber;
+// // //     
 // // // //     //reinitialize super if we've reallocated memory for the parser
 // // // //     if (super_token_index != -1){        
 // // // //         super_token_is_key = types[super_token_index] == JSMN_KEY;
@@ -593,94 +938,8 @@ int jsmn_parse(jsmn_parser *parser,
 // // // //         super_token_is_key = false;
 // // // //     }
 
-    //Initialization
-    //---------------------------------------------------------------------
-    if(parser_position == -1){
-        while (is_whitespace[js[++parser_position]]) {
-        }
-        
-        switch (js[parser_position]) {
-            case '{':
-                goto parse_opening_object;
-            case '[':
-                goto parse_opening_array;
-            default:
-                mexErrMsgIdAndTxt("jsmn_mex:invalid_start","Starting token needs to be an opening object or array");
-                
-        }
-    }else{
-        //TODO: Create specific values per function ...
-        //i.e. switch parser->last_function_type
-        //=====================================================================
-        //                          Reinitialization
-        //=====================================================================
-        //We will have terminated on starting a token since we exited
-        //at token reallocation
-        if (parser->last_function_type == 1){
-            switch(js[parser_position]){
-                case '"':
-                    goto parse_string_of_key;
-                case '-':
-                case '0':
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                    goto parse_number_of_key;
-                case '{':
-                    goto parse_object_of_key;
-                case '[':
-                    goto parse_array_of_key;
-                case 't':
-                    goto parse_true_of_key;
-                case 'f':
-                    goto parse_false_of_key;
-                case 'n':
-                    goto parse_null_of_key;
-                default:
-                    mexErrMsgIdAndTxt("jsmn_mex:code_error","Unable to restart parsing following memory reallocation");
-            }
-            
-        }else if(parser->last_function_type == 0){
-            super_token_size = sizes[super_token_index];
-            switch(js[parser_position]){
-                case '"':
-                    goto parse_string_in_array;
-                case '-':
-                case '0':
-                case '1':
-                case '2':
-                case '3':
-                case '4':
-                case '5':
-                case '6':
-                case '7':
-                case '8':
-                case '9':
-                    goto parse_number_in_array;
-                case '{':
-                    goto parse_object_in_array;
-                case '[':
-                    goto parse_array_in_array;
-                case 't':
-                    goto parse_true_in_array;
-                case 'f':
-                    goto parse_false_in_array;
-                case 'n':
-                    goto parse_null_in_array;
-                default:
-                    mexErrMsgIdAndTxt("jsmn_mex:code_error","Unable to restart parsing following memory reallocation");
-            }
-        } else{
-            goto parse_key;
-        }
-    }
-    //----------------- End of (re)initialization -------------------------
+    
+
     
     
 //=========================================================================
@@ -698,18 +957,14 @@ parse_object_in_array:
     ++current_token_index;
 
     types[current_token_index]   = JSMN_OBJECT;
-    starts[current_token_index]  = parser_position+1;
-    //ends - defined later
     sizes[current_token_index]   = 0;
     parents[current_token_index] = super_token_index;
     //token_after_close - defined later
-    //values - not defined
 
     //--------------------------------------------------------------
     super_token_index = current_token_index;
 
-    while (is_whitespace[js[++parser_position]]){  
-    }
+    SKIP_WHITESPACE
 
     switch (js[parser_position]){
         case '"':
@@ -735,7 +990,7 @@ parse_object_of_key:
     //TODO: Consider merging below this point with object parsing above
 
     types[current_token_index]   = JSMN_OBJECT;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //ends - defined later
     sizes[current_token_index]   = 0;
     parents[current_token_index] = super_token_index;
@@ -785,7 +1040,7 @@ parse_array_common:
     ++current_token_index; 
     
     types[current_token_index]  = JSMN_ARRAY;
-    starts[current_token_index] = parser_position+1;
+    //starts[current_token_index] = parser_position+1;
     //ends - defined later
     //sizes - defined later
     parents[current_token_index] = super_token_index;
@@ -797,8 +1052,7 @@ parse_array_common:
     super_token_size = 0;
     super_token_index = current_token_index;
 
-    while (is_whitespace[js[++parser_position]]){  
-    }
+    SKIP_WHITESPACE
 
     switch(js[parser_position]){
         case '"':
@@ -855,7 +1109,7 @@ close_object:
     
 close_empty_object:
     
-    ends[super_token_index] = parser_position + 1;
+    //ends[super_token_index] = parser_position + 1;
     //sizes - only incremented at keys
     tokens_after_close[super_token_index] = current_token_index+2;
     
@@ -879,7 +1133,7 @@ close_empty_object:
 //========================================================================= 
 close_array:
     
-    ends[super_token_index]  = parser_position + 1;
+    //ends[super_token_index]  = parser_position + 1;
     sizes[super_token_index] = super_token_size;
     tokens_after_close[super_token_index] = current_token_index+2;
     
@@ -909,18 +1163,17 @@ parse_key:
     ++current_token_index;
     
     types[current_token_index]  = JSMN_KEY;
-    starts[current_token_index] = parser_position+2;
+    //starts[current_token_index] = parser_position+2;
         
     parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);  
-    ends[current_token_index] = parser_position;
+    //ends[current_token_index] = parser_position;
     
     //sizes - not defined
     parents[current_token_index] = super_token_index;
     //token_after_close - defined later
     //values - not defined
     
-    while (is_whitespace[js[++parser_position]]){  
-    }
+    SKIP_WHITESPACE
 
     if (js[parser_position] == ':'){
         
@@ -976,10 +1229,10 @@ parse_string_of_key:
     ++current_token_index;    
     
     types[current_token_index]  = JSMN_STRING;    
-    starts[current_token_index] = parser_position+2;
+    //starts[current_token_index] = parser_position+2;
     
     parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);
-    ends[current_token_index] = parser_position;
+    //ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
     parents[current_token_index] = super_token_index;
@@ -1003,10 +1256,10 @@ parse_string_in_array:
     ++current_token_index;    
     
     types[current_token_index]  = JSMN_STRING;    
-    starts[current_token_index] = parser_position+2;
+    //starts[current_token_index] = parser_position+2;
     
     parse_string_helper(js,current_token_index,&parser_position,len,mxStrings);
-    ends[current_token_index] = parser_position;
+    //ends[current_token_index] = parser_position;
     
     //sizes - not currently defined
     parents[current_token_index] = super_token_index;
@@ -1019,8 +1272,7 @@ parse_string_in_array:
 //     Parsing a Comma ',' in an array  ---  [1,2,
 //=========================================================================
 parse_comma_in_array:
-    while (is_whitespace[js[++parser_position]]){  
-    }
+    SKIP_WHITESPACE
     
     //primitive required
     switch (js[parser_position]){
@@ -1063,8 +1315,7 @@ parse_comma_in_object:
     //p   //Need to move p here so that the parent of 'b'
     // is the opening '{', not 'a'
     
-    while (is_whitespace[js[++parser_position]]){  
-    }
+    SKIP_WHITESPACE
     
 
     //ends, for a key this is defined as the end of the string
@@ -1095,17 +1346,10 @@ parse_number_of_key:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_NUMBER;
-    starts[current_token_index]  = parser_position+1;
-    sizes[current_token_index]   = 1;
-    parents[current_token_index] = super_token_index;
-    
-    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
-    //values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
-    
-    
+    values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
+
     parser_position = (int)(pEndNumber - js);  
-    ends[current_token_index] = parser_position;
-    tokens_after_close[current_token_index] = current_token_index+2;
+
     parser_position--; //backtrack so we terminate on the #
 
     goto process_end_of_key_value;
@@ -1125,16 +1369,13 @@ parse_number_in_array:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_NUMBER;
-    starts[current_token_index]  = parser_position+1;
-    sizes[current_token_index]   = 1;
-    parents[current_token_index] = super_token_index;
-    
-    values[current_token_index] = string_to_double(js+parser_position,&pEndNumber);
-    //values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
+
+    values[current_token_index] = string_to_double_no_math(js+parser_position,&pEndNumber);
     
     parser_position = (int)(pEndNumber - js);  
-    ends[current_token_index] = parser_position;
-    tokens_after_close[current_token_index] = current_token_index+2;
+    
+    //TODO: We could incorporate this into the processing
+    //rather than backtracking ...
     parser_position--; //backtrack so we terminate on the #
 
     goto process_end_of_array_value;    
@@ -1152,10 +1393,10 @@ parse_null_of_key:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_NUMBER;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Check null
     parser_position  += 3; //advance to final 'l' in 'null'
-    ends[current_token_index] = parser_position+1;
+    //ends[current_token_index] = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1177,10 +1418,10 @@ parse_null_in_array:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_NUMBER;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Check null
     parser_position  += 3; //advance to final 'l' in 'null'
-    ends[current_token_index] = parser_position+1;
+    //ends[current_token_index] = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1201,10 +1442,10 @@ parse_true_of_key:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_LOGICAL;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
-    ends[current_token_index]    = parser_position+1;
+    //ends[current_token_index]    = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1226,10 +1467,10 @@ parse_true_in_array:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_LOGICAL;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Error check true - make optional with compile flag
     parser_position  += 3; //advance to final 'e' in 'true'
-    ends[current_token_index]    = parser_position+1;
+    //ends[current_token_index]    = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1249,10 +1490,10 @@ parse_false_of_key:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_LOGICAL;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Error check true 
     parser_position  += 4; //advance to final 'e' in 'false'
-    ends[current_token_index]    = parser_position+1;
+    //ends[current_token_index]    = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1274,10 +1515,10 @@ parse_false_in_array:
     ++current_token_index;
     
     types[current_token_index]   = JSMN_LOGICAL;
-    starts[current_token_index]  = parser_position+1;
+    //starts[current_token_index]  = parser_position+1;
     //TODO: Error check true 
     parser_position  += 4; //advance to final 'e' in 'false'
-    ends[current_token_index]    = parser_position+1;
+    //ends[current_token_index]    = parser_position+1;
     sizes[current_token_index]   = 1;
     parents[current_token_index] = super_token_index;
     tokens_after_close[current_token_index] = current_token_index+2;
@@ -1289,8 +1530,7 @@ parse_false_in_array:
 //                  End of Value Handling    
 //=============================================================
 process_end_of_key_value:
-        while (is_whitespace[js[++parser_position]]){
-        }
+        SKIP_WHITESPACE
 
         switch(js[parser_position]){
             case ',':
@@ -1302,8 +1542,7 @@ process_end_of_key_value:
         }
         
 process_end_of_array_value:
-    while (is_whitespace[js[++parser_position]]){
-    }
+    SKIP_WHITESPACE
 
     switch(js[parser_position]){
         case ',':

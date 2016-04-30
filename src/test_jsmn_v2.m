@@ -20,7 +20,11 @@ for i = 1:N
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
-
+%3.92549, 3.39944, 6.8132
+%3.58606, 3.07785, 6.25688 - removed starts and ends
+%3.54081, 2.68656, 5.47246 - no math
+%1.14952, 0.474847, 0.966987 - no strings
+%0.780231, 0.482823, 0.993973
 
 tic; 
 for i = 1:10

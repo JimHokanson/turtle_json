@@ -3,6 +3,41 @@ classdef tokens
     %   Class:
     %   json.tokens
     %
+    %   See Also:
+    %   ---------
+    %   json.fileToTokens
+    %   json.stringToTokens
+    
+    %{
+    
+    Working on new layout to save memory and time
+    
+    object
+    - token after close
+    - n_keys
+    - parent
+    
+    array
+    - token after close
+    - n_elements
+    - parent
+    
+    key
+    - token_after_close
+    - parent
+    - start/pointer
+    - end
+    
+    string
+    - start/pointer
+    - end
+    
+    number/null/true/false
+    - pointer
+    
+    
+    
+    %}
     
     properties
        file_string %string of the file
@@ -16,8 +51,8 @@ classdef tokens
        %5 - logical
        %6 - key (of an object, string)
        
-       starts
-       ends
+%        starts
+%        ends
        sizes
        parents
        tokens_after_close
@@ -28,6 +63,7 @@ classdef tokens
        %5) Parent Index - 0 based 
        %6) Next Object - 0 based
        
+       mex
        
        numeric_data
        strings
@@ -77,7 +113,7 @@ classdef tokens
     methods
         function obj = tokens(file_path,varargin)
             %
-            %
+            %   obj = json.tokens(file_path,varargin)
             %
             %   See Also:
             %   ---------
@@ -118,29 +154,10 @@ classdef tokens
                 obj.d1 = toc(t1);
             end
             
-            
-%             t2 = tic;
-%             %This will eventually change to going in the code ...
-%             %For now I want to expose other code like it has already been
-%             %computed
-%             string_types_I = find(result.types == 3 | result.types == 6);
-%             n_strings = length(string_types_I);
-%             n_tokens = length(result.types);
-%             local_strings = cell(1,n_tokens);
-%             local_starts = result.starts;
-%             local_ends   = result.ends;
-%             local_file_string = obj.file_string;
-%             for iString = 1:n_strings
-%                 cur_I = string_types_I(iString);
-%                 local_strings{cur_I} = local_file_string(local_starts(cur_I):local_ends(cur_I));
-%             end
-%             obj.d2 = toc(t2);
-%             obj.strings = local_strings;
-            
+                       
+            obj.mex = result;
             
             obj.types = result.types;
-            obj.starts = result.starts;
-            obj.ends = result.ends;
             obj.sizes = result.sizes;
             obj.parents = result.parents;
             obj.tokens_after_close = result.tokens_after_close;

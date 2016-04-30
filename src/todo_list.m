@@ -4,12 +4,16 @@
 3) DONE Remove the structure
 4) DONE Change parser variable names
 5) Remove pointless value setting (i.e. initialization to -1)
-6) create key type
+6) DONE create key type
 7) multiline macro refill check
 8) TRIED - NO GO remove extra posiition variable in # parsing
+9) Finish test suite
+10) Improve error printing
+11) make pointers to numeric and strings
+12) parent array with max depth
 
 %Ugly hack to speed things up:
-%- create separate pathways for objects and array processing
+%- DONE create separate pathways for objects and array processing
 
 
 
