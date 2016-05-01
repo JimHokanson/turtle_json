@@ -157,15 +157,15 @@ classdef tokens
                        
             obj.mex = result;
             
-            obj.types = result.types;
-            obj.sizes = result.sizes;
-            obj.parents = result.parents;
-            obj.tokens_after_close = result.tokens_after_close;
-            obj.numeric_data = result.values;
-            obj.strings = result.strings;
-            
-            obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
-            obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
+%             obj.types = result.types;
+%             obj.sizes = result.sizes;
+%             obj.parents = result.parents;
+%             obj.tokens_after_close = result.tokens_after_close;
+%             obj.numeric_data = result.values;
+%             obj.strings = result.strings;
+%             
+%             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
+%             obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
         end
         function root = getRootInfo(obj)
             switch obj.types(1)
