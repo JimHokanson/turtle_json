@@ -10,7 +10,7 @@ file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\canada.json';
 file_path = 'G:\repos\matlab_git\jsmn_mex\example_data\citm_catalog.json'; 
 
 file_path = 'H:\example_data\1.json';
-N = 2;
+N = 5;
 d1_all = zeros(1,N);
 t3 = tic;
 for i = 1:N
@@ -29,6 +29,10 @@ fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
 %
 %
 %0.603803, 0.359887, 0.72572
+%
+%0.560783, 0.306171, 1.54996    5x
+%0.481109, 0.228823, 1.17341  - using GOTO
+%0.468115, 0.233291, 1.18439 - ""
 
 tic; 
 for i = 1:10
@@ -101,6 +105,9 @@ profile viewer
 %0.2745, 0.127264, 1.29634 - no number resolving
 %
 %0.293459, 0.164545, 1.67481 - strings resolved in the function, math is back
+%
+%0.191358, 0.102472, 1.03972 - goto - no string or num processing
+%
 
 
 %No math
