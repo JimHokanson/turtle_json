@@ -846,41 +846,46 @@ int jsmn_parse(const char *js, size_t string_byte_length) {
                     //Advance to the next token
                     SKIP_WHITESPACE
 
-                            switch(js[parser_position]){
-                                case '"':
-                                    next_state = S_PARSE_STRING_IN_KEY;
-                                    break;
-                                case '-':
-                                case '0':
-                                case '1':
-                                case '2':
-                                case '3':
-                                case '4':
-                                case '5':
-                                case '6':
-                                case '7':
-                                case '8':
-                                case '9':
-                                    next_state = S_PARSE_NUMBER_IN_KEY;
-                                    break;
-                                case '{':
-                                    next_state = S_OPEN_OBJECT_IN_KEY;
-                                    break;
-                                case '[':
-                                    next_state = S_OPEN_ARRAY_IN_KEY;
-                                    break;
-                                case 't':
-                                    next_state = S_PARSE_TRUE_IN_KEY;
-                                    break;
-                                case 'f':
-                                    next_state = S_PARSE_FALSE_IN_KEY;
-                                    break;
-                                case 'n':
-                                    next_state = S_PARSE_NULL_IN_KEY;
-                                    break;
-                                default:
-                                    next_state = S_ERROR_OPEN_KEY_2;
-                            }
+                    //TODO: Include - value as well
+                    if (is_number_array[js[parser_position]]){
+                        next_state = S_PARSE_NUMBER_IN_KEY;
+                    }else{ 
+                        switch(js[parser_position]){
+                            case '"':
+                                next_state = S_PARSE_STRING_IN_KEY;
+                                break;
+                            case '-':
+                            case '0':
+                            case '1':
+                            case '2':
+                            case '3':
+                            case '4':
+                            case '5':
+                            case '6':
+                            case '7':
+                            case '8':
+                            case '9':
+                                next_state = S_PARSE_NUMBER_IN_KEY;
+                                break;
+                            case '{':
+                                next_state = S_OPEN_OBJECT_IN_KEY;
+                                break;
+                            case '[':
+                                next_state = S_OPEN_ARRAY_IN_KEY;
+                                break;
+                            case 't':
+                                next_state = S_PARSE_TRUE_IN_KEY;
+                                break;
+                            case 'f':
+                                next_state = S_PARSE_FALSE_IN_KEY;
+                                break;
+                            case 'n':
+                                next_state = S_PARSE_NULL_IN_KEY;
+                                break;
+                            default:
+                                next_state = S_ERROR_OPEN_KEY_2;
+                        }
+                    }
                 }else{
                     next_state = S_ERROR_OPEN_KEY_1;
                 }

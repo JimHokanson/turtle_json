@@ -1,0 +1,2 @@
+http://stackoverflow.com/questions/16716821/how-to-build-mex-file-directly-in-visual-studio
+http://www.mathworks.com/help/matlab/matlab_external/compiling-mex-files-with-the-microsoft-visual-c-ide.html

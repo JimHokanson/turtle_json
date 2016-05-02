@@ -1,0 +1,8 @@
+Object,Array,Key,String,Numeric,Logical,
+type,type,type,type,type,type,
+pointer,pointer,pointer,pointer,pointer,value,uint32
+,,,,,,
+token_after_close,token_after_close,token_after_close,start,start,,
+n_keys,n_tokens,start,end,end,,
+,,end,value,value,,
+,,value,,,,
