@@ -24,7 +24,7 @@
 #include "mex.h"
 #include "jsmn.h"
 
-void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
+void setStructField2(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
     
     //setStructField(plhs[0],data_ptr,"name",mxINT32_CLASS,N)
@@ -58,7 +58,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  token_info
     //      - see wrapping Matlab function
     
-    int parse_result;
+    int *n_tokens_used = mxMalloc(sizeof(int));
     char *json_string;
     size_t string_byte_length;
     
@@ -91,13 +91,14 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
     }
     
-    parse_result = jsmn_parse(json_string,string_byte_length);
+    *n_tokens_used = jsmn_parse(json_string,string_byte_length);
   
     if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
     }
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+	setStructField2(plhs[0],n_tokens_used,"n_tokens_used",mxINT32_CLASS,1);
     
 // // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
 // // //     setStructField(plhs[0],types,"types",mxUINT8_CLASS,n_tokens_used);

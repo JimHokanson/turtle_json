@@ -33,6 +33,7 @@ fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
 %0.560783, 0.306171, 1.54996    5x
 %0.481109, 0.228823, 1.17341  - using GOTO
 %0.468115, 0.233291, 1.18439 - ""
+%0.42677, 0.197664, 0.993281
 
 tic; 
 for i = 1:10
@@ -108,6 +109,7 @@ profile viewer
 %
 %0.191358, 0.102472, 1.03972 - goto - no string or num processing
 %
+%0.177615, 0.0883615, 0.902094 - first round of computed goto optimizations
 
 
 %No math
