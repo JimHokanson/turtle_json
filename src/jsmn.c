@@ -1,6 +1,7 @@
 #include "jsmn.h"
 #include "stdio.h"
 #include <stdlib.h>
+#include <ctype.h>
 #include "mex.h"
 #include <math.h>
 #include "stdint.h"  //uint_8
@@ -10,7 +11,7 @@
 	SKIP_WHITESPACE; \
 	switch (js[parser_position]) { \
         case ',': \
-            SKIP_WHITESPACE; \    
+            SKIP_WHITESPACE; \
             goto *array_jump[js[parser_position]]; \
         case ']': \
             goto S_CLOSE_ARRAY; \
@@ -32,13 +33,14 @@ const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
 //TODO: Allow looking for closer - verify math later
-double string_to_double_no_math(char *p, char **char_offset) {
+inline double string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
-	while (is_number_array[*(++p)]) {}
+
+    while (isdigit(*(++p))) {}
 
 	if (*p == '.') {
 		++p;
-		while (is_number_array[*(++p)]) {}
+        while (isdigit(*(++p))) {}
 	}
 
 	if (*p == 'E' || *p == 'e') {
@@ -51,7 +53,7 @@ double string_to_double_no_math(char *p, char **char_offset) {
 			++p;
 		}
 
-		while (is_number_array[*(++p)]) {}
+		while (isdigit(*(++p))) {}
 	}
 
 	*char_offset = p;
@@ -60,27 +62,78 @@ double string_to_double_no_math(char *p, char **char_offset) {
 }
 
 
-void seek_string_end(const char *js, int *input_parser_position) {
+void seek_string_end(unsigned char *js, int *input_parser_position) {
 
 	//  seek_string_end(js,&parser_position)
 
 	//TODO: This could be completely wrong if we have unicode
 	//although I think unicode has to be escaped????
 	int parser_position = *input_parser_position;
-	char c;
+	unsigned char c;
 
-	while ((c = js[++parser_position])) {
-		if (c == '\"') {
-			//The idea here is that we don't check this all the time
-			//If we hit \" we would need to keep going back until
-			//we determine if the '\' is real or not
-			if (js[parser_position - 1] == '\\') {
-				mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
-			}
-			*input_parser_position = parser_position;
-			return;
-		}
-	}
+//I had wanted to do just a search for " but then
+//I might miss the end of string
+//START_STRING_SEEK:
+    
+// // // 	while ((c = js[++parser_position])) {
+// // // 		if (c == '\"') {
+// // // 			//The idea here is that we don't check this all the time
+// // // 			//If we hit \" we would need to keep going back until
+// // // 			//we determine if the '\' is real or not
+// // // 			if (js[parser_position - 1] == '\\') {
+// // //                 if (js[parser_position - 2] == '\\') {
+// // //                     //This indicates that we have '\\"'
+// // //                     //Since we don't know what's before we could
+// // //                     //have a double escape
+// // //                     //The way to fix this to walk backwards and togggle
+// // //                     //whether or not the quote '"' is escaped or not
+// // //                     //  cur_parser_position = parser_position
+// // //                     //  is_escaped = false;
+// // //                     //  while(js[--parser_position] == '\\'){
+// // //                     //     is_escaped = !is_escaped 
+// // //                     //  }
+// // //                     //  if (is_escaped) => continue
+// // //                     //  else => done
+// // //                     mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
+// // //                 }
+// // //                 //else, keep going looking for another "
+// // // 			}else{
+// // //                 *input_parser_position = parser_position;
+// // //                 return;
+// // //             }
+// // // 		}
+// // // 	}
+
+STRING_SEEK:
+    while ((c = js[++parser_position]) && c != '"'){}
+    
+    if (c == '"') { //otherwise we're at the end of the string ...
+        //The idea here is that we don't check this all the time
+        //If we hit \" we would need to keep going back until
+        //we determine if the '\' is real or not
+        if (js[parser_position - 1] == '\\') {
+            if (js[parser_position - 2] == '\\') {
+                //This indicates that we have '\\"'
+                //Since we don't know what's before we could
+                //have a double escape
+                //The way to fix this to walk backwards and togggle
+                //whether or not the quote '"' is escaped or not
+                //  cur_parser_position = parser_position
+                //  is_escaped = false;
+                //  while(js[--parser_position] == '\\'){
+                //     is_escaped = !is_escaped 
+                //  }
+                //  if (is_escaped) => continue
+                //  else => done
+                mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
+            }
+            goto STRING_SEEK;
+            //else, keep going looking for another "
+        }else{
+            *input_parser_position = parser_position;
+            return;
+        }
+    }
 
 	mexErrMsgIdAndTxt("jsmn_mex:unterminated_string", "Unable to find a terminating string quote");
 }
@@ -88,37 +141,12 @@ void seek_string_end(const char *js, int *input_parser_position) {
 
 
 
-//Parser initialization
-//----------------------------------
-void jsmn_init(jsmn_parser *parser) {
-	parser->position = -1;
-	parser->current_token = -1;
-	parser->super_token = -1;
-	parser->last_function_type = -1;
-	parser->n_numbers = 0;
-}
 
-//We work with the parser variables directly
-//Here we
-void refill_parser(jsmn_parser *parser,
-	int parser_position,
-	int current_token_index,
-	int super_token_index,
-	int last_function_type) {
-
-
-	//  refill_parser(parser,parser_position,next_token_index,super_token_index,false)
-
-	parser->position = parser_position;
-	parser->current_token = current_token_index;
-	parser->super_token = super_token_index;
-	parser->last_function_type = last_function_type;
-}
 
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
-int jsmn_parse(const char *js, size_t string_byte_length) {
+int jsmn_parse(unsigned char *js, size_t string_byte_length) {
 
 	/*
 	*  Inputs
@@ -129,18 +157,40 @@ int jsmn_parse(const char *js, size_t string_byte_length) {
 	*    The JSON string to parse
 	*/
 
-	const void *array_jump[256] = { &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_STRING_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_ARRAY_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_FALSE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NULL_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_TRUE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_OBJECT_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY };
-
-
-	int objects_or_arrays_i = -1;
-	int keys_i = -1;
-	int strings_i = -1;
-	int numeric_i = -1;
-
-	int objects_or_arrays_max_i = 1000;
-	int keys_max_i = 1000;
-	int strings_max_i = 1000;
-	int numeric_max_i = 1000;
+    //const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
+    
+    const void *array_jump[256] = {
+        [0 ... 33]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [34]=&&S_PARSE_STRING_IN_ARRAY, // "
+        [35 ... 44]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [45]=&&S_PARSE_NUMBER_IN_ARRAY,
+        [46 ... 47]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [48 ... 57]=&&S_PARSE_NUMBER_IN_ARRAY,
+        [58 ... 90]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [91]=&&S_OPEN_ARRAY_IN_ARRAY,
+        [92 ... 101]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [102]=&&S_PARSE_FALSE_IN_ARRAY,
+        [103 ... 109]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [110]=&&S_PARSE_NULL_IN_ARRAY,
+        [111 ... 115]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [116]=&&S_PARSE_TRUE_IN_ARRAY,
+        [117 ... 122]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [123]=&&S_OPEN_OBJECT_IN_ARRAY,
+        [124 ... 255]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
+    
+//     temp = cell(1,256);
+// temp(:) = {'&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY'};
+// temp([46 49:58]) = {'&&S_PARSE_NUMBER_IN_ARRAY'};
+// temp{'n'+1} = '&&S_PARSE_NULL_IN_ARRAY';
+// temp{'t'+1} = '&&S_PARSE_TRUE_IN_ARRAY';
+// temp{'f'+1} = '&&S_PARSE_FALSE_IN_ARRAY';
+// temp{'"'+1} = '';
+// temp{'{'+1} = '&&S_OPEN_OBJECT_IN_ARRAY';
+// temp{'['+1} = '&&S_OPEN_ARRAY_IN_ARRAY';
+//     
+    
+    
+	//const void *array_jump[256] = { &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_STRING_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_ARRAY_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_FALSE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NULL_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_TRUE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_OBJECT_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY };
 
 	//enum STATES next_state;
 	const int MAX_DEPTH = 200;
@@ -152,14 +202,15 @@ int jsmn_parse(const char *js, size_t string_byte_length) {
 	int current_depth = 0;
 
 	int parser_position = -1;
-	char *pEndNumber;
+	unsigned char *pEndNumber;
 	int current_token_index = -1;
 
 
 	int n_tokens_to_allocate = ceil(string_byte_length / 2);
 	uint8_t *main_types = mxMalloc(n_tokens_to_allocate);
-	int *main_indices = mxMalloc(n_tokens_to_allocate * sizeof(int));
-
+	int *data1 = mxMalloc(n_tokens_to_allocate * sizeof(int));
+    int *data2 = mxMalloc(n_tokens_to_allocate * sizeof(int));
+    
 	SKIP_WHITESPACE;
 
 	switch (js[parser_position]) {
@@ -181,11 +232,6 @@ S_OPEN_OBJECT_IN_KEY:
 
 	++current_token_index;
 	main_types[current_token_index] = TYPE_OBJECT;
-	main_indices[current_token_index] = ++objects_or_arrays_i;
-
-	if (objects_or_arrays_i > objects_or_arrays_max_i) {
-		//TODO: Resize
-	}
 
 	if (current_depth == MAX_DEPTH) {
 		ERROR_DEPTH
@@ -193,10 +239,11 @@ S_OPEN_OBJECT_IN_KEY:
 	else {
 		++current_depth;
 		parent_types[current_depth] = TYPE_OBJECT;
-		parent_indices[current_depth] = objects_or_arrays_i;
+		parent_indices[current_depth] = current_token_index;
 		parent_sizes[current_depth] = 0;
 	}
 
+    //Navigation -----------------------------
 	SKIP_WHITESPACE
 
     switch (js[parser_position]) {
@@ -223,16 +270,14 @@ S_CLOSE_EMPTY_OBJECT:
 	if (current_depth == 1) {
 		goto S_PARSE_END_OF_FILE;
 	}
-	else {
-		--current_depth;
-		if (parent_types[current_depth] == TYPE_KEY) {
-			goto S_PARSE_END_OF_VALUE_IN_KEY;
-		}
-		else {
-			goto S_PARSE_END_OF_VALUE_IN_ARRAY;
-		}
-	}
-
+    
+    --current_depth;
+    
+    if (parent_types[current_depth] == TYPE_KEY) {
+        goto S_PARSE_END_OF_VALUE_IN_KEY;
+    }
+    
+    PROCESS_END_OF_ARRAY_VALUE
 
 
 	//=============================================================
@@ -244,11 +289,6 @@ S_OPEN_ARRAY_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_ARRAY;
-	main_indices[current_token_index] = ++objects_or_arrays_i;
-
-	if (objects_or_arrays_i > objects_or_arrays_max_i) {
-		//TODO: Resize
-	}
 
 	if (current_depth == MAX_DEPTH) {
 		ERROR_DEPTH
@@ -256,11 +296,10 @@ S_OPEN_ARRAY_IN_KEY:
 	else {
 		++current_depth;
 		parent_types[current_depth] = TYPE_ARRAY;
-		parent_indices[current_depth] = objects_or_arrays_i;
+		parent_indices[current_depth] = current_token_index;
 		parent_sizes[current_depth] = 0;
 	}
 
-	//TODO: This could be a call to S_PARSE_END_OF_VALUE_IN_ARRAY
 	SKIP_WHITESPACE
     goto *array_jump[js[parser_position]];
 
@@ -276,32 +315,23 @@ S_CLOSE_ARRAY:
 	if (current_depth == 1) {
 		goto S_PARSE_END_OF_FILE;
 	}
-	else {
-		--current_depth;
-		if (parent_types[current_depth] == TYPE_KEY) {
-			goto S_PARSE_END_OF_VALUE_IN_KEY;
-		}
-		else {
-			goto S_PARSE_END_OF_VALUE_IN_ARRAY;
-		}
-	}
-	//                 mexPrintf("WTF\n");
-	//                 mexPrintf("Type: %d\n",main_types[current_depth]);
-	//                 mexPrintf("State: %d\n",next_state);
+    
+    --current_depth;
+    
+    if (parent_types[current_depth] == TYPE_KEY) {
+        goto S_PARSE_END_OF_VALUE_IN_KEY;
+    }
+    
+    PROCESS_END_OF_ARRAY_VALUE
 
-	//=============================================================
+
+
+//=============================================================
 S_PARSE_KEY:
 	parent_sizes[current_depth] += 1;
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_KEY;
-	main_indices[current_token_index] = ++keys_i;
-
-
-	//TODO: Change below ....
-	if (keys_i > keys_max_i) {
-		//TODO: Resize
-	}
 
 	if (current_depth == MAX_DEPTH) {
 		ERROR_DEPTH
@@ -309,7 +339,7 @@ S_PARSE_KEY:
 	else {
 		++current_depth;
 		parent_types[current_depth] = TYPE_KEY;
-		parent_indices[current_depth] = keys_i;
+		parent_indices[current_depth] = current_token_index;
 	}
 
 
@@ -381,11 +411,6 @@ S_PARSE_STRING_IN_ARRAY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_STRING;
-	main_indices[current_token_index] = ++strings_i;
-
-	if (strings_i > strings_max_i) {
-		//TODO: Resize
-	}
 
 	//TODO: Set start
 	//
@@ -402,11 +427,6 @@ S_PARSE_STRING_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_STRING;
-	main_indices[current_token_index] = ++strings_i;
-
-	if (strings_i > strings_max_i) {
-		//TODO: Resize
-	}
 
 	//TODO: Set start
 	//
@@ -424,12 +444,6 @@ S_PARSE_NUMBER_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_NUMBER;
-	main_indices[current_token_index] = ++numeric_i;
-
-	if (numeric_i > numeric_max_i) {
-		//TODO: Resize
-
-	}
 
 	//TODO: log start
 
@@ -447,17 +461,35 @@ S_PARSE_NUMBER_IN_ARRAY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_NUMBER;
-	main_indices[current_token_index] = ++numeric_i;
-
-	if (numeric_i > numeric_max_i) {
-		//TODO: Resize
-
-	}
 
 	//TODO: log start
 
 	string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
+    
+    //current char is negative or digit
+    
+    //---------------------------------------------
+//     while (isdigit(js[++parser_position])) {}
+// 
+//     if (js[parser_position] == '.') {
+// 		++parser_position;
+//         while (isdigit(js[++parser_position])) {}
+// 	}
+//     
+//     if (js[parser_position] == 'E' || js[parser_position] == 'e') {
+//         if (js[++parser_position] == '-' || js[parser_position] == '+'){
+//             ++parser_position;
+//         }//TODO: Else, needs to be a digit or otherwise we have a problem
+//         //TODO: I think this can cause an error when we have something like:
+//         //1E, -> we advance 
+// 		while (isdigit(js[++parser_position])) {}
+// 	}
+    
+    //TODO:
+// // //     if(js[parser_position] == ','){
+// // //         
+// // //         else{
 
 	//TODO: Let's get rid of this by incorporating it below
 	parser_position--;
@@ -475,12 +507,6 @@ S_PARSE_NULL_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_NUMBER;
-	main_indices[current_token_index] = ++numeric_i;
-
-	if (numeric_i > numeric_max_i) {
-		//TODO: Resize
-
-	}
 
 	//TODO: log start
 
@@ -496,12 +522,6 @@ S_PARSE_NULL_IN_ARRAY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_NUMBER;
-	main_indices[current_token_index] = ++numeric_i;
-
-	if (numeric_i > numeric_max_i) {
-		//TODO: Resize
-
-	}
 
 	//TODO: log start
 
@@ -516,7 +536,6 @@ S_PARSE_TRUE_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_LOGICAL;
-	main_indices[current_token_index] = 1;
 
 	parser_position += 3;
 	goto S_PARSE_END_OF_VALUE_IN_KEY;
@@ -527,19 +546,15 @@ S_PARSE_TRUE_IN_ARRAY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_LOGICAL;
-	main_indices[current_token_index] = 1;
 
 	parser_position += 3;
     
     PROCESS_END_OF_ARRAY_VALUE;
-    
-	//goto S_PARSE_END_OF_VALUE_IN_ARRAY;
 
 S_PARSE_FALSE_IN_KEY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_LOGICAL;
-	main_indices[current_token_index] = 0;
 
 	parser_position += 4;
     
@@ -550,24 +565,11 @@ S_PARSE_FALSE_IN_ARRAY:
 	++current_token_index;
 
 	main_types[current_token_index] = TYPE_LOGICAL;
-	main_indices[current_token_index] = 0;
 
 	parser_position += 4;
     
 	PROCESS_END_OF_ARRAY_VALUE;
 
-
-S_PARSE_END_OF_VALUE_IN_ARRAY:
-	SKIP_WHITESPACE;
-
-	switch (js[parser_position]) {
-	case ',':
-		goto S_PARSE_COMMA_IN_ARRAY;
-	case ']':
-		goto S_CLOSE_ARRAY;
-	default:
-        goto S_ERROR_END_OF_VALUE_IN_ARRAY;
-	}
 
 
 	//=============================================================
@@ -634,10 +636,6 @@ S_ERROR_OPEN_KEY_2:
 //TODO: Describe when this error is called    
 S_ERROR_END_OF_VALUE_IN_KEY:
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token of key must be followed by a comma or a closing object ""}"" character");
-
-    
-S_ERROR_UNIMPLEMENTED:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_UNIMPLEMENTED");
 
 //TODO: Open array points here now too
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:

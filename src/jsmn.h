@@ -11,23 +11,5 @@
 
 #define JSMN_ERROR_NOMEM -2
 
-typedef struct {
-	int position;       /* offset in the JSON string */
-	int current_token;  /* index of current token */
-	int super_token;    /* index of super token: object, array, or attribute */
-    int last_function_type;
-    int n_numbers;
-    //0 - in array
-    //1 - in key
-    //2 - is key
-} jsmn_parser;
 
-void jsmn_init(jsmn_parser *parser);
-
-void refill_parser(jsmn_parser *parser,    
-        int parser_position,
-        int current_token_index,
-        int super_token_index,
-        int last_function_type);
-
-int jsmn_parse(const char *js, size_t len);
+int jsmn_parse(unsigned char *js, size_t len);
