@@ -6,6 +6,13 @@
 #include <math.h>
 #include "stdint.h"  //uint_8
 
+//TODO: store goto rather than type in parent
+
+#define N_INT_PART data_info[0]
+#define N_FRAC_PART data_info[1]
+#define N_EXP_PART data_info[2]
+#define SIGN_INFO data_info[3]
+
 #define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
 #define PROCESS_END_OF_ARRAY_VALUE \
 	SKIP_WHITESPACE; \
@@ -18,47 +25,282 @@
         default: \
             goto S_ERROR_END_OF_VALUE_IN_ARRAY; \
 	} \
+            
+            
+#define PROCESS_END_OF_KEY_VALUE \
+	SKIP_WHITESPACE; \
+	switch (js[parser_position]) { \
+        case ',': \
+            SKIP_WHITESPACE; \
+            --current_depth; \
+            if (js[parser_position] == '"') { \
+                goto S_PARSE_KEY; \
+            } \
+            else { \
+                mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected"); \
+            } \
+        case '}': \
+            goto S_CLOSE_KEY_AND_OBJECT; \
+        default: \
+            goto S_ERROR_END_OF_VALUE_IN_KEY; \
+	} \
 
-
+//TODO: replace with a goto            
 #define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
 
-const bool is_start_of_number[256] = { false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
+//const bool is_start_of_number[256] = { false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 //const bool is_number_array[256] = { false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 
 //49:58
-const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
+//const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
 
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
 //TODO: Allow looking for closer - verify math later
-inline double string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
+inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
-
-    while (isdigit(*(++p))) {}
-
-	if (*p == '.') {
-		++p;
-        while (isdigit(*(++p))) {}
-	}
-
-	if (*p == 'E' || *p == 'e') {
+    //We're point at a negative or a digit
+    
+    uint8_t data_info[4] = {0,0,0,0};
+    //N_INT_PART
+    //N_FRAC_PART
+    //N_EXP_PART
+    //SIGN_INFO  
+    //  1 for negate integer
+    //  2 for negate exponent
+    
+//     uint8_t n_int;
+//     uint8_t n_frac;
+//     uint8_t n_exp;
+//     uint8_t sign_info = 0;
+//     unsigned char *start;
+    
+    if (*p == '-'){
+        SIGN_INFO = 1;
+        ++p;
+    }
+    
+    if (isdigit(*p)){
+        if(isdigit(*(++p))){
+            if(isdigit(*(++p))){
+                if(isdigit(*(++p))){
+                    if(isdigit(*(++p))){
+                        if(isdigit(*(++p))){
+                            if(isdigit(*(++p))){
+                                if(isdigit(*(++p))){
+                                    if(isdigit(*(++p))){
+                                        if(isdigit(*(++p))){
+                                            if(isdigit(*(++p))){
+                                                if(isdigit(*(++p))){
+                                                    if(isdigit(*(++p))){
+                                                        if(isdigit(*(++p))){
+                                                            if(isdigit(*(++p))){
+                                                                if(isdigit(*(++p))){
+                                                                    if(isdigit(*(++p))){
+                                                                        mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_integer_part", "too_many_numbers_in_integer_part");
+                                                                    }else{
+                                                                        N_INT_PART = 16;
+                                                                    }
+                                                                }else{
+                                                                    N_INT_PART = 15;
+                                                                }
+                                                            }else{
+                                                                N_INT_PART = 14;
+                                                            }
+                                                        }else{
+                                                            N_INT_PART = 13;
+                                                        }
+                                                    }else{
+                                                        N_INT_PART = 12;
+                                                    }
+                                                }else{
+                                                    N_INT_PART = 11;
+                                                }
+                                            }else{
+                                                N_INT_PART = 10;
+                                            }
+                                        }else{
+                                            N_INT_PART = 9;
+                                        }
+                                    }else{
+                                        N_INT_PART = 8;
+                                    }
+                                }else{
+                                    N_INT_PART = 7;
+                                }
+                            }else{
+                                N_INT_PART = 6;
+                            }
+                        }else{
+                            N_INT_PART = 5;
+                        }
+                    }else{
+                        N_INT_PART = 4;
+                    }
+                }else{
+                    N_INT_PART = 3;
+                }
+            }else{
+                N_INT_PART = 2;
+            }
+        }else{
+            N_INT_PART = 1;
+        }
+    }else{
+        mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_minus_sign", "No digit found after minus sign");
+    }
+    
+    if (*p == '.') {
+        if (isdigit(*(++p))){
+            if(isdigit(*(++p))){
+                if(isdigit(*(++p))){
+                    if(isdigit(*(++p))){
+                        if(isdigit(*(++p))){
+                            if(isdigit(*(++p))){
+                                if(isdigit(*(++p))){
+                                    if(isdigit(*(++p))){
+                                        if(isdigit(*(++p))){
+                                            if(isdigit(*(++p))){
+                                                if(isdigit(*(++p))){
+                                                    if(isdigit(*(++p))){
+                                                        if(isdigit(*(++p))){
+                                                            if(isdigit(*(++p))){
+                                                                if(isdigit(*(++p))){
+                                                                    if(isdigit(*(++p))){
+                                                                        if(isdigit(*(++p))){
+                                                                            if(isdigit(*(++p))){
+                                                                                if(isdigit(*(++p))){
+                                                                                    if(isdigit(*(++p))){
+                                                                                        if(isdigit(*(++p))){
+                                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_fractional_part", "too_many_numbers_in_fractional_part");
+                                                                                        }else{
+                                                                                            N_FRAC_PART = 20;
+                                                                                        }
+                                                                                    }else{
+                                                                                        N_FRAC_PART = 19;
+                                                                                    }
+                                                                                }else{
+                                                                                    N_FRAC_PART = 18;
+                                                                                }
+                                                                            }else{
+                                                                                N_FRAC_PART = 17;
+                                                                            }
+                                                                        }else{
+                                                                            N_FRAC_PART = 16;
+                                                                        }
+                                                                    }else{
+                                                                        N_FRAC_PART = 15;
+                                                                    }
+                                                                }else{
+                                                                    N_FRAC_PART = 14;
+                                                                }
+                                                            }else{
+                                                                N_FRAC_PART = 13;
+                                                            }
+                                                        }else{
+                                                            N_FRAC_PART = 12;
+                                                        }
+                                                    }else{
+                                                        N_FRAC_PART = 11;
+                                                    }
+                                                }else{
+                                                    N_FRAC_PART = 10;
+                                                }
+                                            }else{
+                                                N_FRAC_PART = 9;
+                                            }
+                                        }else{
+                                            N_FRAC_PART = 8;
+                                        }
+                                    }else{
+                                        N_FRAC_PART = 7;
+                                    }
+                                }else{
+                                    N_FRAC_PART = 6;
+                                }
+                            }else{
+                                N_FRAC_PART = 5;
+                            }
+                        }else{
+                            N_FRAC_PART = 4;
+                        }
+                    }else{
+                        N_FRAC_PART = 3;
+                    }
+                }else{
+                    N_FRAC_PART = 2;
+                }
+            }else{
+                N_FRAC_PART = 1;
+            }
+        }else{
+            mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_period", "No digit found after period");
+        }
+    }
+    
+    if (*p == 'E' || *p == 'e') {
 		++p;
 		switch (*p) {
 		case '-':
+            SIGN_INFO += 2;
 			++p;
 			break;
 		case '+':
 			++p;
 		}
 
-		while (isdigit(*(++p))) {}
+        if (isdigit(*p)){
+            if (isdigit(*(++p))){
+                if (isdigit(*(++p))){
+                    if (isdigit(*(++p))){
+                        if (isdigit(*(++p))){
+                        	mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_exponent_part", "too_many_numbers_in_exponent");
+                        }else{
+                            N_EXP_PART = 4;
+                        }
+                    }else{
+                        N_EXP_PART = 3;
+                    }
+                }else{
+                    N_EXP_PART = 2;
+                }
+            }else{
+                N_EXP_PART = 1;
+            }
+        }else{
+            mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_exponent", "No digit found after exponent");
+        }
 	}
-
-	*char_offset = p;
-
-	return 0;
+    
+    *char_offset = p;
+    
+    return *(int *)&data_info[0];
+    
+//     while (isdigit(*(++p))) {}
+// 
+// 	if (*p == '.') {
+// 		++p;
+//         while (isdigit(*(++p))) {}
+// 	}
+// 
+// 	if (*p == 'E' || *p == 'e') {
+// 		++p;
+// 		switch (*p) {
+// 		case '-':
+// 			++p;
+// 			break;
+// 		case '+':
+// 			++p;
+// 		}
+// 
+// 		while (isdigit(*(++p))) {}
+// 	}
+// // // 
+// // // 	
+// // // *char_offset = p;
+// // // 	return 0;
 }
 
 
@@ -160,34 +402,42 @@ int jsmn_parse(unsigned char *js, size_t string_byte_length) {
     //const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
     
     const void *array_jump[256] = {
-        [0 ... 33]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [34]=&&S_PARSE_STRING_IN_ARRAY, // "
-        [35 ... 44]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [45]=&&S_PARSE_NUMBER_IN_ARRAY,
-        [46 ... 47]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [48 ... 57]=&&S_PARSE_NUMBER_IN_ARRAY,
-        [58 ... 90]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [91]=&&S_OPEN_ARRAY_IN_ARRAY,
-        [92 ... 101]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [102]=&&S_PARSE_FALSE_IN_ARRAY,
-        [103 ... 109]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [110]=&&S_PARSE_NULL_IN_ARRAY,
-        [111 ... 115]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [116]=&&S_PARSE_TRUE_IN_ARRAY,
-        [117 ... 122]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [123]=&&S_OPEN_OBJECT_IN_ARRAY,
-        [124 ... 255]=&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
-    
-//     temp = cell(1,256);
-// temp(:) = {'&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY'};
-// temp([46 49:58]) = {'&&S_PARSE_NUMBER_IN_ARRAY'};
-// temp{'n'+1} = '&&S_PARSE_NULL_IN_ARRAY';
-// temp{'t'+1} = '&&S_PARSE_TRUE_IN_ARRAY';
-// temp{'f'+1} = '&&S_PARSE_FALSE_IN_ARRAY';
-// temp{'"'+1} = '';
-// temp{'{'+1} = '&&S_OPEN_OBJECT_IN_ARRAY';
-// temp{'['+1} = '&&S_OPEN_ARRAY_IN_ARRAY';
-//     
+        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
+        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
+        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
+        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
+        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [102]         = &&S_PARSE_FALSE_IN_ARRAY,
+        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
+        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
+        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
+        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
+        
+    const void *key_jump[256] = {
+        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
+        [34]        = &&S_PARSE_STRING_IN_KEY,      // "
+        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [45]        = &&S_PARSE_NUMBER_IN_KEY,      // -
+        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_KEY,    
+        [48 ... 57] = &&S_PARSE_NUMBER_IN_KEY,      // 0-9
+        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [91]        = &&S_OPEN_ARRAY_IN_KEY,        // [
+        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_KEY,
+        [102]         = &&S_PARSE_FALSE_IN_KEY,   //false
+        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [110]         = &&S_PARSE_NULL_IN_KEY,    // null
+        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [116]         = &&S_PARSE_TRUE_IN_KEY,    // true
+        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
+        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
     
 	//const void *array_jump[256] = { &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_STRING_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_PARSE_NUMBER_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_ARRAY_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_FALSE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_NULL_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_PARSE_TRUE_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_OPEN_OBJECT_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,&&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY };
@@ -274,7 +524,7 @@ S_CLOSE_EMPTY_OBJECT:
     --current_depth;
     
     if (parent_types[current_depth] == TYPE_KEY) {
-        goto S_PARSE_END_OF_VALUE_IN_KEY;
+        PROCESS_END_OF_KEY_VALUE
     }
     
     PROCESS_END_OF_ARRAY_VALUE
@@ -319,7 +569,7 @@ S_CLOSE_ARRAY:
     --current_depth;
     
     if (parent_types[current_depth] == TYPE_KEY) {
-        goto S_PARSE_END_OF_VALUE_IN_KEY;
+        PROCESS_END_OF_KEY_VALUE
     }
     
     PROCESS_END_OF_ARRAY_VALUE
@@ -355,52 +605,12 @@ S_PARSE_KEY:
 	if (js[parser_position] == ':') {
 
 		//Advance to the next token
-		SKIP_WHITESPACE
+        SKIP_WHITESPACE
+        goto *key_jump[js[parser_position]];
 
-			//TODO: Include - value as well
-			if (is_number_array[js[parser_position]]) {
-				goto S_PARSE_NUMBER_IN_KEY;
-			}
-			else {
-				switch (js[parser_position]) {
-				case '"':
-					goto S_PARSE_STRING_IN_KEY;
-					break;
-				case '-':
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9':
-					goto S_PARSE_NUMBER_IN_KEY;
-					break;
-				case '{':
-					goto S_OPEN_OBJECT_IN_KEY;
-					break;
-				case '[':
-					goto S_OPEN_ARRAY_IN_KEY;
-					break;
-				case 't':
-					goto S_PARSE_TRUE_IN_KEY;
-					break;
-				case 'f':
-					goto S_PARSE_FALSE_IN_KEY;
-					break;
-				case 'n':
-					goto S_PARSE_NULL_IN_KEY;
-					break;
-				default:
-					goto S_ERROR_OPEN_KEY_2;
-				}
-			}
 	}
 	else {
-		goto S_ERROR_OPEN_KEY_1;
+		goto S_ERROR_MISSING_COLON_AFTER_KEY;
 	}
 
 
@@ -434,7 +644,7 @@ S_PARSE_STRING_IN_KEY:
 
 	//TODO: Set end
 
-	goto S_PARSE_END_OF_VALUE_IN_KEY;
+	PROCESS_END_OF_KEY_VALUE
 
 
 
@@ -451,7 +661,7 @@ S_PARSE_NUMBER_IN_KEY:
 	parser_position = (int)(pEndNumber - js);
 	parser_position--;
 
-	goto S_PARSE_END_OF_VALUE_IN_KEY;
+	PROCESS_END_OF_KEY_VALUE
 
 
 
@@ -511,7 +721,7 @@ S_PARSE_NULL_IN_KEY:
 	//TODO: log start
 
 	parser_position += 3;
-	goto S_PARSE_END_OF_VALUE_IN_KEY;
+	PROCESS_END_OF_KEY_VALUE
 
 
 
@@ -538,7 +748,7 @@ S_PARSE_TRUE_IN_KEY:
 	main_types[current_token_index] = TYPE_LOGICAL;
 
 	parser_position += 3;
-	goto S_PARSE_END_OF_VALUE_IN_KEY;
+	PROCESS_END_OF_KEY_VALUE
 
 
 S_PARSE_TRUE_IN_ARRAY:
@@ -558,7 +768,7 @@ S_PARSE_FALSE_IN_KEY:
 
 	parser_position += 4;
     
-    goto S_PARSE_END_OF_VALUE_IN_KEY;
+    PROCESS_END_OF_KEY_VALUE
 
 S_PARSE_FALSE_IN_ARRAY:
 	parent_sizes[current_depth] += 1;
@@ -573,18 +783,18 @@ S_PARSE_FALSE_IN_ARRAY:
 
 
 	//=============================================================
-S_PARSE_END_OF_VALUE_IN_KEY:
-
-	SKIP_WHITESPACE;
-
-	switch (js[parser_position]) {
-        case ',':
-            goto S_PARSE_COMMA_IN_OBJECT;
-        case '}':
-            goto S_CLOSE_KEY_AND_OBJECT;
-        default:
-            goto S_ERROR_END_OF_VALUE_IN_KEY;
-	}
+// // // S_PARSE_END_OF_VALUE_IN_KEY:
+// // // 
+// // // 	SKIP_WHITESPACE;
+// // // 
+// // // 	switch (js[parser_position]) {
+// // //         case ',':
+// // //             goto S_PARSE_COMMA_IN_OBJECT;
+// // //         case '}':
+// // //             goto S_CLOSE_KEY_AND_OBJECT;
+// // //         default:
+// // //             goto S_ERROR_END_OF_VALUE_IN_KEY;
+// // // 	}
 
 
 	//=============================================================
@@ -600,26 +810,18 @@ S_PARSE_END_OF_FILE:
 
 
 	//=============================================================
-S_PARSE_COMMA_IN_ARRAY:
-	SKIP_WHITESPACE
-	goto *array_jump[js[parser_position]];
-
-
-
-
-	//=============================================================
-S_PARSE_COMMA_IN_OBJECT:
-
-	SKIP_WHITESPACE
-		--current_depth;
-
-	if (js[parser_position] == '"') {
-		goto S_PARSE_KEY;
-	}
-	else {
-		//TODO: Change this ...
-		mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected");
-	}
+// // // S_PARSE_COMMA_IN_OBJECT:
+// // // 
+// // // 	SKIP_WHITESPACE
+// // // 		--current_depth;
+// // // 
+// // // 	if (js[parser_position] == '"') {
+// // // 		goto S_PARSE_KEY;
+// // // 	}
+// // // 	else {
+// // // 		//TODO: Change this ...
+// // // 		mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected");
+// // // 	}
 
 
 
@@ -627,11 +829,8 @@ S_PARSE_COMMA_IN_OBJECT:
 S_ERROR_OPEN_OBJECT:
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_OPEN_OBJECT");
 
-S_ERROR_OPEN_KEY_1:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_OPEN_KEY_1");
-
-S_ERROR_OPEN_KEY_2:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_OPEN_KEY_2");
+S_ERROR_MISSING_COLON_AFTER_KEY:
+	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_MISSING_COLON_AFTER_KEY");
 
 //TODO: Describe when this error is called    
 S_ERROR_END_OF_VALUE_IN_KEY:
@@ -641,6 +840,12 @@ S_ERROR_END_OF_VALUE_IN_KEY:
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY");
 	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");
+   
+//TODO: Open array points here now too
+S_ERROR_TOKEN_AFTER_KEY:
+	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_TOKEN_AFTER_KEY");
+	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");    
+    
 
 S_ERROR_END_OF_VALUE_IN_ARRAY:
 		//                         mexPrintf("Current depth: %d\n",current_depth);
