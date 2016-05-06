@@ -62,6 +62,7 @@
 	SKIP_WHITESPACE; \
 	switch (js[parser_position]) { \
         case ',': \
+            SET_TAC; \
             SKIP_WHITESPACE; \
             --current_depth; \
             if (js[parser_position] == '"') { \
@@ -569,7 +570,7 @@ S_OPEN_OBJECT_IN_KEY:
 
 //=============================================================
 S_CLOSE_KEY_AND_OBJECT:
-	//TODO: set token close
+    
     SET_TAC;
 	--current_depth; //Move up to the object
     
@@ -635,9 +636,8 @@ S_PARSE_KEY:
     
     SETUP_PARENT_INFO(TYPE_KEY);
     
-//     if (current_depth == 5 && current_data_index < 2000){
-//         mexPrintf("parent size %d\n",parent_sizes[current_depth-1]);
-//         mexPrintf("parent size %d\n",parent_sizes[current_depth]);
+//     if (current_depth == 2 && current_data_index < 2000){
+//         mexPrintf("current_data_index %d\n",current_data_index);
 //     }
     
 
