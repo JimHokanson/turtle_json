@@ -8,10 +8,41 @@
 
 //TODO: store goto rather than type in parent
 
+//TODO: replace with a goto            
+#define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+
 #define N_INT_PART data_info[0]
 #define N_FRAC_PART data_info[1]
 #define N_EXP_PART data_info[2]
-#define SIGN_INFO data_info[3]
+
+#define EXPAND_DATA_CHECK(x) \
+	if (current_type_index+x >= data_size_index_max){ \
+        data_size_allocated = ceil(1.5*data_size_allocated); \
+        types = mxRealloc(types,type_size_allocated*sizeof(int)); \
+        data_size_index_max = data_size_allocated-1; \
+    } \
+
+#define SET_TYPE(x) \
+	if (current_type_index >= type_size_index_max){ \
+        type_size_allocated = ceil(1.5*type_size_allocated); \
+        types = mxRealloc(types,type_size_allocated); \
+        type_size_index_max = type_size_allocated-1; \
+    } \
+	types[++current_type_index] = x; \
+      
+#define SET_TAC data[parent_indices[current_depth]] = current_data_index+1;
+#define SET_N_VALUES data[parent_indices[current_depth]+1] = parent_sizes[current_depth];             
+            
+#define SETUP_PARENT_INFO(x) \
+	if (current_depth == MAX_DEPTH) { \
+		ERROR_DEPTH \
+	} \
+	else { \
+		++current_depth; \
+		parent_types[current_depth] = x; \
+		parent_indices[current_depth] = (++current_data_index); \
+		parent_sizes[current_depth] = 0; \
+	} \
 
 #define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
 #define PROCESS_END_OF_ARRAY_VALUE \
@@ -45,8 +76,7 @@
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
 	} \
 
-//TODO: replace with a goto            
-#define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+
 
 //const bool is_start_of_number[256] = { false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,true,true,true,true,true,true,true,true,true,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
@@ -54,6 +84,28 @@ const bool is_whitespace[256] = { false,false,false,false,false,false,false,fals
 
 //49:58
 //const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
+
+
+void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
+{
+    
+    //setStructField(plhs[0],data_ptr,"name",mxINT32_CLASS,N)
+    
+    //mwSize ndim, const mwSize *dims, mxClassID classid, mxComplexity ComplexFlag
+    //void mxSetM(mxArray *pm, mwSize m);
+    //void mxSetData(mxArray *pm, void *pr);
+    //extern int mxAddField(mxArray *pm, const char *fieldname);
+    
+    mxArray *pm;
+    
+    pm = mxCreateNumericArray(0, 0, classid, mxREAL);
+    mxSetData(pm, pr);
+    mxSetM(pm, 1);
+    mxSetN(pm, N);
+    mxAddField(s,fieldname);
+    mxSetField(s,0,fieldname,pm);
+
+}
 
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
@@ -63,7 +115,13 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
 
     //We're point at a negative or a digit
     
+    
     uint8_t data_info[4] = {0,0,0,0};
+    
+//     uint8_t d[4];
+//     uint8_t *data_info = d;
+    
+    
     //N_INT_PART
     //N_FRAC_PART
     //N_EXP_PART
@@ -78,7 +136,7 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
 //     unsigned char *start;
     
     if (*p == '-'){
-        SIGN_INFO = 1;
+        //SIGN_INFO = 1;
         ++p;
     }
     
@@ -240,11 +298,15 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
         }
     }
     
+// //     else{
+// //         ++data_info;
+// //     }
+    
     if (*p == 'E' || *p == 'e') {
 		++p;
 		switch (*p) {
 		case '-':
-            SIGN_INFO += 2;
+            //SIGN_INFO += 2;
 			++p;
 			break;
 		case '+':
@@ -276,7 +338,9 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
     
     *char_offset = p;
     
-    return *(int *)&data_info[0];
+//     return *(int *)&data_info[0];
+    
+    return *(int *)data_info;
     
 //     while (isdigit(*(++p))) {}
 // 
@@ -388,7 +452,7 @@ STRING_SEEK:
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
-int jsmn_parse(unsigned char *js, size_t string_byte_length) {
+int jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 
 	/*
 	*  Inputs
@@ -453,13 +517,20 @@ int jsmn_parse(unsigned char *js, size_t string_byte_length) {
 
 	int parser_position = -1;
 	unsigned char *pEndNumber;
-	int current_token_index = -1;
+	int current_type_index = -1;
+    int current_data_index = -1;
 
-
-	int n_tokens_to_allocate = ceil(string_byte_length / 2);
-	uint8_t *main_types = mxMalloc(n_tokens_to_allocate);
-	int *data1 = mxMalloc(n_tokens_to_allocate * sizeof(int));
-    int *data2 = mxMalloc(n_tokens_to_allocate * sizeof(int));
+    //We might change these ...
+	int type_size_allocated = ceil(string_byte_length / 6);
+    int data_size_allocated = string_byte_length;
+    
+    int type_size_index_max = type_size_allocated - 1;
+    int data_size_index_max = data_size_allocated - 1;
+    
+	uint8_t *types = mxMalloc(type_size_allocated);
+	int *data = mxMalloc(data_size_allocated * sizeof(int));
+    
+    const double MX_NAN = mxGetNaN();
     
 	SKIP_WHITESPACE;
 
@@ -480,20 +551,11 @@ S_OPEN_OBJECT_IN_ARRAY:
     
 S_OPEN_OBJECT_IN_KEY:
 
-	++current_token_index;
-	main_types[current_token_index] = TYPE_OBJECT;
+    SET_TYPE(TYPE_OBJECT);
 
-	if (current_depth == MAX_DEPTH) {
-		ERROR_DEPTH
-	}
-	else {
-		++current_depth;
-		parent_types[current_depth] = TYPE_OBJECT;
-		parent_indices[current_depth] = current_token_index;
-		parent_sizes[current_depth] = 0;
-	}
+    SETUP_PARENT_INFO(TYPE_OBJECT);
+    ++current_data_index; //Space for setting size
 
-    //Navigation -----------------------------
 	SKIP_WHITESPACE
 
     switch (js[parser_position]) {
@@ -508,8 +570,9 @@ S_OPEN_OBJECT_IN_KEY:
 //=============================================================
 S_CLOSE_KEY_AND_OBJECT:
 	//TODO: set token close
+    SET_TAC;
 	--current_depth;
-
+    
 	//Fall Through ------  closing the object
 S_CLOSE_EMPTY_OBJECT:
 
@@ -521,7 +584,11 @@ S_CLOSE_EMPTY_OBJECT:
 		goto S_PARSE_END_OF_FILE;
 	}
     
+    SET_TAC;
+    SET_N_VALUES;
     --current_depth;
+    
+    
     
     if (parent_types[current_depth] == TYPE_KEY) {
         PROCESS_END_OF_KEY_VALUE
@@ -536,19 +603,11 @@ S_OPEN_ARRAY_IN_ARRAY:
 
 	//Fall Through -------------------------------
 S_OPEN_ARRAY_IN_KEY:
-	++current_token_index;
 
-	main_types[current_token_index] = TYPE_ARRAY;
+    SET_TYPE(TYPE_ARRAY);
 
-	if (current_depth == MAX_DEPTH) {
-		ERROR_DEPTH
-	}
-	else {
-		++current_depth;
-		parent_types[current_depth] = TYPE_ARRAY;
-		parent_indices[current_depth] = current_token_index;
-		parent_sizes[current_depth] = 0;
-	}
+    SETUP_PARENT_INFO(TYPE_ARRAY);
+    ++current_data_index; //Space for setting size
 
 	SKIP_WHITESPACE
     goto *array_jump[js[parser_position]];
@@ -566,6 +625,9 @@ S_CLOSE_ARRAY:
 		goto S_PARSE_END_OF_FILE;
 	}
     
+    
+    SET_TAC;
+    SET_N_VALUES;
     --current_depth;
     
     if (parent_types[current_depth] == TYPE_KEY) {
@@ -579,25 +641,24 @@ S_CLOSE_ARRAY:
 //=============================================================
 S_PARSE_KEY:
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
+    
+    SET_TYPE(TYPE_KEY);
+    
+    SETUP_PARENT_INFO(TYPE_KEY);
+    
+//     if (current_depth == 5 && current_data_index < 2000){
+//         mexPrintf("parent size %d\n",parent_sizes[current_depth-1]);
+//         mexPrintf("parent size %d\n",parent_sizes[current_depth]);
+//     }
+    
 
-	main_types[current_token_index] = TYPE_KEY;
-
-	if (current_depth == MAX_DEPTH) {
-		ERROR_DEPTH
-	}
-	else {
-		++current_depth;
-		parent_types[current_depth] = TYPE_KEY;
-		parent_indices[current_depth] = current_token_index;
-	}
-
-
-	//TODO: Set start
+    //start
+    data[++current_data_index] = parser_position;
 
 	seek_string_end(js, &parser_position);
 
-	//TODO: Set end
+    //end
+	data[++current_data_index] = parser_position;
 
 
 	SKIP_WHITESPACE;
@@ -618,15 +679,13 @@ S_PARSE_KEY:
 	//=============================================================
 S_PARSE_STRING_IN_ARRAY:
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
 
-	main_types[current_token_index] = TYPE_STRING;
+    SET_TYPE(TYPE_STRING);
 
-	//TODO: Set start
-	//
+    EXPAND_DATA_CHECK(N_DATA_STRING)
+	data[++current_data_index] = parser_position;
 	seek_string_end(js, &parser_position);
-
-	//TODO: Set end
+    data[++current_data_index] = parser_position;
 
 	PROCESS_END_OF_ARRAY_VALUE;
 
@@ -634,15 +693,13 @@ S_PARSE_STRING_IN_ARRAY:
 
 	//=============================================================
 S_PARSE_STRING_IN_KEY:
-	++current_token_index;
 
-	main_types[current_token_index] = TYPE_STRING;
+	SET_TYPE(TYPE_STRING);
 
-	//TODO: Set start
-	//
+    EXPAND_DATA_CHECK(N_DATA_STRING)
+	data[++current_data_index] = parser_position;
 	seek_string_end(js, &parser_position);
-
-	//TODO: Set end
+    data[++current_data_index] = parser_position;
 
 	PROCESS_END_OF_KEY_VALUE
 
@@ -651,13 +708,12 @@ S_PARSE_STRING_IN_KEY:
 	//=============================================================
 S_PARSE_NUMBER_IN_KEY:
 
-	++current_token_index;
+    SET_TYPE(TYPE_NUMBER);
 
-	main_types[current_token_index] = TYPE_NUMBER;
-
-	//TODO: log start
-
-	string_to_double_no_math(js + parser_position, &pEndNumber);
+    EXPAND_DATA_CHECK(N_DATA_NUMERIC)
+    
+    data[++current_data_index] = parser_position;
+	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
 	parser_position--;
 
@@ -668,33 +724,15 @@ S_PARSE_NUMBER_IN_KEY:
 	//=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
+    
+	SET_TYPE(TYPE_NUMBER);
 
-	main_types[current_token_index] = TYPE_NUMBER;
-
-	//TODO: log start
-
-	string_to_double_no_math(js + parser_position, &pEndNumber);
+	EXPAND_DATA_CHECK(N_DATA_NUMERIC)
+    data[++current_data_index] = parser_position;
+	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
     
-    //current char is negative or digit
-    
-    //---------------------------------------------
-//     while (isdigit(js[++parser_position])) {}
-// 
-//     if (js[parser_position] == '.') {
-// 		++parser_position;
-//         while (isdigit(js[++parser_position])) {}
-// 	}
-//     
-//     if (js[parser_position] == 'E' || js[parser_position] == 'e') {
-//         if (js[++parser_position] == '-' || js[parser_position] == '+'){
-//             ++parser_position;
-//         }//TODO: Else, needs to be a digit or otherwise we have a problem
-//         //TODO: I think this can cause an error when we have something like:
-//         //1E, -> we advance 
-// 		while (isdigit(js[++parser_position])) {}
-// 	}
+
     
     //TODO:
 // // //     if(js[parser_position] == ','){
@@ -711,70 +749,84 @@ S_PARSE_NUMBER_IN_ARRAY:
     //Navigation --------------------------------
 	PROCESS_END_OF_ARRAY_VALUE;
 
-	//=============================================================
+//=============================================================
 S_PARSE_NULL_IN_KEY:
 
-	++current_token_index;
+	SET_TYPE(TYPE_NULL);
 
-	main_types[current_token_index] = TYPE_NUMBER;
+	EXPAND_DATA_CHECK(N_DATA_NULL)
 
-	//TODO: log start
-
+    data[++current_data_index] = MX_NAN;
+    
 	parser_position += 3;
+    
 	PROCESS_END_OF_KEY_VALUE
 
 
 
-	//=============================================================
+//=============================================================
 S_PARSE_NULL_IN_ARRAY:
 
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
+    
+	SET_TYPE(TYPE_NULL);
 
-	main_types[current_token_index] = TYPE_NUMBER;
-
-	//TODO: log start
+	EXPAND_DATA_CHECK(N_DATA_NULL)
+    
+    data[++current_data_index] = MX_NAN;
 
 	parser_position += 3;
     
 	PROCESS_END_OF_ARRAY_VALUE;
 
 
-
-	//=============================================================
+//=============================================================
 S_PARSE_TRUE_IN_KEY:
-	++current_token_index;
+    
+    SET_TYPE(TYPE_LOGICAL);
 
-	main_types[current_token_index] = TYPE_LOGICAL;
-
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
+    
+    data[++current_data_index] = 1;
+    
 	parser_position += 3;
 	PROCESS_END_OF_KEY_VALUE
 
 
 S_PARSE_TRUE_IN_ARRAY:
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
-
-	main_types[current_token_index] = TYPE_LOGICAL;
+    
+	SET_TYPE(TYPE_LOGICAL);
+    
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
+    
+    data[++current_data_index] = 1;
 
 	parser_position += 3;
     
     PROCESS_END_OF_ARRAY_VALUE;
 
-S_PARSE_FALSE_IN_KEY:
-	++current_token_index;
-
-	main_types[current_token_index] = TYPE_LOGICAL;
-
-	parser_position += 4;
     
+S_PARSE_FALSE_IN_KEY:
+	SET_TYPE(TYPE_LOGICAL);
+
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
+    
+    data[++current_data_index] = 0;
+    
+	parser_position += 4;
+
     PROCESS_END_OF_KEY_VALUE
 
+            
 S_PARSE_FALSE_IN_ARRAY:
 	parent_sizes[current_depth] += 1;
-	++current_token_index;
-
-	main_types[current_token_index] = TYPE_LOGICAL;
+    
+	SET_TYPE(TYPE_LOGICAL);
+    
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
+    
+    data[++current_data_index] = 0;
 
 	parser_position += 4;
     
@@ -861,12 +913,20 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 finish_main:
     
     
+    //TODO: make realloc calls here ...
+    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_type_index + 1);
+	setStructField(plhs[0],data,"data",mxINT32_CLASS,current_data_index + 1);
+    
+// // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
+// // //     setStructField(plhs[0],types,"types",mxUINT8_CLASS,n_tokens_used);
+// // //     setStructField(plhs[0],sizes,"sizes",mxINT32_CLASS,n_tokens_used);
+// // //     setStructField(plhs[0],parents,"parents",mxINT32_CLASS,n_tokens_used);    
     
     
     
     
     
-	return current_token_index + 1;
+	return current_type_index + 1;
 
 	//         int num_tokens,
 	//         double *values,
@@ -912,24 +972,5 @@ finish_main:
 
 }
 
-void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
-{
-    
-    //setStructField(plhs[0],data_ptr,"name",mxINT32_CLASS,N)
-    
-    //mwSize ndim, const mwSize *dims, mxClassID classid, mxComplexity ComplexFlag
-    //void mxSetM(mxArray *pm, mwSize m);
-    //void mxSetData(mxArray *pm, void *pr);
-    //extern int mxAddField(mxArray *pm, const char *fieldname);
-    
-    mxArray *pm;
-    
-    pm = mxCreateNumericArray(0, 0, classid, mxREAL);
-    mxSetData(pm, pr);
-    mxSetM(pm, 1);
-    mxSetN(pm, N);
-    mxAddField(s,fieldname);
-    mxSetField(s,0,fieldname,pm);
 
-}
 

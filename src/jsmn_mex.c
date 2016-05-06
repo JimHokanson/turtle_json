@@ -97,13 +97,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
     }
     
-    *n_tokens_used = jsmn_parse(json_string,string_byte_length);
+    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
+    *n_tokens_used = jsmn_parse(json_string,string_byte_length,plhs);
   
     if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
     }
     
-    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
 	setStructField2(plhs[0],n_tokens_used,"n_tokens_used",mxINT32_CLASS,1);
     
 // // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
