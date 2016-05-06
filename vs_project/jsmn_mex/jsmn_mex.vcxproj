@@ -87,6 +87,8 @@
       <CLanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Default</CLanguageStandard>
       <StrictAliasing Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</StrictAliasing>
       <StrictAliasing Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</StrictAliasing>
+      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Speed</FavorSizeOrSpeed>
+      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

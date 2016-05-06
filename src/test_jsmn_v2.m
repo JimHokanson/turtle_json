@@ -30,10 +30,16 @@ fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
 %
 %0.603803, 0.359887, 0.72572
 %
-%0.560783, 0.306171, 1.54996    5x
+%0.560783, 0.306171, 1.54996    5x - bumped up from running 2x
 %0.481109, 0.228823, 1.17341  - using GOTO
 %0.468115, 0.233291, 1.18439 - ""
 %0.42677, 0.197664, 0.993281
+
+%Current times from master
+%-------------------------
+%3.44778, 2.95078, 5.92744 - string and # processing
+
+%0.544709, 0.276992, 1.41813
 
 tic; 
 for i = 1:10
@@ -111,6 +117,12 @@ profile viewer
 %
 %0.177615, 0.0883615, 0.902094 - first round of computed goto optimizations
 
+%Current times from master
+%-------------------------
+%3 different runs
+% 0.302934, 0.172757, 1.74443
+% 0.32871, 0.164724, 1.69345
+% 0.297383, 0.167984, 1.70325
 
 %No math
 %0.4,

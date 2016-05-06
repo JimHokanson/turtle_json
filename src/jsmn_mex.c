@@ -58,9 +58,6 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //  token_info
     //      - see wrapping Matlab function
     
-    int *n_tokens_used = mxMalloc(sizeof(int));
-    
-    
     //The initialization isn't really needed but it silences a warning
     //in the compiler - compiler not recognizing terminal errors in code
     //so it thinks you can pass in an uninitialized value to the main function
@@ -99,14 +96,15 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     
-    *n_tokens_used = jsmn_parse(json_string,string_byte_length,plhs);
+    jsmn_parse(json_string,string_byte_length,plhs);
   
     if (mxIsClass(prhs[0],"char")){
         mxFree(json_string);
     }
     
     
-	setStructField2(plhs[0],n_tokens_used,"n_tokens_used",mxINT32_CLASS,1);
+    
+    
     
 // // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
 // // //     setStructField(plhs[0],types,"types",mxUINT8_CLASS,n_tokens_used);

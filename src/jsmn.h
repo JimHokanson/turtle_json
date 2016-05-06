@@ -21,4 +21,4 @@
 #define JSMN_ERROR_NOMEM -2
 
 
-int jsmn_parse(unsigned char *js, size_t len, mxArray *plhs[]);
+void jsmn_parse(unsigned char *js, size_t len, mxArray *plhs[]);
