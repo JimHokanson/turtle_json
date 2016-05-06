@@ -12,10 +12,19 @@ classdef tokens
     
     Working on new layout to save memory and time
     
-    object
-    - token after close
-    - n_keys
-    - parent
+    object: 1) type  2) parent      3) tac     4) n_values
+    array:  1) type  2) parent      3) tac     4) n_values
+    key:    1) type  2) parent      3) tac     4) start/p     5) end
+    string: 1) type  2) start/p     3) end
+    number: 1) type  2) start/p     3) info
+    null:   1) type  2) <nothing>/p 3) <nothing>
+    t/f:    1) type  
+    
+    RULES:
+    1) parent-1 => type
+    2) parent+2 => n_values (for array and object)
+    3
+    
     
     array
     - token after close
@@ -44,24 +53,14 @@ classdef tokens
        %We might not hold onto this ...
        
        types
+       data
        %1 - object
        %2 - array
        %3 - string
        %4 - numeric
        %5 - logical
        %6 - key (of an object, string)
-       
-%        starts
-%        ends
-       sizes
-       parents
-       tokens_after_close
-       %1) Type
-       %2) Start
-       %3) End
-       %4) Size
-       %5) Parent Index - 0 based 
-       %6) Next Object - 0 based
+       %7 - null
        
        mex
        
@@ -156,6 +155,9 @@ classdef tokens
             
                        
             obj.mex = result;
+            
+            obj.data = result.data;
+            obj.numeric_data = result.numeric_data;
             
 %             obj.types = result.types;
 %             obj.sizes = result.sizes;

@@ -53,6 +53,10 @@ wtf = sl.io.fileRead(file_path,'*uint8');
 end
 toc;
 
+clear all
+p1 = 'G:\repos\matlab_git\jsmn_mex\vs_project\jsmn_mex\x64\Release\jsmn_mex.mexw64';
+p2 = 'G:\repos\matlab_git\jsmn_mex\src\jsmn_mex.mexw64';
+copyfile(p1,p2);
 
 if ismac
 file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';

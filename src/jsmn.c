@@ -6,6 +6,8 @@
 #include <math.h>
 #include "stdint.h"  //uint_8
 
+//TODO: Assume TAC is 1 ahead
+//TODO: Build in if statements on keys
 
 //TODO: replace with a goto for more information
 #define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
@@ -14,50 +16,49 @@
 #define N_FRAC_PART data_info[1]
 #define N_EXP_PART  data_info[2]
 
+//Things for opening ======================================================
+#define SET_TYPE(x) data[++current_data_index] = x;
+
+#define STORE_AND_UPDATE_PARENT \
+    data[++current_data_index] = parent_index; \
+    parent_index = current_data_index;  
+    
+#define INIT_N_THINGS data[current_data_index+2] = n_things;
+//=========================================================================
+    
+    
+//Things for closing ======================================================
+#define FINALIZE_N_THINGS \
+    temp_n_things = n_things - data[parent_index+2]; \
+    n_things = data[parent_index+2]; \
+    data[parent_index+1] = temp_n_things; \
+            
+//+1 to next element
+//+1 for Matlab 1 based indexing
+#define STORE_TAC data[parent_index+1] = current_data_index+2;
+            
+#define MOVE_UP_PARENT_INDEX parent_index = data[parent_index];	
+            
+#define NULL_PARENT_INDEX parent_index == 0     
+            
+#define PARENT_TYPE data[parent_index-1]            
+//=========================================================================
+            
+            
+
+
 //TODO: Document
 #define EXPAND_DATA_CHECK(x) \
-	if (current_type_index+x >= data_size_index_max){ \
+	if (current_data_index + x >= data_size_index_max){ \
         data_size_allocated = ceil(1.5*data_size_allocated); \
-        types = mxRealloc(types,type_size_allocated*sizeof(int)); \
+        data = mxRealloc(data,data_size_allocated*sizeof(int)); \
         data_size_index_max = data_size_allocated-1; \
     } \
 
 //TODO: Document
-#define SET_TYPE(x) \
-	if (current_type_index >= type_size_index_max){ \
-        type_size_allocated = ceil(1.5*type_size_allocated); \
-        types = mxRealloc(types,type_size_allocated); \
-        type_size_index_max = type_size_allocated-1; \
-    } \
-	types[++current_type_index] = x; \
-      
-//Sets the token after close information for the object, array, or key
-//that is being closed
-#define SET_TAC data[parent_indices[current_depth]] = current_data_index+1;
-//Sets the # of values that 
-#define SET_N_VALUES data[parent_indices[current_depth]+1] = parent_sizes[current_depth];             
-            
-#define SETUP_PARENT_INFO(x) \
-	if (current_depth == MAX_DEPTH) { \
-		ERROR_DEPTH \
-	} \
-	else { \
-		++current_depth; \
-		parent_types[current_depth] = x; \
-		parent_indices[current_depth] = (++current_data_index); \
-		parent_sizes[current_depth] = 0; \
-	} \
 
-//same as above but with no size
-#define SETUP_PARENT_INFO_FOR_KEY \
-	if (current_depth == MAX_DEPTH) { \
-		ERROR_DEPTH \
-	} \
-	else { \
-		++current_depth; \
-		parent_types[current_depth] = TYPE_KEY; \
-		parent_indices[current_depth] = (++current_data_index); \
-	} \
+      
+
             
 #define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
             
@@ -72,18 +73,22 @@
         default: \
             goto S_ERROR_END_OF_VALUE_IN_ARRAY; \
 	} \
-                       
+ 
+//             data[parent_indices[current_depth]] = current_data_index+1;
+//             SET_TAC; \
+            
 #define PROCESS_END_OF_KEY_VALUE \
 	SKIP_WHITESPACE; \
 	switch (js[parser_position]) { \
         case ',': \
-            SET_TAC; \
+            STORE_TAC; \
+            MOVE_UP_PARENT_INDEX; \
             SKIP_WHITESPACE; \
-            --current_depth; \
             if (js[parser_position] == '"') { \
                 goto S_PARSE_KEY; \
             } \
             else { \
+                mexPrintf("Position %d\n",parser_position); \
                 mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected"); \
             } \
         case '}': \
@@ -151,7 +156,8 @@ const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 inline double string_to_double(unsigned char *p, int num_info) {
 
-    double value = 0;
+    double value;
+    double exponent_value;
     bool negate;
     uint8_t n_int  = (uint8_t)num_info;
     uint8_t n_frac = num_info >> 8;
@@ -166,6 +172,7 @@ inline double string_to_double(unsigned char *p, int num_info) {
         negate = false;
     }
 
+    value = 0;
     //I'm curious if you could take advantage of something like SSE
     //if each case was written out explicitly rather than via fall through
     switch (n_int) {
@@ -203,208 +210,302 @@ inline double string_to_double(unsigned char *p, int num_info) {
            value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
     }  
     
-    //This would be written neater as a while loop that updates a pointer
-    //to the various arrays but I don't think it would be as fast
-    //
-    //Unlike the integer part, we know how to interpret each
-    //numeric value as we are parsing it
-    //
-    //0.1234 =
-    //0.1 +
-    //0.02 +
-    //0.003 +
-    //0.0004
+    if(n_frac){
+        ++p;
+        switch (n_frac) {
+            case 20:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               value += p1e_16[*p++];
+               value += p1e_17[*p++];
+               value += p1e_18[*p++];
+               value += p1e_19[*p++];
+               value += p1e_20[*p++];
+               break;
+            case 19:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               value += p1e_16[*p++];
+               value += p1e_17[*p++];
+               value += p1e_18[*p++];
+               value += p1e_19[*p++];
+               break;               
+            case 18:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               value += p1e_16[*p++];
+               value += p1e_17[*p++];
+               value += p1e_18[*p++];
+               break;                  
+            case 17:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               value += p1e_16[*p++];
+               value += p1e_17[*p++];
+               break;                
+            case 16:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               value += p1e_16[*p++];
+               break;
+            case 15:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               value += p1e_15[*p++];
+               break;
+            case 14:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               value += p1e_14[*p++];
+               break;
+            case 13:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               value += p1e_13[*p++];
+               break;
+            case 12:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               value += p1e_12[*p++];
+               break;
+            case 11:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               value += p1e_11[*p++];
+               break;
+            case 10:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               value += p1e_10[*p++];
+               break;
+            case 9:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               value += p1e_9[*p++];
+               break;
+            case 8:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               value += p1e_8[*p++];
+               break;
+            case 7:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               value += p1e_7[*p++];
+               break;
+            case 6:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               value += p1e_6[*p++];
+               break;
+            case 5:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               value += p1e_5[*p++];
+               break;
+            case 4:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               value += p1e_4[*p++];
+               break;
+            case 3:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++]; 
+               value += p1e_3[*p++];
+               break;
+            case 2:
+               value += p1e_1[*p++];
+               value += p1e_2[*p++];
+               break;
+            case 1:
+               value += p1e_1[*p++];
+
+        }  
+    }
     
-    //TODO: Implement fraction next
-    
-//     if (*p == '.') {
-//         ++p;   
-//         //TODO: Is no digit ok?
-//         if(is_number_array[*p]){
-//             value += p1e_1[*p++];
-//             if(is_number_array[*p]){
-//                 value += p1e_2[*p++];
-//                 if(is_number_array[*p]){
-//                     value += p1e_3[*p++];
-//                     if(is_number_array[*p]){
-//                         value += p1e_4[*p++];
-//                         if(is_number_array[*p]){
-//                             value += p1e_5[*p++];
-//                             if(is_number_array[*p]){
-//                                 value += p1e_6[*p++];
-//                                 if(is_number_array[*p]){
-//                                     value += p1e_7[*p++];
-//                                     if(is_number_array[*p]){
-//                                         value += p1e_8[*p++];
-//                                         if(is_number_array[*p]){
-//                                             value += p1e_9[*p++];
-//                                             if(is_number_array[*p]){
-//                                                 value += p1e_10[*p++];
-//                                                 if(is_number_array[*p]){
-//                                                     value += p1e_11[*p++];
-//                                                     if(is_number_array[*p]){
-//                                                         value += p1e_12[*p++];
-//                                                         if(is_number_array[*p]){
-//                                                             value += p1e_13[*p++];
-//                                                             if(is_number_array[*p]){
-//                                                                 value += p1e_14[*p++];
-//                                                                 if(is_number_array[*p]){
-//                                                                     value += p1e_15[*p++];
-//                                                                     if(is_number_array[*p]){
-//                                                                         value += p1e_16[*p++];
-//                                                                         if(is_number_array[*p]){
-//                                                                             value += p1e_17[*p++];
-//                                                                             if(is_number_array[*p]){
-//                                                                                 value += p1e_18[*p++];
-//                                                                                 if(is_number_array[*p]){
-//                                                                                     value += p1e_19[*p++];
-//                                                                                     if(is_number_array[*p]){
-//                                                                                         value += p1e_20[*p++];
-//                                                                                         if(is_number_array[*p]){
-//                                                                                             mexErrMsgIdAndTxt("jsmn_mex:too_many_decimals","The fractional component of the number had too many digits");
-// 
-//                                                                                         }
-//                                                                                     }
-//                                                                                 }
-//                                                                             }
-//                                                                         }
-//                                                                     }
-//                                                                 }
-//                                                             }
-//                                                         }
-//                                                     }
-//                                                 }
-//                                             }
-//                                         }
-//                                     }
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
     //End of if '.'    
     if (negate) {
         value = -value;
     }
 
-    
+    if(n_exp){
+        ++p;
+          switch (*p){
+            case '-':
+                ++p;
+                negate = true;
+                break;
+            case '+':
+                ++p;
+            default:
+                negate = false;
+        }  
+        
+        exponent_value = 0;
+        switch(n_exp){
+            case 4:
+               exponent_value += p1e3[*p++];
+            case 3:
+               exponent_value += p1e2[*p++];
+            case 2:
+               exponent_value += p1e1[*p++]; //1e1 == 10, 2 #s plus the off by 1
+            case 1:
+               exponent_value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
+        } 
+        
+        if (negate){
+          exponent_value = -exponent_value;  
+        }
+        value *= pow(10.0, exponent_value);
+          
+    }
     
     
     return value;
     
-    /*
-     *  I found atof to be the main bottleneck in this code. It was 
-     *  suggested to me by some internet searching that a custom algorithm
-     *  would be close enough in 99.99 of the cases. I found a couple
-     *  basic ones online that used loops and multiplation. This was my
-     *  attempt to make something as fast possible. I welcome a faster
-     *  approach!
-     */
-    
-// // // // // //     double value = 0;
-// // // // // //     double exponent_value;
-// // // // // //     
-// // // // // //     int64_t n_numeric_chars_plus_1;
-// // // // // //     char *number_start;
-// // // // // //     
-// // // // // //     if (*p == '-'){
-// // // // // //         ++p;
-// // // // // //         negate = true;    
-// // // // // //     }else{
-// // // // // //         negate = false;
-// // // // // //     }
-// // // // // // 
-// // // // // //     number_start = p;
-// // // // // //     while (is_number_array[*p++]) {  
-// // // // // //     }
-// // // // // //     
-// // // // // //     n_numeric_chars_plus_1 = p-number_start; //# of numeric characters (off by 1 due to ++)
-// // // // // //     
-// // // // // //     //reset p so that we can increment our way along the number
-// // // // // //     p = number_start;
-// // // // // //     //Now that we know how many #s we have (off by 1 due to ++)
-// // // // // //     //we can start at the beginning and add each to its correct place
-// // // // // //     //e.g:
-// // // // // //     //  4086 =
-// // // // // //     //  4000 +
-// // // // // //     //   0   +
-// // // // // //     //    80 +
-// // // // // //     //     6
-// // // // // //     
-// // // // // //     
-// // // // // //     if (*p == 'E' || *p == 'e') {
-// // // // // //         ++p;
-// // // // // //         switch (*p){
-// // // // // //             case '-':
-// // // // // //                 ++p;
-// // // // // //                 negate = true;
-// // // // // //                 break;
-// // // // // //             case '+':
-// // // // // //                 ++p;
-// // // // // //             default:
-// // // // // //                 negate = false;
-// // // // // //         }
-// // // // // //         
-// // // // // //         number_start = p;
-// // // // // //         while (is_number_array[*p++]) {  
-// // // // // //         }
-// // // // // // 
-// // // // // //         exponent_value = 0;
-// // // // // //         n_numeric_chars_plus_1 = p-number_start;
-// // // // // //         //reset p so that we can increment our way down
-// // // // // //         p = number_start;
-// // // // // //         switch (n_numeric_chars_plus_1) {
-// // // // // //             case 17:
-// // // // // //                exponent_value += p1e15[*p++];  
-// // // // // //             case 16:
-// // // // // //                exponent_value += p1e14[*p++];  
-// // // // // //             case 15:
-// // // // // //                exponent_value += p1e13[*p++];   
-// // // // // //             case 14:
-// // // // // //                exponent_value += p1e12[*p++];   
-// // // // // //             case 13:
-// // // // // //                exponent_value += p1e11[*p++];   
-// // // // // //             case 12:
-// // // // // //                exponent_value += p1e10[*p++];       
-// // // // // //             case 11:
-// // // // // //                exponent_value += p1e9[*p++];  
-// // // // // //             case 10:
-// // // // // //                exponent_value += p1e8[*p++];  
-// // // // // //             case 9:
-// // // // // //                exponent_value += p1e7[*p++];  
-// // // // // //             case 8:
-// // // // // //                exponent_value += p1e6[*p++]; 
-// // // // // //             case 7:
-// // // // // //                exponent_value += p1e5[*p++];
-// // // // // //             case 6:
-// // // // // //                exponent_value += p1e4[*p++];
-// // // // // //             case 5:
-// // // // // //                exponent_value += p1e3[*p++];
-// // // // // //             case 4:
-// // // // // //                exponent_value += p1e2[*p++];
-// // // // // //             case 3:
-// // // // // //                exponent_value += p1e1[*p++];
-// // // // // //             case 2:
-// // // // // //                exponent_value += p1e0[*p++];
-// // // // // //                break;
-// // // // // //             case 1:
-// // // // // //                 mexErrMsgIdAndTxt("jsmn_mex:empty_exponent","An exponent was given with no numeric value");
-// // // // // //             default:
-// // // // // //                 //TODO: Give error location in string
-// // // // // //                 mexErrMsgIdAndTxt("jsmn_mex:large_exponent","There were more than 15 digits in a numeric exponent");
-// // // // // //         }
-// // // // // //         if (negate){
-// // // // // //           exponent_value = -exponent_value;  
-// // // // // //         }
-// // // // // //         value *= pow(10.0, exponent_value);
-// // // // // //     }
-// // // // // //     
-// // // // // //     *char_offset = p;
-// // // // // //     
-// // // // // //     return value;
 }
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
@@ -431,7 +532,7 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
-inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
+int string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
     //An alternative approach would be to look for the closing string
     //e.g.: ',' '}' ']' and then check all of the math when running
@@ -608,16 +709,11 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
             mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_period", "No digit found after period");
         }
     }
-    
-// //     else{
-// //         ++data_info;
-// //     }
-    
+
     if (*p == 'E' || *p == 'e') {
 		++p;
 		switch (*p) {
 		case '-':
-            //SIGN_INFO += 2;
 			++p;
 			break;
 		case '+':
@@ -649,33 +745,8 @@ inline int string_to_double_no_math(unsigned char *p, unsigned char **char_offse
     
     *char_offset = p;
     
-//     return *(int *)&data_info[0];
-    
     return *(int *)data_info;
     
-//     while (isdigit(*(++p))) {}
-// 
-// 	if (*p == '.') {
-// 		++p;
-//         while (isdigit(*(++p))) {}
-// 	}
-// 
-// 	if (*p == 'E' || *p == 'e') {
-// 		++p;
-// 		switch (*p) {
-// 		case '-':
-// 			++p;
-// 			break;
-// 		case '+':
-// 			++p;
-// 		}
-// 
-// 		while (isdigit(*(++p))) {}
-// 	}
-// // // 
-// // // 	
-// // // *char_offset = p;
-// // // 	return 0;
 }
 
 
@@ -755,26 +826,21 @@ STRING_SEEK:
 	mexErrMsgIdAndTxt("jsmn_mex:unterminated_string", "Unable to find a terminating string quote");
 }
 
-
-
-
-
-
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
 void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
-
-	/*
-	*  Inputs
-	*  ------
-	*  parser :
-	*    Initialized parser from jsmn_init()
-	*  js :
-	*    The JSON string to parse
-	*/
-
-    //const bool is_number_array[256] = {[0 ... 47]=false,[48 ... 57]=true,[58 ... 255]=false};
+    
+    const void *post_parse_jump[9] = {
+        &&S2_TYPE_DATA_END,
+        &&S2_TYPE_OBJECT,
+        &&S2_TYPE_ARRAY,
+        &&S2_TYPE_KEY,
+        &&S2_TYPE_STRING,
+        &&S2_TYPE_NUMBER,
+        &&S2_TYPE_NULL,
+        &&S2_TYPE_TRUE,
+        &&S2_TYPE_FALSE};
     
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
@@ -814,30 +880,22 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
         [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
-	const int MAX_DEPTH = 200;
 
+    int temp_n_things = 0;
+    int n_things = 0;
+    
     int n_numeric = 0;
     int n_keys = 0;
     int n_strings = 0;
-    
-	int parent_types[201];
-	int parent_indices[201];
-	int parent_sizes[201];
-	int current_depth = 0;
 
 	int parser_position = -1;
 	unsigned char *pEndNumber;
-	int current_type_index = -1;
     int current_data_index = -1;
 
-    //We might change these ...
-	int type_size_allocated = ceil(string_byte_length / 6);
+    int parent_index = 0;
+
     int data_size_allocated = string_byte_length;
-    
-    int type_size_index_max = type_size_allocated - 1;
     int data_size_index_max = data_size_allocated - 1;
-    
-	uint8_t *types = mxMalloc(type_size_allocated);
 	int *data = mxMalloc(data_size_allocated * sizeof(int));
     
     const double MX_NAN = mxGetNaN();
@@ -855,64 +913,71 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 
 //=============================================================
 S_OPEN_OBJECT_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
+    n_things++;
 
 	//Fall Through --------------------
-    
 S_OPEN_OBJECT_IN_KEY:
-
+    
+    EXPAND_DATA_CHECK(N_DATA_OBJECT);
     SET_TYPE(TYPE_OBJECT);
-
-    SETUP_PARENT_INFO(TYPE_OBJECT);
-    ++current_data_index; //Space for setting size
-
+    STORE_AND_UPDATE_PARENT;
+    ++current_data_index; //TAC
+    INIT_N_THINGS;
+    
+    //Navigation -----------------
 	SKIP_WHITESPACE
 
     switch (js[parser_position]) {
         case '"':
             goto S_PARSE_KEY;
         case '}':
-            goto S_CLOSE_EMPTY_OBJECT;
+            goto S_CLOSE_OBJECT;
         default:
             goto S_ERROR_OPEN_OBJECT;
     }
 
 //=============================================================
-S_CLOSE_KEY_AND_OBJECT:
-    
-    SET_TAC;
-	--current_depth; //Move up to the object
-    
-	//Fall Through ------  closing the object
-S_CLOSE_EMPTY_OBJECT:
 
-    SET_TAC;
-    SET_N_VALUES;
-    --current_depth; //Move up to parent of the object
+S_CLOSE_KEY_AND_OBJECT:    
+    //Update tac and parent
+    STORE_TAC;
     
-    if (current_depth == 0) {
+    //Fall Through ------
+S_CLOSE_KEY_AND_OBJECT_SIMPLE:
+    
+    //Only update parent
+    MOVE_UP_PARENT_INDEX;
+
+	//Fall Through ------
+S_CLOSE_OBJECT:
+
+    FINALIZE_N_THINGS;
+    STORE_TAC;
+    MOVE_UP_PARENT_INDEX;
+    
+    if (NULL_PARENT_INDEX) {
 		goto S_PARSE_END_OF_FILE;
 	}
     
-    if (parent_types[current_depth] == TYPE_KEY) {
-        PROCESS_END_OF_KEY_VALUE
+    if (PARENT_TYPE == TYPE_KEY) {
+    	PROCESS_END_OF_KEY_VALUE
+    } else {
+        PROCESS_END_OF_ARRAY_VALUE
     }
     
-    PROCESS_END_OF_ARRAY_VALUE
-
-
-	//=============================================================
+//=============================================================
 S_OPEN_ARRAY_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
+	n_things++;
 
 	//Fall Through -------------------------------
 S_OPEN_ARRAY_IN_KEY:
 
-    SET_TYPE(TYPE_ARRAY);
-
-    SETUP_PARENT_INFO(TYPE_ARRAY);
-    ++current_data_index; //Space for setting size
-
+    EXPAND_DATA_CHECK(N_DATA_ARRAY);
+    SET_TYPE(TYPE_OBJECT);
+    STORE_AND_UPDATE_PARENT;
+    ++current_data_index; //TAC
+    INIT_N_THINGS
+    
 	SKIP_WHITESPACE
     goto *array_jump[js[parser_position]];
 
@@ -921,36 +986,35 @@ S_OPEN_ARRAY_IN_KEY:
 	//=============================================================
 S_CLOSE_ARRAY:
 
-    SET_TAC;
-    SET_N_VALUES;
-    --current_depth;
+    FINALIZE_N_THINGS;
+    STORE_TAC;
+    MOVE_UP_PARENT_INDEX;
     
-	if (current_depth == 0) {
+	if (NULL_PARENT_INDEX) {
 		goto S_PARSE_END_OF_FILE;
 	}
     
-    if (parent_types[current_depth] == TYPE_KEY) {
+    if (PARENT_TYPE == TYPE_KEY) {
         PROCESS_END_OF_KEY_VALUE
+    } else {
+        PROCESS_END_OF_ARRAY_VALUE
     }
-    
-    PROCESS_END_OF_ARRAY_VALUE
-
-
 
 //=============================================================
 S_PARSE_KEY:
-	parent_sizes[current_depth] += 1;
+	n_things++;
     
     ++n_keys;
     
+    EXPAND_DATA_CHECK(N_DATA_KEY);
+
     SET_TYPE(TYPE_KEY);
-    
-    SETUP_PARENT_INFO_FOR_KEY;
-    
-//     if (current_depth == 2 && current_data_index < 2000){
-//         mexPrintf("current_data_index %d\n",current_data_index);
-//     }
-    
+    STORE_AND_UPDATE_PARENT;
+    //tac - 0, start 1 end 2 
+    //- assume 3 indices, true for string, #, null
+    //- then + 1 for pointing to after
+    ++current_data_index;
+    data[current_data_index] = current_data_index + 6;
 
     //start
     data[++current_data_index] = parser_position;
@@ -960,15 +1024,15 @@ S_PARSE_KEY:
     //end
 	data[++current_data_index] = parser_position;
 
-
-	SKIP_WHITESPACE;
+    //Navigation ------------------
+	//TODO: Assume : and space otherwise use code below
+    // if js[++parser_position] = ':' and 
+    
+    SKIP_WHITESPACE;
 
 	if (js[parser_position] == ':') {
-
-		//Advance to the next token
         SKIP_WHITESPACE
         goto *key_jump[js[parser_position]];
-
 	}
 	else {
 		goto S_ERROR_MISSING_COLON_AFTER_KEY;
@@ -978,13 +1042,13 @@ S_PARSE_KEY:
 
 	//=============================================================
 S_PARSE_STRING_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
+	n_things++;
 
-    ++n_strings;
+    n_strings++;
     
+    EXPAND_DATA_CHECK(N_DATA_STRING);
     SET_TYPE(TYPE_STRING);
 
-    EXPAND_DATA_CHECK(N_DATA_STRING)
 	data[++current_data_index] = parser_position;
 	seek_string_end(js, &parser_position);
     data[++current_data_index] = parser_position;
@@ -996,11 +1060,11 @@ S_PARSE_STRING_IN_ARRAY:
 	//=============================================================
 S_PARSE_STRING_IN_KEY:
 
-    ++n_strings;
+    n_strings++;
     
+    EXPAND_DATA_CHECK(N_DATA_STRING)    
 	SET_TYPE(TYPE_STRING);
 
-    EXPAND_DATA_CHECK(N_DATA_STRING)
 	data[++current_data_index] = parser_position;
 	seek_string_end(js, &parser_position);
     data[++current_data_index] = parser_position;
@@ -1014,40 +1078,27 @@ S_PARSE_NUMBER_IN_KEY:
 
     ++n_numeric;
     
+    EXPAND_DATA_CHECK(N_DATA_NUMERIC)
     SET_TYPE(TYPE_NUMBER);
 
-    EXPAND_DATA_CHECK(N_DATA_NUMERIC)
-    
     data[++current_data_index] = parser_position;
 	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
 	parser_position--;
 
-	PROCESS_END_OF_KEY_VALUE
+	PROCESS_END_OF_KEY_VALUE;
 
-
-
-	//=============================================================
+//=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
-
+	n_things++;
     ++n_numeric;
     
+    EXPAND_DATA_CHECK(N_DATA_NUMERIC);
 	SET_TYPE(TYPE_NUMBER);
 
-	EXPAND_DATA_CHECK(N_DATA_NUMERIC)
     data[++current_data_index] = parser_position;
 	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
-    
-
-    
-    //TODO:
-// // //     if(js[parser_position] == ','){
-// // //         
-// // //         else{
-
-	//TODO: Let's get rid of this by incorporating it below
 	parser_position--;
 
 	//TODO: I think we would get some speed gains by correctly guessing
@@ -1062,30 +1113,29 @@ S_PARSE_NULL_IN_KEY:
 
     ++n_numeric;
     
+    EXPAND_DATA_CHECK(N_DATA_NULL);
 	SET_TYPE(TYPE_NULL);
-
-	EXPAND_DATA_CHECK(N_DATA_NULL)
-
-    data[++current_data_index] = MX_NAN;
+    ++current_data_index;
+    ++current_data_index;
     
+    //TODO: Add null check ...
 	parser_position += 3;
     
-	PROCESS_END_OF_KEY_VALUE
+	PROCESS_END_OF_KEY_VALUE;
 
 
 
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
 
-	parent_sizes[current_depth] += 1;
+	n_things++;
     
     ++n_numeric;
     
+    EXPAND_DATA_CHECK(N_DATA_NULL);
 	SET_TYPE(TYPE_NULL);
-
-	EXPAND_DATA_CHECK(N_DATA_NULL)
-    
-    data[++current_data_index] = MX_NAN;
+    ++current_data_index;
+    ++current_data_index;
 
 	parser_position += 3;
     
@@ -1095,53 +1145,34 @@ S_PARSE_NULL_IN_ARRAY:
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
     
-    SET_TYPE(TYPE_LOGICAL);
-
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
-    
-    data[++current_data_index] = 1;
-    
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
+    SET_TYPE(TYPE_TRUE);
 	parser_position += 3;
 	PROCESS_END_OF_KEY_VALUE
 
 
 S_PARSE_TRUE_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
     
-	SET_TYPE(TYPE_LOGICAL);
-    
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
-    
-    data[++current_data_index] = 1;
-
+	n_things++;
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
+	SET_TYPE(TYPE_TRUE);
 	parser_position += 3;
-    
     PROCESS_END_OF_ARRAY_VALUE;
 
     
 S_PARSE_FALSE_IN_KEY:
-	SET_TYPE(TYPE_LOGICAL);
-
+    
     EXPAND_DATA_CHECK(N_DATA_LOGICAL)
-    
-    data[++current_data_index] = 0;
-    
+	SET_TYPE(TYPE_FALSE);
 	parser_position += 4;
+    PROCESS_END_OF_KEY_VALUE;
 
-    PROCESS_END_OF_KEY_VALUE
-
-            
 S_PARSE_FALSE_IN_ARRAY:
-	parent_sizes[current_depth] += 1;
     
-	SET_TYPE(TYPE_LOGICAL);
-    
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
-    
-    data[++current_data_index] = 0;
-
+	n_things++;
+    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
+	SET_TYPE(TYPE_FALSE);
 	parser_position += 4;
-    
 	PROCESS_END_OF_ARRAY_VALUE;
 
 	//=============================================================
@@ -1207,16 +1238,15 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 
 finish_main:
     
-    //We free up memory
-    types = mxRealloc(types,(current_type_index + 1));
-    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_type_index + 1);
+    //Hopefully this doesn't ever need to run ...
+    EXPAND_DATA_CHECK(1);
+    data[++current_data_index] = TYPE_DATA_END; 
     
-    data = mxRealloc(data,(current_type_index + 1)*sizeof(int));
+    
+    data = mxRealloc(data,(current_data_index + 1)*sizeof(int));
 	setStructField(plhs[0],data,"data",mxINT32_CLASS,current_data_index + 1);
     
     //Holding onto values
-    int *p_type_size_allocated = mxMalloc(sizeof(int));
-    *p_type_size_allocated = type_size_allocated;
     int *p_data_size_allocated = mxMalloc(sizeof(int));
     *p_data_size_allocated = data_size_allocated;
     int *p_n_numeric = mxMalloc(sizeof(int));
@@ -1226,52 +1256,53 @@ finish_main:
     int *p_n_strings = mxMalloc(sizeof(int));
     *p_n_strings= n_strings;
 
-    setStructField(plhs[0],p_type_size_allocated,"type_size_allocated",mxINT32_CLASS,1);
     setStructField(plhs[0],p_data_size_allocated,"data_size_allocated",mxINT32_CLASS,1);
     setStructField(plhs[0],p_n_numeric,"n_numeric",mxINT32_CLASS,1);
     setStructField(plhs[0],p_n_keys,"n_keys",mxINT32_CLASS,1);
     setStructField(plhs[0],p_n_strings,"n_strings",mxINT32_CLASS,1);
     
+    int cur_number = -1;
     int cur_string = -1;
     int cur_key = -1;
-    int cur_data_index = -1;
+    
     
     double *numeric_data = mxMalloc(n_numeric*sizeof(double));
-    double *moving_numeric_data = numeric_data;
 
     unsigned char *char_start;
     int num_info;
     
-    //Eventually I'd like this part to be multi-threaded
-    for(int iKey = 0; iKey <= current_type_index; iKey++){
-        switch(types[iKey]){
-            case TYPE_OBJECT:
-                cur_data_index += 2;
-                break;
-            case TYPE_ARRAY:
-                cur_data_index += 2;
-                break;
-            case TYPE_STRING:
-                cur_data_index += 2;
-                break;
-            case TYPE_NUMBER:
-                char_start = js + data[++cur_data_index];
-                num_info = data[++cur_data_index];
-                *moving_numeric_data = string_to_double(char_start,num_info);
-                ++moving_numeric_data;
-                break;
-            case TYPE_LOGICAL:
-                cur_data_index += 1;
-                break;
-            case TYPE_KEY:
-                cur_data_index += 3;
-                break;
-            case TYPE_NULL:
-                cur_data_index += 1;
-                break;
-        }
-             
-    }
+    goto *post_parse_jump[data[++current_data_index]];
+            
+    S2_TYPE_OBJECT:
+        current_data_index += 3;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_ARRAY:
+        current_data_index += 3;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_KEY:
+        current_data_index += 4;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_STRING:
+        current_data_index += 2;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_NUMBER:
+        char_start = js + data[++current_data_index];
+        data[current_data_index] = ++cur_number;
+        num_info = data[++current_data_index];
+        //numeric_data[cur_number] = string_to_double(char_start,num_info);
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_TRUE:
+        //cur_data_index += 1;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_FALSE:
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_NULL:
+        data[++current_data_index] = ++cur_number;
+        //numeric_data[cur_number] = MX_NAN;
+        ++current_data_index;
+        goto *post_parse_jump[data[++current_data_index]];
+    S2_TYPE_DATA_END:
+        //all done        
     
     setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numeric);        
 
