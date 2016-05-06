@@ -11,9 +11,9 @@
 //TODO: replace with a goto            
 #define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
 
-#define N_INT_PART data_info[0]
+#define N_INT_PART  data_info[0]
 #define N_FRAC_PART data_info[1]
-#define N_EXP_PART data_info[2]
+#define N_EXP_PART  data_info[2]
 
 #define EXPAND_DATA_CHECK(x) \
 	if (current_type_index+x >= data_size_index_max){ \
@@ -571,24 +571,18 @@ S_OPEN_OBJECT_IN_KEY:
 S_CLOSE_KEY_AND_OBJECT:
 	//TODO: set token close
     SET_TAC;
-	--current_depth;
+	--current_depth; //Move up to the object
     
 	//Fall Through ------  closing the object
 S_CLOSE_EMPTY_OBJECT:
 
-	//TODO: Insert logic for object
-	//token close
-	//set count
-
-	if (current_depth == 1) {
-		goto S_PARSE_END_OF_FILE;
-	}
-    
     SET_TAC;
     SET_N_VALUES;
-    --current_depth;
+    --current_depth; //Move up to parent of the object
     
-    
+    if (current_depth == 0) {
+		goto S_PARSE_END_OF_FILE;
+	}
     
     if (parent_types[current_depth] == TYPE_KEY) {
         PROCESS_END_OF_KEY_VALUE
@@ -617,18 +611,13 @@ S_OPEN_ARRAY_IN_KEY:
 	//=============================================================
 S_CLOSE_ARRAY:
 
-	//TODO: Insert logic for object
-	//token close
-	//set count
-
-	if (current_depth == 1) {
-		goto S_PARSE_END_OF_FILE;
-	}
-    
-    
     SET_TAC;
     SET_N_VALUES;
     --current_depth;
+    
+	if (current_depth == 0) {
+		goto S_PARSE_END_OF_FILE;
+	}
     
     if (parent_types[current_depth] == TYPE_KEY) {
         PROCESS_END_OF_KEY_VALUE
