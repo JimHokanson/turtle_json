@@ -18,7 +18,7 @@ classdef tokens
     string: 1) type  2) start/p     3) end
     number: 1) type  2) start/p     3) info
     null:   1) type  2) <nothing>/p 3) <nothing>
-    t/f:    1) type  
+    t/f:    1) type
     
     RULES:
     1) parent-1 => type
@@ -49,27 +49,32 @@ classdef tokens
     %}
     
     properties
-       file_string %string of the file
-       %We might not hold onto this ...
+        file_string %string of the file
+        %We might not hold onto this ...
+        
+        data
+        %type-ids
+        % #define TYPE_DATA_END 0
+        % #define TYPE_OBJECT 1
+        % #define TYPE_ARRAY  2
+        % #define TYPE_KEY    3
+        % #define TYPE_STRING 4
+        % #define TYPE_NUMBER 5
+        % #define TYPE_NULL   6
+        % #define TYPE_TRUE   7
+        % #define TYPE_FALSE  8
+        
        
-       types
-       data
-       %1 - object
-       %2 - array
-       %3 - string
-       %4 - numeric
-       %5 - logical
-       %6 - key (of an object, string)
-       %7 - null
-       
-       mex
-       
-       numeric_data
-       strings
-       d0
-       d1
-       chars_per_token
-       ns_per_token
+        
+        numeric_data
+        strings
+        
+        d_extra_info = '-------------------------------'
+        mex
+        data_to_string_ratio
+        toc_file_read
+        toc_parse
+        ns_per_char
     end
     
     %{
@@ -128,7 +133,7 @@ classdef tokens
                 t0 = tic;
                 uint8_data = read_to_uint8(file_path);
                 obj.file_string = char(uint8_data);
-                obj.d0 = toc(t0);
+                obj.toc_file_read = toc(t0);
                 t1 = tic;
                 if in.n_tokens
                     result = jsmn_mex(uint8_data,in.n_tokens);
@@ -137,11 +142,11 @@ classdef tokens
                 else
                     result = jsmn_mex(uint8_data);
                 end
-                obj.d1 = toc(t1);
+                obj.toc_parse = toc(t1);
             else
                 t0 = tic;
                 obj.file_string = in.raw_string;
-                obj.d0 = toc(t0);
+                obj.toc_file_read = toc(t0);
                 t1 = tic;
                 if in.n_tokens
                     result = jsmn_mex(in.raw_string,in.n_tokens);
@@ -150,49 +155,119 @@ classdef tokens
                 else
                     result = jsmn_mex(in.raw_string);
                 end
-                obj.d1 = toc(t1);
+                obj.toc_parse = toc(t1);
             end
             
-                       
-            obj.mex = result;
             
+            obj.mex = result;
+            obj.data_to_string_ratio = length(result.data)/length(obj.file_string);
             obj.data = result.data;
             obj.numeric_data = result.numeric_data;
+            obj.ns_per_char = 1e9*obj.toc_parse/length(obj.file_string);
             
-%             obj.types = result.types;
-%             obj.sizes = result.sizes;
-%             obj.parents = result.parents;
-%             obj.tokens_after_close = result.tokens_after_close;
-%             obj.numeric_data = result.values;
-%             obj.strings = result.strings;
-%             
-%             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
-%             obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
+            %These would take some work to get, would need to make these
+            %dependent ...
+            %             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
+            %             obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
         end
         function root = getRootInfo(obj)
-            switch obj.types(1)
+            switch obj.data(1)
                 case 1
                     %name,full_name,index,parse_object
                     root = json.token_info.object_token_info('root','root',1,obj);
-            	case 2
+                case 2
                     error('Not yet implemented')
-                %output = parse_array(str,j,1,numeric_data,in);
+                    %output = parse_array(str,j,1,numeric_data,in);
                 otherwise
                     error('Unexpected parent object')
-            end 
+            end
         end
-        function output = viewOldInfo(obj,indices)
-           output = [num2cell(indices);
-               json.TYPES(obj.types(indices));
-               num2cell(obj.starts(indices));
-               num2cell(obj.ends(indices));
-               num2cell(obj.sizes(indices));
-               num2cell(obj.parents(indices));
-               num2cell(obj.tokens_after_close(indices));
-               num2cell(obj.numeric_data(indices));
-               obj.strings(indices)];
-           output = [{'indices','type','start','end','size','parent','token_after_close','value','string'}' output];
+        %This no longer works since I changed the output format
+        %from the parser ...
+        %
+        %What might be nice is something that flattens "data" into
+        %a structure
+        
+        function c = getDataAsStruct(obj)
+%     object: 1) type  2) parent      3) tac     4) n_values
+%     array:  1) type  2) parent      3) tac     4) n_values
+%     key:    1) type  2) parent      3) tac     4) start/p     5) end
+%     string: 1) type  2) start/p     3) end
+%     number: 1) type  2) start/p     3) info
+%     null:   1) type  2) <nothing>/p 3) <nothing>
+%     t/f:    1) type    
+
+            cur_I = 1;
+            d = obj.data;
+            n_tokens = 0;
+            %We don't know how much to allocate here, this is a poor guess
+            %that should avoid resizing
+            c = cell(1,ceil(length(d)/2));
+            while(1)
+                s = struct;
+                switch d(cur_I)
+                    case 0
+                        break;
+                    case 1
+                        s.type   = 'object';
+                        s.parent = d(cur_I+1);
+                        s.tac    = d(cur_I+2);
+                        s.n_keys = d(cur_I+3);
+                        cur_I    = cur_I + 4;
+                    case 2
+                        s.type   = 'array';
+                        s.parent = d(cur_I+1);
+                        s.tac    = d(cur_I+2);
+                        s.n_token_values = d(cur_I+3);
+                        cur_I    = cur_I + 4; 
+                    case 3
+                        s.type = 'key';
+                        s.parent = d(cur_I+1);
+                        s.tac = d(cur_I+2);
+                        s.start = d(cur_I+3);
+                        s.end = d(cur_I+4);
+                        cur_I    = cur_I + 5; 
+                    case 4
+                        s.type = 'string';
+                        s.start_p = d(cur_I+1);
+                        s.end = d(cur_I+2);
+                        cur_I    = cur_I + 3; 
+                    case 5
+                         s.type = 'number';
+                         s.start_p = d(cur_I+1);
+                         s.info = d(cur_I+2);
+                         cur_I    = cur_I + 3; 
+                    case 6
+                         s.type = 'null';
+                         s.p = d(cur_I+1);
+                         cur_I    = cur_I + 3; 
+                    case 7
+                         s.type = 'true';
+                         cur_I    = cur_I + 1; 
+                    case 8
+                         s.type = 'false';
+                         cur_I    = cur_I + 1; 
+                    otherwise
+                        error('Unexpected type')
+                end
+                n_tokens = n_tokens + 1;
+                c{n_tokens} = s;
+            end
+            c = c(1:n_tokens);
         end
+        
+%         function output = viewOldInfo(obj,indices)
+%             output = [num2cell(indices);
+%                 json.TYPES(obj.types(indices));
+%                 num2cell(obj.starts(indices));
+%                 num2cell(obj.ends(indices));
+%                 num2cell(obj.sizes(indices));
+%                 num2cell(obj.parents(indices));
+%                 num2cell(obj.tokens_after_close(indices));
+%                 num2cell(obj.numeric_data(indices));
+%                 obj.strings(indices)];
+%             output = [{'indices','type','start','end','size','parent','token_after_close','value','string'}' output];
+%         end
     end
     
 end

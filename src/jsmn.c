@@ -5,9 +5,16 @@
 #include "mex.h"
 #include <math.h>
 #include "stdint.h"  //uint_8
+#include <time.h>
 
+//This is needed for AVX?
+#include "immintrin.h"
+
+//TODO: Pad end with nulls and maybe a string end???
+//TODO: Figure out SSE2/SSE4/AVX
 //TODO: Assume TAC is 1 ahead
 //TODO: Build in if statements on keys
+//TODO: Pad with empty first setting to allow using uint instead of int (padding would allow removal of -1)
 
 //TODO: replace with a goto for more information
 #define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
@@ -17,13 +24,20 @@
 #define N_EXP_PART  data_info[2]
 
 //Things for opening ======================================================
+#define EXPAND_DATA_CHECK(x) \
+	if (current_data_index + x >= data_size_index_max){ \
+        data_size_allocated = ceil(1.5*data_size_allocated); \
+        data = mxRealloc(data,data_size_allocated*sizeof(int)); \
+        data_size_index_max = data_size_allocated-1; \
+    } \
+
 #define SET_TYPE(x) data[++current_data_index] = x;
 
 #define STORE_AND_UPDATE_PARENT \
     data[++current_data_index] = parent_index; \
     parent_index = current_data_index;  
     
-#define INIT_N_THINGS data[current_data_index+2] = n_things;
+#define INIT_N_THINGS data[++current_data_index] = n_things;
 //=========================================================================
     
     
@@ -46,20 +60,10 @@
             
             
 
-
-//TODO: Document
-#define EXPAND_DATA_CHECK(x) \
-	if (current_data_index + x >= data_size_index_max){ \
-        data_size_allocated = ceil(1.5*data_size_allocated); \
-        data = mxRealloc(data,data_size_allocated*sizeof(int)); \
-        data_size_index_max = data_size_allocated-1; \
-    } \
-
-//TODO: Document
-
-      
-
-            
+//===================== Navigation ========================================
+//=========================================================================      
+#define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
+          
 #define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
             
 #define PROCESS_END_OF_ARRAY_VALUE \
@@ -67,16 +71,13 @@
 	switch (js[parser_position]) { \
         case ',': \
             SKIP_WHITESPACE; \
-            goto *array_jump[js[parser_position]]; \
+            DO_ARRAY_JUMP; \
         case ']': \
             goto S_CLOSE_ARRAY; \
         default: \
             goto S_ERROR_END_OF_VALUE_IN_ARRAY; \
 	} \
- 
-//             data[parent_indices[current_depth]] = current_data_index+1;
-//             SET_TAC; \
-            
+             
 #define PROCESS_END_OF_KEY_VALUE \
 	SKIP_WHITESPACE; \
 	switch (js[parser_position]) { \
@@ -97,13 +98,16 @@
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
 	} \
 
-
+//=========================================================================
 
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 
 //Values for Integer portion of number
 //------------------------------------
 //Note that I'm avoiding subtracting 0 which makes these arrays rather large ...
+//It may be faster to subtract and do the lookup ...
+//We might even be better having a single array which we offset into
+//e.g. js[parser_position-9] + js[parser_position-9+10] + js[parser_position-9+20] + js[parser_position-9+30] 
 const double p1e0[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9};
 const double p1e1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,20,30,40,50,60,70,80,90};
 const double p1e2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,200,300,400,500,600,700,800,900};
@@ -127,6 +131,10 @@ const double p1e15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 //and accordingly, how far out we should really populate ...
 //
 //I've gone out to the maximum of double (I think)
+//
+//I ran into problems with something being defined with leading zeros
+//
+//e.g. 0.0000000000001234567891234567
 //
 //i.e. 2.0123456789012345 ?
 const double p1e_1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9};
@@ -157,13 +165,13 @@ const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 inline double string_to_double(unsigned char *p, int num_info) {
 
     double value;
-    double exponent_value;
-    bool negate;
-    uint8_t n_int  = (uint8_t)num_info;
-    uint8_t n_frac = num_info >> 8;
-    uint8_t n_exp  = num_info >> 16;
     
-//     uint8_t *info2 = (uint8_t*)&num_info;
+    bool negate;
+//     uint8_t n_int  = (uint8_t)num_info;
+//     uint8_t n_frac = num_info >> 8;
+//     uint8_t n_exp  = num_info >> 16;
+    
+	uint8_t *info2 = (uint8_t*)&num_info;
     
     if (*p == '-'){
         ++p;
@@ -175,7 +183,8 @@ inline double string_to_double(unsigned char *p, int num_info) {
     value = 0;
     //I'm curious if you could take advantage of something like SSE
     //if each case was written out explicitly rather than via fall through
-    switch (n_int) {
+//     switch (n_int) {
+    switch (info2[0]){
         case 16:
            value += p1e15[*p++];  
         case 15:
@@ -210,9 +219,9 @@ inline double string_to_double(unsigned char *p, int num_info) {
            value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
     }  
     
-    if(n_frac){
+    if(info2[1]){
         ++p;
-        switch (n_frac) {
+        switch (info2[1]) {
             case 20:
                value += p1e_1[*p++];
                value += p1e_2[*p++]; 
@@ -471,7 +480,7 @@ inline double string_to_double(unsigned char *p, int num_info) {
         value = -value;
     }
 
-    if(n_exp){
+    if(info2[2]){
         ++p;
           switch (*p){
             case '-':
@@ -480,12 +489,13 @@ inline double string_to_double(unsigned char *p, int num_info) {
                 break;
             case '+':
                 ++p;
+				// fall through -------
             default:
                 negate = false;
         }  
         
-        exponent_value = 0;
-        switch(n_exp){
+		double exponent_value = 0;
+        switch(info2[2]){
             case 4:
                exponent_value += p1e3[*p++];
             case 3:
@@ -510,6 +520,8 @@ inline double string_to_double(unsigned char *p, int num_info) {
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
+    
+    //This function is used to set a field in the output struct
     
     //setStructField(plhs[0],data_ptr,"name",mxINT32_CLASS,N)
     
@@ -759,9 +771,8 @@ void seek_string_end(unsigned char *js, int *input_parser_position) {
 	int parser_position = *input_parser_position;
 	unsigned char c;
 
-//I had wanted to do just a search for " but then
+//I had wanted to just do a search for " but then
 //I might miss the end of string
-//START_STRING_SEEK:
     
 // // // 	while ((c = js[++parser_position])) {
 // // // 		if (c == '\"') {
@@ -830,17 +841,23 @@ STRING_SEEK:
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
 void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
+
+#ifdef  __AVX__
+    mexPrintf("AVX is defined\n");
+#endif
+#ifdef  __AVX2__
+    mexPrintf("AVX2 is defined\n");
+#endif    
     
-    const void *post_parse_jump[9] = {
-        &&S2_TYPE_DATA_END,
-        &&S2_TYPE_OBJECT,
-        &&S2_TYPE_ARRAY,
-        &&S2_TYPE_KEY,
-        &&S2_TYPE_STRING,
-        &&S2_TYPE_NUMBER,
-        &&S2_TYPE_NULL,
-        &&S2_TYPE_TRUE,
-        &&S2_TYPE_FALSE};
+      /* Initialize the two argument vectors */
+  __m256 evens = _mm256_set_ps(2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0);
+  __m256 odds = _mm256_set_ps(1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0);
+
+  /* Compute the difference between the two vectors */
+  __m256 result = _mm256_sub_ps(evens, odds);
+    
+        //mexPrintf("AVX2 is defined\n");
+    
     
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
@@ -894,6 +911,8 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 
     int parent_index = 0;
 
+    //This current allocation means we hit 4x the size of the file
+    //in initial memory allocation
     int data_size_allocated = string_byte_length;
     int data_size_index_max = data_size_allocated - 1;
 	int *data = mxMalloc(data_size_allocated * sizeof(int));
@@ -919,6 +938,7 @@ S_OPEN_OBJECT_IN_ARRAY:
 S_OPEN_OBJECT_IN_KEY:
     
     EXPAND_DATA_CHECK(N_DATA_OBJECT);
+    
     SET_TYPE(TYPE_OBJECT);
     STORE_AND_UPDATE_PARENT;
     ++current_data_index; //TAC
@@ -973,16 +993,15 @@ S_OPEN_ARRAY_IN_ARRAY:
 S_OPEN_ARRAY_IN_KEY:
 
     EXPAND_DATA_CHECK(N_DATA_ARRAY);
-    SET_TYPE(TYPE_OBJECT);
+    
+    SET_TYPE(TYPE_ARRAY);
     STORE_AND_UPDATE_PARENT;
     ++current_data_index; //TAC
     INIT_N_THINGS
     
 	SKIP_WHITESPACE
-    goto *array_jump[js[parser_position]];
-
-
-
+    DO_ARRAY_JUMP
+            
 	//=============================================================
 S_CLOSE_ARRAY:
 
@@ -1002,18 +1021,19 @@ S_CLOSE_ARRAY:
 
 //=============================================================
 S_PARSE_KEY:
-	n_things++;
-    
+	++n_things;
     ++n_keys;
     
     EXPAND_DATA_CHECK(N_DATA_KEY);
 
     SET_TYPE(TYPE_KEY);
     STORE_AND_UPDATE_PARENT;
+    
+    //TAC handling -----------------------
     //tac - 0, start 1 end 2 
     //- assume 3 indices, true for string, #, null
     //- then + 1 for pointing to after
-    ++current_data_index;
+    ++current_data_index; 
     data[current_data_index] = current_data_index + 6;
 
     //start
@@ -1090,23 +1110,37 @@ S_PARSE_NUMBER_IN_KEY:
 
 //=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
-	n_things++;
+	++n_things;
     ++n_numeric;
     
     EXPAND_DATA_CHECK(N_DATA_NUMERIC);
-	SET_TYPE(TYPE_NUMBER);
-
+	
+    SET_TYPE(TYPE_NUMBER);
     data[++current_data_index] = parser_position;
 	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
 	parser_position = (int)(pEndNumber - js);
-	parser_position--;
-
-	//TODO: I think we would get some speed gains by correctly guessing
-	//the structure
-	// -> typically ", " <- comma then space then number
-
-    //Navigation --------------------------------
-	PROCESS_END_OF_ARRAY_VALUE;
+    
+    if (js[parser_position] == ','){
+        SKIP_WHITESPACE;
+        DO_ARRAY_JUMP;
+        
+//         if (js[++parser_position] == ' '){
+//             if (isdigit(js[++parser_position]) || js[parser_position] == '-'){
+//                 goto S_PARSE_NUMBER_IN_ARRAY;
+//             }else{
+//                 parser_position--;
+//                 SKIP_WHITESPACE;
+//                 DO_ARRAY_JUMP;
+//             }
+//         }else{
+//             parser_position--;
+//             SKIP_WHITESPACE;
+//             DO_ARRAY_JUMP;
+//         }
+    }else{
+        parser_position--;
+        PROCESS_END_OF_ARRAY_VALUE;
+    }
 
 //=============================================================
 S_PARSE_NULL_IN_KEY:
@@ -1214,9 +1248,12 @@ S_ERROR_MISSING_COLON_AFTER_KEY:
 S_ERROR_END_OF_VALUE_IN_KEY:
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token of key must be followed by a comma or a closing object ""}"" character");
 
-//TODO: Open array points here now too
+//This error comes when we have a comma in an array that is not followed
+// by a valid value => i.e. #, ", [, {, etc.
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY");
+    mexPrintf("Current character: %c\n",js[parser_position]);
+    mexPrintf("Current position in string: %d\n",parser_position);
+	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Invalid token found after a comma in an array");
 	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");
    
 //TODO: Open array points here now too
@@ -1239,10 +1276,12 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 finish_main:
     
     //Hopefully this doesn't ever need to run ...
+    //We're adding a single type value at the end to indicate we are done
+    //rather than checking at each type value
     EXPAND_DATA_CHECK(1);
     data[++current_data_index] = TYPE_DATA_END; 
     
-    
+    //Set the data into storage
     data = mxRealloc(data,(current_data_index + 1)*sizeof(int));
 	setStructField(plhs[0],data,"data",mxINT32_CLASS,current_data_index + 1);
     
@@ -1265,102 +1304,81 @@ finish_main:
     int cur_string = -1;
     int cur_key = -1;
     
-    
+    //Initialization of all numeric data
     double *numeric_data = mxMalloc(n_numeric*sizeof(double));
 
     unsigned char *char_start;
     int num_info;
     
-    goto *post_parse_jump[data[++current_data_index]];
-            
-    S2_TYPE_OBJECT:
-        current_data_index += 3;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_ARRAY:
-        current_data_index += 3;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_KEY:
-        current_data_index += 4;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_STRING:
-        current_data_index += 2;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_NUMBER:
-        char_start = js + data[++current_data_index];
-        data[current_data_index] = ++cur_number;
-        num_info = data[++current_data_index];
-        //numeric_data[cur_number] = string_to_double(char_start,num_info);
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_TRUE:
-        //cur_data_index += 1;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_FALSE:
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_NULL:
-        data[++current_data_index] = ++cur_number;
-        //numeric_data[cur_number] = MX_NAN;
-        ++current_data_index;
-        goto *post_parse_jump[data[++current_data_index]];
-    S2_TYPE_DATA_END:
-        //all done        
+    clock_t start_post_process, end_post_process;
+    
+    
+    start_post_process = clock();
+    current_data_index = -1;
+    //while (current_data_index <= data_size_index_max){
+    while (1){
+      
+// #define N_DATA_OBJECT   4
+// #define N_DATA_ARRAY    4
+// #define N_DATA_KEY      5
+// #define N_DATA_STRING   3
+// #define N_DATA_NUMERIC  3
+// #define N_DATA_LOGICAL  1
+// #define N_DATA_NULL     3
+        
+        switch(data[++current_data_index]){
+            case TYPE_DATA_END:
+                goto ALL_DONE;
+            case TYPE_OBJECT:
+                current_data_index += 3;
+                break;
+            case TYPE_ARRAY:
+                current_data_index += 3;
+                break;
+            case TYPE_STRING:
+                current_data_index += 2;
+                break;
+            case TYPE_NUMBER:
+                //storage format:
+                //1) type   2) start of number 3) info about number
+                //We change #2 to pointing to the storage location of
+                //the number in the array
+                char_start = js + data[++current_data_index];
+                data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
+                num_info = data[++current_data_index];
+                numeric_data[cur_number] = string_to_double(char_start,num_info);
+                break;
+            case TYPE_TRUE:
+                break;
+            case TYPE_FALSE:
+                break;
+            case TYPE_KEY:
+                current_data_index += 4;
+                break;
+            case TYPE_NULL:
+                data[++current_data_index] = ++cur_number;
+                numeric_data[cur_number] = MX_NAN;
+                ++current_data_index;
+                break;
+
+        }   
+    }
+    
+ALL_DONE:
+    
+    end_post_process = clock();
+    double *elapsed_pp_time = mxMalloc(sizeof(double));
+    *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
+    
+    setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
     
     setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numeric);        
 
     
-    //=====================================================================
-    
-    
-    
-    
-    
-// // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],types,"types",mxUINT8_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],sizes,"sizes",mxINT32_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],parents,"parents",mxINT32_CLASS,n_tokens_used);    
-    
-    
-    
-    
     
 	return;
 
-	//         int num_tokens,
-	//         double *values,
-	//         uint8_t *types,
-	//         int *sizes,
-	//         int *parents,
-	//         int *tokens_after_close,
-	//         mxArray **mxStrings
 
-
-
-
-
-	// // //     const double MX_NAN = mxGetNaN();
-	// // //
-	// // //     //Parser local variables
-	// // //     //--------------------------------------
-	// // //     int parser_position = parser->position;
-	// // //     int current_token_index = parser->current_token;
-	// // //     int super_token_index = parser->super_token;
-	// // //
-	// // //     int num_tokens_minus_1 = num_tokens-1;
-	// // //
-	// // //     //Frequently accessed super token attributes
-	// // //     //------------------------------------------
-	// // //     //This is true when inside an attribute
-	// // //     bool super_token_is_key;
-	// // //     //This was moved to a variable specifically for large arrays
-	// // //     int super_token_size;
-	// // //
-	// // //     char *pEndNumber;
-	// // //
-	// // // //     //reinitialize super if we've reallocated memory for the parser
-	// // // //     if (super_token_index != -1){
-	// // // //         super_token_is_key = types[super_token_index] == JSMN_KEY;
-	// // // //     }else{
-	// // // //         super_token_is_key = false;
-	// // // //     }
 
 
 

@@ -71,10 +71,11 @@ t3 = tic;
 for i = 1:20
     %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'chars_per_token',5);
-    d1_all(i) = jt.d1;
+    d1_all(i) = jt.toc_parse;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
+
 
 
 

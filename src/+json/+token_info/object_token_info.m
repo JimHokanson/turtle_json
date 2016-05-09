@@ -40,9 +40,17 @@ classdef object_token_info
             obj.p = parse_object;
             
             p = parse_object;
-                        
-            n_attributes = p.sizes(index);
-            cur_name_I   = index+1;
+            
+%         object: 1) type  2) parent      3) tac     4) n_values
+%         array:  1) type  2) parent      3) tac     4) n_values
+%         key:    1) type  2) parent      3) tac     4) start/p     5) end
+%         string: 1) type  2) start/p     3) end
+%         number: 1) type  2) start/p     3) info
+%         null:   1) type  2) <nothing>/p 3) <nothing>
+%         t/f:    1) type
+            
+            n_attributes = p.data(index+3);
+            cur_name_I   = index+4;
             
             a_indices = zeros(1,n_attributes,'int32');
             a_names   = cell(1,n_attributes);
