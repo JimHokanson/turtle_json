@@ -50,7 +50,7 @@ classdef object_token_info
 %         t/f:    1) type
             
             n_attributes = p.data(index+3);
-            cur_name_I   = index+4;
+            key_start_I  = index+4;
             
             a_indices = zeros(1,n_attributes,'int32');
             a_names   = cell(1,n_attributes);
@@ -59,9 +59,11 @@ classdef object_token_info
             %TODO: initialize map with string and indices
             map = containers.Map;
             for iItem = 1:n_attributes
-                cur_value_I =  cur_name_I + 1;
+                cur_value_I =  key_start_I + 5;
+                
                 a_indices(iItem) = cur_value_I;
-                temp_name = p.strings{cur_name_I};
+                
+                temp_name = p.strings{cur_value_I};
                 map(temp_name) = iItem;
                 a_names{iItem} = temp_name;
                 cur_name_I = p.tokens_after_close(cur_name_I);

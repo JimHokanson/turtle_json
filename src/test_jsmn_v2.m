@@ -16,7 +16,7 @@ t3 = tic;
 for i = 1:N
     jt = json.tokens(file_path);
 	%jt = json.tokens(file_path,'chars_per_token',10);
-    d1_all(i) = jt.d1;
+    d1_all(i) = jt.toc_parse;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
@@ -129,11 +129,14 @@ profile viewer
 % 0.32871, 0.164724, 1.69345
 % 0.297383, 0.167984, 1.70325
 
-%No math
-%0.4,
-%0.76, 0.54, 5.47
-%0.5, 0.27, 2.82
+%New version - goto refactoring
+%-------------------------------
+%   0.263153, 0.209014, 2.12919
 
+
+
+%OLD NUMBERS
+%============================
 %2.58 - 2016-03-21, removed test for null tokens
 %2.50 - 2016-03-22, removed error checking at the end for closed arrays and objects
 %- minor refactoring of code

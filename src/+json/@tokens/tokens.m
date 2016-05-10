@@ -129,34 +129,42 @@ classdef tokens
             in.raw_string = -1;
             in = sl.in.processVarargin(in,varargin);
             
-            if in.raw_string == -1
-                t0 = tic;
-                uint8_data = read_to_uint8(file_path);
-                obj.file_string = char(uint8_data);
-                obj.toc_file_read = toc(t0);
-                t1 = tic;
-                if in.n_tokens
-                    result = jsmn_mex(uint8_data,in.n_tokens);
-                elseif in.chars_per_token
-                    result = jsmn_mex(uint8_data,length(obj.file_string)/in.chars_per_token);
-                else
-                    result = jsmn_mex(uint8_data);
-                end
-                obj.toc_parse = toc(t1);
-            else
-                t0 = tic;
-                obj.file_string = in.raw_string;
-                obj.toc_file_read = toc(t0);
-                t1 = tic;
-                if in.n_tokens
-                    result = jsmn_mex(in.raw_string,in.n_tokens);
-                elseif in.chars_per_token
-                    result = jsmn_mex(in.raw_string,length(obj.file_string)/in.chars_per_token);
-                else
-                    result = jsmn_mex(in.raw_string);
-                end
-                obj.toc_parse = toc(t1);
-            end
+            t0 = tic;
+            result = jsmn_mex(file_path);
+            %TODO: Build in an explicit timer on the parsing ...
+            obj.toc_parse = toc(t0)-result.elapsed_read_time;
+            obj.toc_file_read = result.elapsed_read_time;
+            
+            
+            
+%             if in.raw_string == -1
+%                 t0 = tic;
+%                 uint8_data = read_to_uint8(file_path);
+%                 obj.file_string = char(uint8_data);
+%                 obj.toc_file_read = toc(t0);
+%                 t1 = tic;
+%                 if in.n_tokens
+%                     result = jsmn_mex(uint8_data,0,in.n_tokens);
+%                 elseif in.chars_per_token
+%                     result = jsmn_mex(uint8_data,0,length(obj.file_string)/in.chars_per_token);
+%                 else
+%                     result = jsmn_mex(uint8_data);
+%                 end
+%                 obj.toc_parse = toc(t1);
+%             else
+%                 t0 = tic;
+%                 obj.file_string = in.raw_string;
+%                 obj.toc_file_read = toc(t0);
+%                 t1 = tic;
+%                 if in.n_tokens
+%                     result = jsmn_mex(in.raw_string,0,in.n_tokens);
+%                 elseif in.chars_per_token
+%                     result = jsmn_mex(in.raw_string,length(obj.file_string)/in.chars_per_token);
+%                 else
+%                     result = jsmn_mex(in.raw_string);
+%                 end
+%                 obj.toc_parse = toc(t1);
+%             end
             
             
             obj.mex = result;

@@ -23,6 +23,7 @@
 #include "stdint.h"  //uint_8
 #include "mex.h"
 #include "jsmn.h"
+#include <time.h> //clock
 
 void setStructField2(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
@@ -45,18 +46,70 @@ void setStructField2(mxArray *s, void *pr, const char *fieldname, mxClassID clas
 
 }
 
-void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
+void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
+    
+	FILE *file;
+    char *file_path;
+	size_t file_length;
+    int N_PADDING = 17;
+    unsigned char *buffer;
+
+    file_path = mxArrayToString(prhs[0]);
+    
+	//Open file
+	//file = fopen(file_path, "rb");
+	fopen_s(&file, file_path, "rb");
+    if (!file)
+	{
+        mexErrMsgIdAndTxt("jsmn_mex:file_open","Unable to open file");
+	}
+	
+	//Get file length
+	fseek(file, 0, SEEK_END);
+	file_length = ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	//Allocate memory
+	buffer = mxMalloc(file_length+N_PADDING);
+
+	//Read file contents into buffer
+	fread(buffer, file_length, 1, file);
+    fclose(file);
+    buffer[file_length] = 0; 
+    for (int i = 0; i < N_PADDING; i++){
+        //length 1, index 0
+        //length file_length, max index - file_length-1
+        //so padding starts at file_length + 0
+        buffer[file_length + i] = 0;
+    }
+    
+    //This would allow us to only seek for "
+    buffer[file_length+1] = '"';
+    
+    *string_byte_length = file_length; 
+    
+    *p_buffer = buffer;
+    
+    mxFree(file_path);
+}
+
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     //  Usage:
     //  ------
-    //  str = fileread(file_path);
-    //  token_info = jsmn_mex(str)
+    //  token_info = jsmn_mex(file_path,*is_string,*allocation_size)
     //
+    //  Inputs #2 and #3 are not yet implemented
+    //
+    //  TODO: Eventually we should allow passing in a padded version
+    //  of the string rather than expanding it ourselves
     //
     //  Outputs:
     //  --------
     //  token_info
     //      - see wrapping Matlab function
+    
+    
     
     //The initialization isn't really needed but it silences a warning
     //in the compiler - compiler not recognizing terminal errors in code
@@ -65,42 +118,67 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[] )
     //same here 
     unsigned char *json_string = NULL;
     
+    bool is_file_path = true;
+    
+    clock_t start_read, end_read;
+
     //Input Handling
     //---------------------------------------------------------------------
-    if (!(nrhs == 1 || nrhs == 2)){
+    if (!(nrhs == 1 || nrhs == 2 || nrhs == 3)){
         mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of inputs ...");
     }
     
-    if (mxIsUint8(prhs[0])){
-        json_string = (unsigned char *)mxGetData(prhs[0]);
-        //We've padded with 0
-        string_byte_length = mxGetNumberOfElements(prhs[0])-1;
-        if (string_byte_length <= 1){
-            mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
-        }
-        if (json_string[string_byte_length] != 0){
-            mexErrMsgIdAndTxt("jsmn_mex:bad_uint8_input","Currently uint8 should be padded with a trailing zero");
-        }
-    }else if (mxIsClass(prhs[0],"char")){
-        json_string = (unsigned char *) mxArrayToString(prhs[0]);
-        string_byte_length = mxGetNumberOfElements(prhs[0]);
-        if (string_byte_length == 0){
-            mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
+    if (!(nlhs == 1)){
+        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of outputs");
+    }
+    
+    start_read = clock();
+    if (mxIsClass(prhs[0],"char")){
+        
+        if (nrhs > 1){
+            if (mxIsClass(prhs[1],"double")){
+                is_file_path = mxGetScalar(prhs[1]) == 0;
+            }else{
+                mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a double");    
+            }
         }
         
-        //mexPrintf("Last Character: %c\n",json_string[string_byte_length]);
-        
+        if (is_file_path){
+            readFileToString(prhs,&json_string,&string_byte_length);
+            //mexPrintf("String byte length: %d\n",string_byte_length);
+        }else{
+            json_string = (unsigned char *) mxArrayToString(prhs[0]);
+            string_byte_length = mxGetNumberOfElements(prhs[0]);
+            
+            //TODO: Need to buffer
+            
+            mexErrMsgIdAndTxt("jsmn_mex:not_yet_implemented","Not yet implemented");
+            
+            if (string_byte_length == 0){
+                mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
+            }
+        }
     }else {
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
     }
     
+    end_read = clock();
+    
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     
+    double *elapsed_read_time = mxMalloc(sizeof(double));
+    *elapsed_read_time = (double)(end_read - start_read)/CLOCKS_PER_SEC;
+    
+    setStructField2(plhs[0],elapsed_read_time,"elapsed_read_time",mxDOUBLE_CLASS,1);
+
+    if (is_file_path){
+        setStructField2(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
+    }
+    
+
     jsmn_parse(json_string,string_byte_length,plhs);
   
-    if (mxIsClass(prhs[0],"char")){
-        mxFree(json_string);
-    }
+
     
     
     
