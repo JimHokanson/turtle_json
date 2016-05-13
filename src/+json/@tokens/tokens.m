@@ -74,6 +74,7 @@ classdef tokens
         data_to_string_ratio
         toc_file_read
         toc_parse
+        toc_post_process
         ns_per_char
     end
     
@@ -134,6 +135,7 @@ classdef tokens
             %TODO: Build in an explicit timer on the parsing ...
             obj.toc_parse = toc(t0)-result.elapsed_read_time;
             obj.toc_file_read = result.elapsed_read_time;
+            obj.toc_post_process = result.elapsed_pp_time;
             
             
             
@@ -166,12 +168,12 @@ classdef tokens
 %                 obj.toc_parse = toc(t1);
 %             end
             
-            
+            obj.file_string = result.json_string;
             obj.mex = result;
-            obj.data_to_string_ratio = length(result.data)/length(obj.file_string);
+            obj.data_to_string_ratio = length(result.data)/length(result.json_string);
             obj.data = result.data;
             obj.numeric_data = result.numeric_data;
-            obj.ns_per_char = 1e9*obj.toc_parse/length(obj.file_string);
+            obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
             
             %These would take some work to get, would need to make these
             %dependent ...

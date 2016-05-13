@@ -6,6 +6,7 @@
 #include <math.h>
 #include "stdint.h"  //uint_8
 #include <time.h>
+#include <omp.h>
 
 //This is needed for AVX?
 #include "immintrin.h"
@@ -45,7 +46,7 @@
 #define FINALIZE_N_THINGS \
     temp_n_things = n_things - data[parent_index+2]; \
     n_things = data[parent_index+2]; \
-    data[parent_index+1] = temp_n_things; \
+    data[parent_index+2] = temp_n_things; \
             
 //+1 to next element
 //+1 for Matlab 1 based indexing
@@ -100,6 +101,47 @@
 
 //=========================================================================
 
+            
+
+
+/* This is our thread function.  It is like main(), but for a thread */
+void do_calculation(int *wtf)
+{
+    int j = 1;
+    #pragma omp parallel num_threads(4)
+    {
+        int i = 0;
+        int tid;
+        tid = omp_get_thread_num(); 
+        
+        #pragma omp critical
+        {
+            wtf[tid] = tid;
+        }
+        
+//         while(i < 10 )
+//         {   
+//             #pragma omp critical
+//             {
+//                 mexPrintf("threadFunc says: %d,%d\n",tid,j);
+//                 ++i;
+//             }
+//         }
+
+	
+    }
+}            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 
 //Values for Integer portion of number
@@ -919,6 +961,15 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     
     const double MX_NAN = mxGetNaN();
     
+    int *wtf = mxMalloc(16);
+    
+    do_calculation(wtf);
+    
+    mexPrintf("wtf[1] = %d\n",wtf[0]);
+    mexPrintf("wtf[1] = %d\n",wtf[1]);
+    mexPrintf("wtf[1] = %d\n",wtf[2]);
+    mexPrintf("wtf[1] = %d\n",wtf[3]);
+    
 	SKIP_WHITESPACE;
 
 	switch (js[parser_position]) {
@@ -932,7 +983,7 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 
 //=============================================================
 S_OPEN_OBJECT_IN_ARRAY:
-    n_things++;
+    ++n_things;
 
 	//Fall Through --------------------
 S_OPEN_OBJECT_IN_KEY:
@@ -987,7 +1038,7 @@ S_CLOSE_OBJECT:
     
 //=============================================================
 S_OPEN_ARRAY_IN_ARRAY:
-	n_things++;
+	++n_things;
 
 	//Fall Through -------------------------------
 S_OPEN_ARRAY_IN_KEY:

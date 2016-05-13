@@ -41,15 +41,18 @@ classdef object_token_info
             
             p = parse_object;
             
-%         object: 1) type  2) parent      3) tac     4) n_values
-%         array:  1) type  2) parent      3) tac     4) n_values
-%         key:    1) type  2) parent      3) tac     4) start/p     5) end
-%         string: 1) type  2) start/p     3) end
-%         number: 1) type  2) start/p     3) info
-%         null:   1) type  2) <nothing>/p 3) <nothing>
+%         1) object: 1) type  2) parent      3) tac     4) n_values
+%         2) array:  1) type  2) parent      3) tac     4) n_values
+%         3) key:    1) type  2) parent      3) tac     4) start/p     5) end
+%         4) string: 1) type  2) start/p     3) end
+%         5) number: 1) type  2) start/p     3) info
+%         6) null:   1) type  2) <nothing>/p 3) <nothing>
 %         t/f:    1) type
             
-            n_attributes = p.data(index+3);
+
+            data = p.data;
+            
+            n_attributes = data(index+3);
             key_start_I  = index+4;
             
             a_indices = zeros(1,n_attributes,'int32');
@@ -63,10 +66,14 @@ classdef object_token_info
                 
                 a_indices(iItem) = cur_value_I;
                 
-                temp_name = p.strings{cur_value_I};
+                temp_name = sprintf('wtf%d',iItem);
+                
+                %TODO: Fix string parsing so that this works
+                %temp_name = p.string{key_start_I+3};
+                
                 map(temp_name) = iItem;
                 a_names{iItem} = temp_name;
-                cur_name_I = p.tokens_after_close(cur_name_I);
+                key_start_I = data(key_start_I+2);
             end
             obj.map = map;
             obj.attribute_indices = a_indices;
