@@ -139,6 +139,11 @@ profile viewer
 %0.272117, 0.218557, 2.2447 - "  " goto
 
 
+%0.18034, 0.130137, 1.34816 - no post processing TDM-GCC
+%0.180698, 0.129493, 1.36089 - no nthings
+%0.182756, 0.1321, 1.37136 - no TAC storage
+%0.174785, 0.125994, 1.28713 - using GOTO again
+
 %OLD NUMBERS
 %============================
 %2.58 - 2016-03-21, removed test for null tokens

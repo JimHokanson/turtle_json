@@ -11,6 +11,12 @@
 //This is needed for AVX?
 #include "immintrin.h"
 
+//TODO: Can we substantially remove parent indexing
+//- type
+//- n_things
+//- tac
+
+
 //TODO: Pad end with nulls and maybe a string end???
 //TODO: Figure out SSE2/SSE4/AVX
 //TODO: Assume TAC is 1 ahead
@@ -43,14 +49,15 @@
     
     
 //Things for closing ======================================================
-#define FINALIZE_N_THINGS \
-    temp_n_things = n_things - data[parent_index+2]; \
-    n_things = data[parent_index+2]; \
-    data[parent_index+2] = temp_n_things; \
+#define FINALIZE_N_THINGS 1 \
+//     temp_n_things = n_things - data[parent_index+2]; \
+//     n_things = data[parent_index+2]; \
+//     data[parent_index+2] = temp_n_things; \
             
 //+1 to next element
 //+1 for Matlab 1 based indexing
-#define STORE_TAC data[parent_index+1] = current_data_index+2;
+#define STORE_TAC 1
+    //data[parent_index+1] = current_data_index+2;
             
 #define MOVE_UP_PARENT_INDEX parent_index = data[parent_index];	
             
@@ -63,70 +70,70 @@
 
 //===================== Navigation ========================================
 //=========================================================================      
-// #define DO_KEY_JUMP goto *key_jump[js[parser_position]];
-//      
-// #define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
+#define DO_KEY_JUMP goto *key_jump[js[parser_position]];
+     
+#define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
             
-#define DO_KEY_JUMP \
-    switch(js[parser_position]){\
-        case '"':\
-            goto S_PARSE_STRING_IN_KEY;\
-        case '-':\
-        case '0':\
-        case '1':\
-        case '2':\
-        case '3':\
-        case '4':\
-        case '5':\
-        case '6':\
-        case '7':\
-        case '8':\
-        case '9':\
-            goto S_PARSE_NUMBER_IN_KEY;\
-        case '{':\
-            goto S_OPEN_OBJECT_IN_KEY;\
-        case '[':\
-            goto S_OPEN_ARRAY_IN_KEY;\
-        case 't':\
-            goto S_PARSE_TRUE_IN_KEY;\
-        case 'f':\
-            goto S_PARSE_FALSE_IN_KEY;\
-        case 'n':\
-            goto S_PARSE_NULL_IN_KEY;\
-        default:\
-            mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following colon after key declaration");\
-    } \
-    
+// #define DO_KEY_JUMP \
+//     switch(js[parser_position]){\
+//         case '"':\
+//             goto S_PARSE_STRING_IN_KEY;\
+//         case '-':\
+//         case '0':\
+//         case '1':\
+//         case '2':\
+//         case '3':\
+//         case '4':\
+//         case '5':\
+//         case '6':\
+//         case '7':\
+//         case '8':\
+//         case '9':\
+//             goto S_PARSE_NUMBER_IN_KEY;\
+//         case '{':\
+//             goto S_OPEN_OBJECT_IN_KEY;\
+//         case '[':\
+//             goto S_OPEN_ARRAY_IN_KEY;\
+//         case 't':\
+//             goto S_PARSE_TRUE_IN_KEY;\
+//         case 'f':\
+//             goto S_PARSE_FALSE_IN_KEY;\
+//         case 'n':\
+//             goto S_PARSE_NULL_IN_KEY;\
+//         default:\
+//             mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following colon after key declaration");\
+//     } \
+//     
         
-#define DO_ARRAY_JUMP \
-    switch(js[parser_position]){\
-        case '"':\
-            goto S_PARSE_STRING_IN_ARRAY;\
-        case '-':\
-        case '0':\
-        case '1':\
-        case '2':\
-        case '3':\
-        case '4':\
-        case '5':\
-        case '6':\
-        case '7':\
-        case '8':\
-        case '9':\
-            goto S_PARSE_NUMBER_IN_ARRAY;\
-        case '{':\
-            goto S_OPEN_OBJECT_IN_ARRAY;\
-        case '[':\
-            goto S_OPEN_ARRAY_IN_ARRAY;\
-        case 't':\
-            goto S_PARSE_TRUE_IN_ARRAY;\
-        case 'f':\
-            goto S_PARSE_FALSE_IN_ARRAY;\
-        case 'n':\
-            goto S_PARSE_NULL_IN_ARRAY;\
-        default:\
-            mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following comma in an array");\
-    }\
+// #define DO_ARRAY_JUMP \
+//     switch(js[parser_position]){\
+//         case '"':\
+//             goto S_PARSE_STRING_IN_ARRAY;\
+//         case '-':\
+//         case '0':\
+//         case '1':\
+//         case '2':\
+//         case '3':\
+//         case '4':\
+//         case '5':\
+//         case '6':\
+//         case '7':\
+//         case '8':\
+//         case '9':\
+//             goto S_PARSE_NUMBER_IN_ARRAY;\
+//         case '{':\
+//             goto S_OPEN_OBJECT_IN_ARRAY;\
+//         case '[':\
+//             goto S_OPEN_ARRAY_IN_ARRAY;\
+//         case 't':\
+//             goto S_PARSE_TRUE_IN_ARRAY;\
+//         case 'f':\
+//             goto S_PARSE_FALSE_IN_ARRAY;\
+//         case 'n':\
+//             goto S_PARSE_NULL_IN_ARRAY;\
+//         default:\
+//             mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following comma in an array");\
+//     }\
             
 
           
@@ -962,43 +969,43 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 // // // // //         //mexPrintf("AVX2 is defined\n");
     
     
-//     const void *array_jump[256] = {
-//         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
-//         [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
-//         [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
-//         [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
-//         [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [102]         = &&S_PARSE_FALSE_IN_ARRAY,
-//         [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
-//         [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
-//         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-//         [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
-//         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
-//         
-//     const void *key_jump[256] = {
-//         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [34]        = &&S_PARSE_STRING_IN_KEY,      // "
-//         [35 ... 44] = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [45]        = &&S_PARSE_NUMBER_IN_KEY,      // -
-//         [46 ... 47] = &&S_ERROR_TOKEN_AFTER_KEY,    
-//         [48 ... 57] = &&S_PARSE_NUMBER_IN_KEY,      // 0-9
-//         [58 ... 90] = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [91]        = &&S_OPEN_ARRAY_IN_KEY,        // [
-//         [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [102]         = &&S_PARSE_FALSE_IN_KEY,   //false
-//         [103 ... 109] = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [110]         = &&S_PARSE_NULL_IN_KEY,    // null
-//         [111 ... 115] = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [116]         = &&S_PARSE_TRUE_IN_KEY,    // true
-//         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_KEY,
-//         [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
-//         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
+    const void *array_jump[256] = {
+        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
+        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
+        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
+        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
+        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [102]         = &&S_PARSE_FALSE_IN_ARRAY,
+        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
+        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
+        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+        [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
+        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
+        
+    const void *key_jump[256] = {
+        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
+        [34]        = &&S_PARSE_STRING_IN_KEY,      // "
+        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [45]        = &&S_PARSE_NUMBER_IN_KEY,      // -
+        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_KEY,    
+        [48 ... 57] = &&S_PARSE_NUMBER_IN_KEY,      // 0-9
+        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [91]        = &&S_OPEN_ARRAY_IN_KEY,        // [
+        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_KEY,
+        [102]         = &&S_PARSE_FALSE_IN_KEY,   //false
+        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [110]         = &&S_PARSE_NULL_IN_KEY,    // null
+        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [116]         = &&S_PARSE_TRUE_IN_KEY,    // true
+        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_KEY,
+        [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
+        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
 
     int temp_n_things = 0;
