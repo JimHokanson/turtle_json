@@ -63,7 +63,72 @@
 
 //===================== Navigation ========================================
 //=========================================================================      
-#define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
+// #define DO_KEY_JUMP goto *key_jump[js[parser_position]];
+//      
+// #define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
+            
+#define DO_KEY_JUMP \
+    switch(js[parser_position]){\
+        case '"':\
+            goto S_PARSE_STRING_IN_KEY;\
+        case '-':\
+        case '0':\
+        case '1':\
+        case '2':\
+        case '3':\
+        case '4':\
+        case '5':\
+        case '6':\
+        case '7':\
+        case '8':\
+        case '9':\
+            goto S_PARSE_NUMBER_IN_KEY;\
+        case '{':\
+            goto S_OPEN_OBJECT_IN_KEY;\
+        case '[':\
+            goto S_OPEN_ARRAY_IN_KEY;\
+        case 't':\
+            goto S_PARSE_TRUE_IN_KEY;\
+        case 'f':\
+            goto S_PARSE_FALSE_IN_KEY;\
+        case 'n':\
+            goto S_PARSE_NULL_IN_KEY;\
+        default:\
+            mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following colon after key declaration");\
+    } \
+    
+        
+#define DO_ARRAY_JUMP \
+    switch(js[parser_position]){\
+        case '"':\
+            goto S_PARSE_STRING_IN_ARRAY;\
+        case '-':\
+        case '0':\
+        case '1':\
+        case '2':\
+        case '3':\
+        case '4':\
+        case '5':\
+        case '6':\
+        case '7':\
+        case '8':\
+        case '9':\
+            goto S_PARSE_NUMBER_IN_ARRAY;\
+        case '{':\
+            goto S_OPEN_OBJECT_IN_ARRAY;\
+        case '[':\
+            goto S_OPEN_ARRAY_IN_ARRAY;\
+        case 't':\
+            goto S_PARSE_TRUE_IN_ARRAY;\
+        case 'f':\
+            goto S_PARSE_FALSE_IN_ARRAY;\
+        case 'n':\
+            goto S_PARSE_NULL_IN_ARRAY;\
+        default:\
+            mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following comma in an array");\
+    }\
+            
+
           
 #define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
             
@@ -110,14 +175,10 @@ void do_calculation(int *wtf)
     int j = 1;
     #pragma omp parallel num_threads(4)
     {
-        int i = 0;
-        int tid;
-        tid = omp_get_thread_num(); 
-        
-        #pragma omp critical
-        {
-            wtf[tid] = tid;
-        }
+
+        int tid = omp_get_thread_num();
+        wtf[tid] = tid;
+
         
 //         while(i < 10 )
 //         {   
@@ -901,43 +962,43 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 // // // // //         //mexPrintf("AVX2 is defined\n");
     
     
-    const void *array_jump[256] = {
-        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
-        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
-        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
-        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
-        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [102]         = &&S_PARSE_FALSE_IN_ARRAY,
-        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
-        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
-        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
-        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
-        
-    const void *key_jump[256] = {
-        [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
-        [34]        = &&S_PARSE_STRING_IN_KEY,      // "
-        [35 ... 44] = &&S_ERROR_TOKEN_AFTER_KEY,
-        [45]        = &&S_PARSE_NUMBER_IN_KEY,      // -
-        [46 ... 47] = &&S_ERROR_TOKEN_AFTER_KEY,    
-        [48 ... 57] = &&S_PARSE_NUMBER_IN_KEY,      // 0-9
-        [58 ... 90] = &&S_ERROR_TOKEN_AFTER_KEY,
-        [91]        = &&S_OPEN_ARRAY_IN_KEY,        // [
-        [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_KEY,
-        [102]         = &&S_PARSE_FALSE_IN_KEY,   //false
-        [103 ... 109] = &&S_ERROR_TOKEN_AFTER_KEY,
-        [110]         = &&S_PARSE_NULL_IN_KEY,    // null
-        [111 ... 115] = &&S_ERROR_TOKEN_AFTER_KEY,
-        [116]         = &&S_PARSE_TRUE_IN_KEY,    // true
-        [117 ... 122] = &&S_ERROR_TOKEN_AFTER_KEY,
-        [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
-        [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
+//     const void *array_jump[256] = {
+//         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
+//         [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
+//         [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
+//         [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
+//         [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [102]         = &&S_PARSE_FALSE_IN_ARRAY,
+//         [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
+//         [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
+//         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
+//         [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
+//         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
+//         
+//     const void *key_jump[256] = {
+//         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [34]        = &&S_PARSE_STRING_IN_KEY,      // "
+//         [35 ... 44] = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [45]        = &&S_PARSE_NUMBER_IN_KEY,      // -
+//         [46 ... 47] = &&S_ERROR_TOKEN_AFTER_KEY,    
+//         [48 ... 57] = &&S_PARSE_NUMBER_IN_KEY,      // 0-9
+//         [58 ... 90] = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [91]        = &&S_OPEN_ARRAY_IN_KEY,        // [
+//         [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [102]         = &&S_PARSE_FALSE_IN_KEY,   //false
+//         [103 ... 109] = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [110]         = &&S_PARSE_NULL_IN_KEY,    // null
+//         [111 ... 115] = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [116]         = &&S_PARSE_TRUE_IN_KEY,    // true
+//         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_KEY,
+//         [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
+//         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
 
     int temp_n_things = 0;
@@ -969,6 +1030,8 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     mexPrintf("wtf[1] = %d\n",wtf[1]);
     mexPrintf("wtf[1] = %d\n",wtf[2]);
     mexPrintf("wtf[1] = %d\n",wtf[3]);
+    
+    mxFree(wtf);
     
 	SKIP_WHITESPACE;
 
@@ -1103,7 +1166,8 @@ S_PARSE_KEY:
 
 	if (js[parser_position] == ':') {
         SKIP_WHITESPACE
-        goto *key_jump[js[parser_position]];
+        DO_KEY_JUMP
+        //goto *key_jump[js[parser_position]];
 	}
 	else {
 		goto S_ERROR_MISSING_COLON_AFTER_KEY;
@@ -1397,15 +1461,19 @@ finish_main:
                 //1) type   2) start of number 3) info about number
                 //We change #2 to pointing to the storage location of
                 //the number in the array
-                char_start = js + data[++current_data_index];
-                data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
-                num_info = data[++current_data_index];
-                numeric_data[cur_number] = string_to_double(char_start,num_info);
+//                 char_start = js + data[++current_data_index];
+//                 data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
+//                 num_info = data[++current_data_index];
+//                 numeric_data[cur_number] = string_to_double(char_start,num_info);
+                
+                current_data_index += 2;
                 break;
             case TYPE_NULL:
-                data[++current_data_index] = ++cur_number;
-                numeric_data[cur_number] = MX_NAN;
-                ++current_data_index;
+//                 data[++current_data_index] = ++cur_number;
+//                 numeric_data[cur_number] = MX_NAN;
+//                 ++current_data_index;
+                
+                current_data_index += 2;
                 break;    
             case TYPE_TRUE:
                 break;

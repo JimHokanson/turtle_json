@@ -12,10 +12,14 @@
  *      
  *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  *
+ *
+ *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v  
+ *
+ *
  */
 
 //TODO: These may not all be needed ...
-#include <stdio.h>
+#include <stdio.h>   //fopen_s?
 #include <stdlib.h>
 #include <string.h>
 #include "matrix.h"

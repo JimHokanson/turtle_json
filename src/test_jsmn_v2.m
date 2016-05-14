@@ -68,7 +68,7 @@ file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
 file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,20);
 t3 = tic;
-for i = 1:1
+for i = 1:20
     %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'chars_per_token',5);
     d1_all(i) = jt.toc_parse;
@@ -133,6 +133,10 @@ profile viewer
 %-------------------------------
 %   0.263153, 0.209014, 2.12919
 
+%0.258993, 0.205119, 2.0911 - swith instead of goto
+%0.252532, 0.199187, 2.0213 - goto instead of switch
+%0.272186, 0.215841, 2.21788 - with TDM-GCC - switch
+%0.272117, 0.218557, 2.2447 - "  " goto
 
 
 %OLD NUMBERS
