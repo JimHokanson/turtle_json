@@ -164,17 +164,18 @@ classdef tokens
             obj.mex = result;
             
             obj.file_string = result.json_string;
-            obj.types = result.types;
-            obj.d1 = result.d1;
-            obj.d2 = result.d2;
-            obj.numeric_data = result.numeric_data;
             
-            obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
-            
+% %             obj.types = result.types;
+% %             obj.d1 = result.d1;
+% %             obj.d2 = result.d2;
+% %             %obj.numeric_data = result.numeric_data;
+% %             
+% %             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
+% %             
             obj.toc_total_time = toc(t0);
             obj.toc_file_read = result.elapsed_read_time;
             obj.toc_parse = obj.toc_total_time - result.elapsed_read_time;
-            obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+% %             obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
             
             %TODO: Build in an explicit timer on the parsing ...
 %             obj.toc_parse = toc(t0)-result.elapsed_read_time;

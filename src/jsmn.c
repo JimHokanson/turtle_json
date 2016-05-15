@@ -15,6 +15,14 @@
 //with define flags ...
 #include "immintrin.h"
 
+//Important characters in a quick initial search
+//---------------------
+// [
+// {
+// \
+// unicode indicators
+
+
 
 
 //TODO: Pad end with nulls and maybe a string end???
@@ -105,7 +113,7 @@
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
     
-    
+//tested that is_whitespce was faster than isspace()    
 #define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}
 
 #define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
@@ -146,35 +154,7 @@
 	} \
 
 //=========================================================================
-
             
-
-
-/* This is our thread function.  It is like main(), but for a thread */
-void do_calculation(int *wtf)
-{
-    int j = 1;
-    #pragma omp parallel num_threads(4)
-    {
-
-        int tid = omp_get_thread_num();
-        wtf[tid] = tid;
-
-        
-//         while(i < 10 )
-//         {   
-//             #pragma omp critical
-//             {
-//                 mexPrintf("threadFunc says: %d,%d\n",tid,j);
-//                 ++i;
-//             }
-//         }
-
-	
-    }
-}            
-            
-        
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
@@ -203,7 +183,7 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
-void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
+void string_to_double_no_math(unsigned char *p, unsigned char **char_offset, unsigned char *d) {
 
     //strcspn - should know what to look for ...
     //Would need to confirm that we end at the correct location
@@ -221,11 +201,20 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     
     if (*p == '-'){
         ++p;
+        ++d;
     }
 
+//     mexPrintf("Cur p: %c\n",*p);
+//     mexPrintf("Cur d: %c\n",*d);
+    
 //     PRINT_CURRENT_CHAR
     
-    while (isdigit(*p)) {++p;}
+    while (*d){
+        p += *d;
+        d += *d;
+    }
+    
+    //while (isdigit(*p)) {++p;}
        
 //     mexPrintf("End of digits\n");
 //     PRINT_CURRENT_CHAR        
@@ -233,18 +222,31 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     if (*p == '.'){
         //SIGN_INFO = 1;
         ++p;
-        while (isdigit(*p)) {++p;}
+        ++d;
+        while (*d){
+            p += *d;
+            d += *d;
+        }
+        //while (isdigit(*p)) {++p;}
     }
+    
+    
 //     mexPrintf("End of dot\n");
 // 
 //     PRINT_CURRENT_CHAR     
     
     if (*p == 'E' || *p == 'e') {
         ++p;
+        ++d;
         if (*p == '-' || *p == '+'){
             ++p;
+            ++d;
         }
-        while (isdigit(*p)) {++p;}
+        while (*d){
+            p += *d;
+            d += *d;
+        }
+        //while (isdigit(*p)) {++p;}
     }
     
     *char_offset = p;    
@@ -253,11 +255,14 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 void seek_string_end_v2(unsigned char *p, unsigned char **char_offset){
 
 STRING_SEEK:    
-    while(*(++p) != '"'){}
+    //p+1 to advance past initial '"'
+    p = strchr(p+1,'"');
     
+    //Back up to verify 
     --p;
     
     //I've padded the string with a quote that is preceeded by a null
+    //so a null indicates that there really was no "
     if (*p == '\0'){
         mexErrMsgIdAndTxt("jsmn_mex:missing_quotes", "Quote not found");
     }
@@ -349,15 +354,82 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     unsigned int string_size_allocated = ceil(string_byte_length/4);
     unsigned int string_size_index_max = string_size_allocated-1;
     unsigned int current_string_index = 0;
-    unsigned char *string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
+    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
     
     int numeric_size_allocated = ceil(string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
     unsigned int current_numeric_index = 0;
-    unsigned char *numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
+    unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
     
     
     const double MX_NAN = mxGetNaN();
+    
+    unsigned char *digit_info = mxMalloc(string_byte_length);
+    
+    int starts[4];
+    int stops[4];
+    //TODO: Support small strings
+    
+    int step_size = ceil(string_byte_length/4);
+    
+    starts[0] = 0;
+    starts[1] = starts[0]+step_size;
+    stops[0] = starts[1] - 1;
+    starts[2] = starts[1]+step_size;
+    stops[1] = starts[2] - 1;
+    starts[3] = starts[2]+step_size;
+    stops[2] = starts[3] - 1;
+    stops[3] = string_byte_length-1;
+    
+    //checking for a single thread
+//     starts[0] = 0;
+//     stops[0] = string_byte_length-1;
+    
+    #pragma omp parallel num_threads(4)
+    {
+        int tid = omp_get_thread_num();
+        
+        int current_index = stops[tid];
+        int stop_index = starts[tid];
+        int digit_count = 0;
+        //int space_count = 0;
+
+        unsigned char *cur_source_char = js + current_index;
+        unsigned char *cur_output_char = digit_info + current_index;
+        
+        for (;current_index >= stop_index; --current_index){
+            
+            if (isdigit(*cur_source_char)){
+                *cur_output_char = ++digit_count;
+                if (digit_count == 255){
+                    digit_count = 0;
+                }
+            }else{
+                digit_count = 0;
+                *cur_output_char = 0;
+            }
+            --cur_output_char;
+            --cur_source_char;
+            
+            
+//             if (isdigit(js[current_index])){
+//                 digit_info[current_index] = ++digit_count;
+//            
+//                 //Note, this avoids incrementing to 0 on the next
+//                 //run and implying that we don't need to move ahead at all
+//                 if (digit_count == 255){
+//                     digit_count = 0;
+//                 }
+//             }else{
+//                 digit_count = 0;
+//                 digit_info[current_index] = 0;
+//             }                
+        }
+    }
+    
+    setStructField(plhs[0],digit_info,"digit_info",mxUINT8_CLASS,string_byte_length);
+    
+    //return;
     
 // // // // //     int *wtf = mxMalloc(16);
 // // // // //     
@@ -564,7 +636,7 @@ S_PARSE_NUMBER_IN_KEY:
     numeric_p[current_numeric_index] = CURRENT_POINTER;
     d1[current_data_index] = current_numeric_index;
     
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER, digit_info + (p - js));
     
     DECREMENT_POINTER;
 
@@ -583,7 +655,7 @@ S_PARSE_NUMBER_IN_ARRAY:
     numeric_p[current_numeric_index] = CURRENT_POINTER;
     d1[current_data_index] = current_numeric_index;
 
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER, digit_info + (p - js));
        
     if (CURRENT_CHAR == ','){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
@@ -769,17 +841,7 @@ finish_main:
     setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
         
     
-    double *numeric_data = mxMalloc((current_numeric_index + 1)*sizeof(double));
-    
-    #pragma omp parallel num_threads(4)
-    {
-        int tid = omp_get_thread_num();
-        for (int i = tid; i <= current_numeric_index; i += 4){
-            numeric_data[i] = i;
-        }
-    }
-    
-    setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,current_numeric_index + 1);
+
     
     
     

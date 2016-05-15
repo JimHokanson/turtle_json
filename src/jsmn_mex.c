@@ -5,7 +5,7 @@
  *  Compile via:
  *      mex jsmn_mex.c jsmn.c -O 
  *      
- *      //Not useful ... mex COMPFLAGS="$COMPFLAGS /arch:AVX /fp:fast" jsmn_mex.c jsmn.c -O 
+ *      //Not useful ... mex COMPFLAGS="$COMPFLAGS /arch:AVX /fp:fast"  jsmn_mex.c jsmn.c -O 
  *      mex OPTIMFLAGS="/Ox" jsmn_mex.c jsmn.c
  *
  *      mex jsmn_mex.c jsmn.c COMPFLAGS="$COMPFLAGS -O3"
@@ -14,7 +14,7 @@
  *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  *
  *
- *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v  
+ *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v
  *
  *
  */
