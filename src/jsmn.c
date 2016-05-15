@@ -5,16 +5,16 @@
 #include "mex.h"
 #include <math.h>
 #include "stdint.h"  //uint_8
+#include <string.h> //strchr
 #include <time.h>
 #include <omp.h>
 
-//This is needed for AVX?
+//This is needed for AVX
+//but, we might not use AVX - SSE4
+//TODO: Need to build in SSE4 and AVX testing support
+//with define flags ...
 #include "immintrin.h"
 
-//TODO: Can we substantially remove parent indexing
-//- type
-//- n_things
-//- tac
 
 
 //TODO: Pad end with nulls and maybe a string end???
@@ -30,120 +30,93 @@
 #define N_FRAC_PART data_info[1]
 #define N_EXP_PART  data_info[2]
 
+//DEBUGGING
+
+#define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
+#define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
+
+
 //Things for opening ======================================================
-#define EXPAND_DATA_CHECK(x) \
-	if (current_data_index + x >= data_size_index_max){ \
+
+#define INCREMENT_PARENT_SIZE parent_sizes[current_depth] += 1
+
+#define EXPAND_DATA_CHECK \
+    ++current_data_index; \
+	if (current_data_index >= data_size_index_max){ \
         data_size_allocated = ceil(1.5*data_size_allocated); \
-        data = mxRealloc(data,data_size_allocated*sizeof(int)); \
         data_size_index_max = data_size_allocated-1; \
+        \
+        types = mxRealloc(types,data_size_allocated); \
+        d1 = mxRealloc(d1,data_size_allocated*sizeof(int)); \
+        d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
     } \
 
-#define SET_TYPE(x) data[++current_data_index] = x;
+#define EXPAND_STRING_CHECK \
+    ++current_string_index; \
+    if (current_string_index >= string_size_index_max) { \
+        string_size_allocated = ceil(1.5*string_size_allocated); \
+        string_size_index_max = string_size_allocated - 1; \
+        string_p = mxRealloc(string_p,string_size_allocated * sizeof(unsigned char *)); \
+    } \
+            
+#define EXPAND_NUMERIC_CHECK \
+    ++current_numeric_index; \
+    if (current_numeric_index >= numeric_size_index_max) { \
+        numeric_size_allocated = ceil(1.5*numeric_size_allocated); \
+        numeric_size_index_max = numeric_size_allocated - 1; \
+        numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
+    } \
+            
+#define SET_TYPE(x) types[current_data_index] = x;
 
-#define STORE_AND_UPDATE_PARENT \
-    data[++current_data_index] = parent_index; \
-    parent_index = current_data_index;  
-    
-#define INIT_N_THINGS data[++current_data_index] = n_things;
+#define INITIALIZE_PARENT_INFO(x) \
+        ++current_depth; \
+        if (current_depth > 200){\
+            goto S_ERROR_DEPTH_EXCEEDED; \
+        }\
+        parent_types[current_depth] = x; \
+        parent_indices[current_depth] = current_data_index; \
+        parent_sizes[current_depth] = 0; \
+            
 //=========================================================================
     
     
-//Things for closing ======================================================
-#define FINALIZE_N_THINGS 1 \
-//     temp_n_things = n_things - data[parent_index+2]; \
-//     n_things = data[parent_index+2]; \
-//     data[parent_index+2] = temp_n_things; \
-            
+//================    Things for closing             ======================
+//=========================================================================     
 //+1 to next element
 //+1 for Matlab 1 based indexing
-#define STORE_TAC 1
-    //data[parent_index+1] = current_data_index+2;
+#define STORE_TAC  d2[current_parent_index] = current_data_index + 2;
+#define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
             
-#define MOVE_UP_PARENT_INDEX parent_index = data[parent_index];	
+#define MOVE_UP_PARENT_INDEX --current_depth;
+
+#define IS_NULL_PARENT_INDEX current_depth == 0     
             
-#define NULL_PARENT_INDEX parent_index == 0     
-            
-#define PARENT_TYPE data[parent_index-1]            
+#define PARENT_TYPE parent_types[current_depth]            
 //=========================================================================
-            
-            
-
-//===================== Navigation ========================================
+  
+//================      Navigation       ==================================
 //=========================================================================      
-#define DO_KEY_JUMP goto *key_jump[js[parser_position]];
-     
-#define DO_ARRAY_JUMP goto *array_jump[js[parser_position]];
-            
-// #define DO_KEY_JUMP \
-//     switch(js[parser_position]){\
-//         case '"':\
-//             goto S_PARSE_STRING_IN_KEY;\
-//         case '-':\
-//         case '0':\
-//         case '1':\
-//         case '2':\
-//         case '3':\
-//         case '4':\
-//         case '5':\
-//         case '6':\
-//         case '7':\
-//         case '8':\
-//         case '9':\
-//             goto S_PARSE_NUMBER_IN_KEY;\
-//         case '{':\
-//             goto S_OPEN_OBJECT_IN_KEY;\
-//         case '[':\
-//             goto S_OPEN_ARRAY_IN_KEY;\
-//         case 't':\
-//             goto S_PARSE_TRUE_IN_KEY;\
-//         case 'f':\
-//             goto S_PARSE_FALSE_IN_KEY;\
-//         case 'n':\
-//             goto S_PARSE_NULL_IN_KEY;\
-//         default:\
-//             mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following colon after key declaration");\
-//     } \
-//     
-        
-// #define DO_ARRAY_JUMP \
-//     switch(js[parser_position]){\
-//         case '"':\
-//             goto S_PARSE_STRING_IN_ARRAY;\
-//         case '-':\
-//         case '0':\
-//         case '1':\
-//         case '2':\
-//         case '3':\
-//         case '4':\
-//         case '5':\
-//         case '6':\
-//         case '7':\
-//         case '8':\
-//         case '9':\
-//             goto S_PARSE_NUMBER_IN_ARRAY;\
-//         case '{':\
-//             goto S_OPEN_OBJECT_IN_ARRAY;\
-//         case '[':\
-//             goto S_OPEN_ARRAY_IN_ARRAY;\
-//         case 't':\
-//             goto S_PARSE_TRUE_IN_ARRAY;\
-//         case 'f':\
-//             goto S_PARSE_FALSE_IN_ARRAY;\
-//         case 'n':\
-//             goto S_PARSE_NULL_IN_ARRAY;\
-//         default:\
-//             mexErrMsgIdAndTxt("jsmn_mex:asdfasdfsadf","Invalid token following comma in an array");\
-//     }\
-            
+#define CURRENT_CHAR *p
+#define CURRENT_POINTER p
+#define CURRENT_INDEX p - js
+#define ADVANCE_POINTER_AND_GET_CHAR_VALUE *(++p)
+#define DECREMENT_POINTER --p
+#define ADVANCE_POINTER_BY_X(x) p += x;
+#define REF_OF_CURRENT_POINTER &p;
+    
+    
+#define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}
 
-          
-#define SKIP_WHITESPACE while (is_whitespace[js[++parser_position]]){}
-            
+#define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
+     
+#define DO_ARRAY_JUMP goto *array_jump[CURRENT_CHAR]
+                
 #define PROCESS_END_OF_ARRAY_VALUE \
-	SKIP_WHITESPACE; \
-	switch (js[parser_position]) { \
+	ADVANCE_TO_NON_WHITESPACE_CHAR; \
+	switch (CURRENT_CHAR) { \
         case ',': \
-            SKIP_WHITESPACE; \
+            ADVANCE_TO_NON_WHITESPACE_CHAR; \
             DO_ARRAY_JUMP; \
         case ']': \
             goto S_CLOSE_ARRAY; \
@@ -152,17 +125,18 @@
 	} \
              
 #define PROCESS_END_OF_KEY_VALUE \
-	SKIP_WHITESPACE; \
-	switch (js[parser_position]) { \
+    ADVANCE_TO_NON_WHITESPACE_CHAR; \
+	switch (CURRENT_CHAR) { \
         case ',': \
+            current_parent_index = parent_indices[current_depth]; \
             STORE_TAC; \
             MOVE_UP_PARENT_INDEX; \
-            SKIP_WHITESPACE; \
-            if (js[parser_position] == '"') { \
+            ADVANCE_TO_NON_WHITESPACE_CHAR; \
+            if (CURRENT_CHAR == '"') { \
                 goto S_PARSE_KEY; \
             } \
             else { \
-                mexPrintf("Position %d\n",parser_position); \
+                mexPrintf("Position %d\n",CURRENT_INDEX); \
                 mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected"); \
             } \
         case '}': \
@@ -200,433 +174,8 @@ void do_calculation(int *wtf)
     }
 }            
             
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
+        
 const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
-
-//Values for Integer portion of number
-//------------------------------------
-//Note that I'm avoiding subtracting 0 which makes these arrays rather large ...
-//It may be faster to subtract and do the lookup ...
-//We might even be better having a single array which we offset into
-//e.g. js[parser_position-9] + js[parser_position-9+10] + js[parser_position-9+20] + js[parser_position-9+30] 
-const double p1e0[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9};
-const double p1e1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,20,30,40,50,60,70,80,90};
-const double p1e2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,200,300,400,500,600,700,800,900};
-const double p1e3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000,2000,3000,4000,5000,6000,7000,8000,9000};
-const double p1e4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000,20000,30000,40000,50000,60000,70000,80000,90000};
-const double p1e5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000,200000,300000,400000,500000,600000,700000,800000,900000};
-const double p1e6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000,2000000,3000000,4000000,5000000,6000000,7000000,8000000,9000000};
-const double p1e7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000,20000000,30000000,40000000,50000000,60000000,70000000,80000000,90000000};
-const double p1e8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000,200000000,300000000,400000000,500000000,600000000,700000000,800000000,900000000};
-const double p1e9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000,2000000000,3000000000,4000000000,5000000000,6000000000,7000000000,8000000000,9000000000};
-const double p1e10[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000000,20000000000,30000000000,40000000000,50000000000,60000000000,70000000000,80000000000,90000000000};
-const double p1e11[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000000,200000000000,300000000000,400000000000,500000000000,600000000000,700000000000,800000000000,900000000000};
-const double p1e12[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000000,2000000000000,3000000000000,4000000000000,5000000000000,6000000000000,7000000000000,8000000000000,9000000000000};
-const double p1e13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10000000000000,20000000000000,30000000000000,40000000000000,50000000000000,60000000000000,70000000000000,80000000000000,90000000000000};
-const double p1e14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100000000000000,200000000000000,300000000000000,400000000000000,500000000000000,600000000000000,700000000000000,800000000000000,900000000000000};
-const double p1e15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1000000000000000,2000000000000000,3000000000000000,4000000000000000,5000000000000000,6000000000000000,7000000000000000,8000000000000000,9000000000000000};
-
-//Values for fractional component
-//-------------------------------
-//Note, it is unclear how accurate we can really be with this ...
-//and accordingly, how far out we should really populate ...
-//
-//I've gone out to the maximum of double (I think)
-//
-//I ran into problems with something being defined with leading zeros
-//
-//e.g. 0.0000000000001234567891234567
-//
-//i.e. 2.0123456789012345 ?
-const double p1e_1[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9};
-const double p1e_2[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09};
-const double p1e_3[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009};
-const double p1e_4[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0001,0.0002,0.0003,0.0004,0.0005,0.0006,0.0007,0.0008,0.0009};
-const double p1e_5[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00001,0.00002,0.00003,0.00004,0.00005,0.00006,0.00007,0.00008,0.00009};
-const double p1e_6[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000001,0.000002,0.000003,0.000004,0.000005,0.000006,0.000007,0.000008,0.000009};
-const double p1e_7[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000001,0.0000002,0.0000003,0.0000004,0.0000005,0.0000006,0.0000007,0.0000008,0.0000009};
-const double p1e_8[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000001,0.00000002,0.00000003,0.00000004,0.00000005,0.00000006,0.00000007,0.00000008,0.00000009};
-const double p1e_9[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000001,0.000000002,0.000000003,0.000000004,0.000000005,0.000000006,0.000000007,0.000000008,0.000000009};
-const double p1e_10[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000001,0.0000000002,0.0000000003,0.0000000004,0.0000000005,0.0000000006,0.0000000007,0.0000000008,0.0000000009};
-const double p1e_11[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000001,0.00000000002,0.00000000003,0.00000000004,0.00000000005,0.00000000006,0.00000000007,0.00000000008,0.00000000009};
-const double p1e_12[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000001,0.000000000002,0.000000000003,0.000000000004,0.000000000005,0.000000000006,0.000000000007,0.000000000008,0.000000000009};
-const double p1e_13[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000001,0.0000000000002,0.0000000000003,0.0000000000004,0.0000000000005,0.0000000000006,0.0000000000007,0.0000000000008,0.0000000000009};
-const double p1e_14[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000001,0.00000000000002,0.00000000000003,0.00000000000004,0.00000000000005,0.00000000000006,0.00000000000007,0.00000000000008,0.00000000000009};
-const double p1e_15[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000001,0.000000000000002,0.000000000000003,0.000000000000004,0.000000000000005,0.000000000000006,0.000000000000007,0.000000000000008,0.000000000000009};
-const double p1e_16[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000001,0.0000000000000002,0.0000000000000003,0.0000000000000004,0.0000000000000005,0.0000000000000006,0.0000000000000007,0.0000000000000008,0.0000000000000009};
-const double p1e_17[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000001,0.00000000000000002,0.00000000000000003,0.00000000000000004,0.00000000000000005,0.00000000000000006,0.00000000000000007,0.00000000000000008,0.00000000000000009};
-const double p1e_18[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.000000000000000001,0.000000000000000002,0.000000000000000003,0.000000000000000004,0.000000000000000005,0.000000000000000006,0.000000000000000007,0.000000000000000008,0.000000000000000009};
-const double p1e_19[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.0000000000000000001,0.0000000000000000002,0.0000000000000000003,0.0000000000000000004,0.0000000000000000005,0.0000000000000000006,0.0000000000000000007,0.0000000000000000008,0.0000000000000000009};
-const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.00000000000000000001,0.00000000000000000002,0.00000000000000000003,0.00000000000000000004,0.00000000000000000005,0.00000000000000000006,0.00000000000000000007,0.00000000000000000008,0.00000000000000000009};
-
-//*p++                  js[parser_position++]    
-//*p   ==========       js[parser_position]
-//++p  ==========       ++parser_position
-
-inline double string_to_double(unsigned char *p, int num_info) {
-
-    double value;
-    
-    bool negate;
-//     uint8_t n_int  = (uint8_t)num_info;
-//     uint8_t n_frac = num_info >> 8;
-//     uint8_t n_exp  = num_info >> 16;
-    
-	uint8_t *info2 = (uint8_t*)&num_info;
-    
-    if (*p == '-'){
-        ++p;
-        negate = true;    
-    }else{
-        negate = false;
-    }
-
-    value = 0;
-    //I'm curious if you could take advantage of something like SSE
-    //if each case was written out explicitly rather than via fall through
-//     switch (n_int) {
-    switch (info2[0]){
-        case 16:
-           value += p1e15[*p++];  
-        case 15:
-           value += p1e14[*p++];  
-        case 14:
-           value += p1e13[*p++];   
-        case 13:
-           value += p1e12[*p++];   
-        case 12:
-           value += p1e11[*p++];   
-        case 11:
-           value += p1e10[*p++];       
-        case 10:
-           value += p1e9[*p++];  
-        case 9:
-           value += p1e8[*p++];  
-        case 8:
-           value += p1e7[*p++];  
-        case 7:
-           value += p1e6[*p++]; 
-        case 6:
-           value += p1e5[*p++];
-        case 5:
-           value += p1e4[*p++];
-        case 4:
-           value += p1e3[*p++];
-        case 3:
-           value += p1e2[*p++];
-        case 2:
-           value += p1e1[*p++]; //1e1 == 10, 2 #s plus the off by 1
-        case 1:
-           value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
-    }  
-    
-    if(info2[1]){
-        ++p;
-        switch (info2[1]) {
-            case 20:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               value += p1e_16[*p++];
-               value += p1e_17[*p++];
-               value += p1e_18[*p++];
-               value += p1e_19[*p++];
-               value += p1e_20[*p++];
-               break;
-            case 19:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               value += p1e_16[*p++];
-               value += p1e_17[*p++];
-               value += p1e_18[*p++];
-               value += p1e_19[*p++];
-               break;               
-            case 18:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               value += p1e_16[*p++];
-               value += p1e_17[*p++];
-               value += p1e_18[*p++];
-               break;                  
-            case 17:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               value += p1e_16[*p++];
-               value += p1e_17[*p++];
-               break;                
-            case 16:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               value += p1e_16[*p++];
-               break;
-            case 15:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               value += p1e_15[*p++];
-               break;
-            case 14:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               value += p1e_14[*p++];
-               break;
-            case 13:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               value += p1e_13[*p++];
-               break;
-            case 12:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               value += p1e_12[*p++];
-               break;
-            case 11:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               value += p1e_11[*p++];
-               break;
-            case 10:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               value += p1e_10[*p++];
-               break;
-            case 9:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               value += p1e_9[*p++];
-               break;
-            case 8:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               value += p1e_8[*p++];
-               break;
-            case 7:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               value += p1e_7[*p++];
-               break;
-            case 6:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               value += p1e_6[*p++];
-               break;
-            case 5:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               value += p1e_5[*p++];
-               break;
-            case 4:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               value += p1e_4[*p++];
-               break;
-            case 3:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++]; 
-               value += p1e_3[*p++];
-               break;
-            case 2:
-               value += p1e_1[*p++];
-               value += p1e_2[*p++];
-               break;
-            case 1:
-               value += p1e_1[*p++];
-
-        }  
-    }
-    
-    //End of if '.'    
-    if (negate) {
-        value = -value;
-    }
-
-    if(info2[2]){
-        ++p;
-          switch (*p){
-            case '-':
-                ++p;
-                negate = true;
-                break;
-            case '+':
-                ++p;
-				// fall through -------
-            default:
-                negate = false;
-        }  
-        
-		double exponent_value = 0;
-        switch(info2[2]){
-            case 4:
-               exponent_value += p1e3[*p++];
-            case 3:
-               exponent_value += p1e2[*p++];
-            case 2:
-               exponent_value += p1e1[*p++]; //1e1 == 10, 2 #s plus the off by 1
-            case 1:
-               exponent_value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
-        } 
-        
-        if (negate){
-          exponent_value = -exponent_value;  
-        }
-        value *= pow(10.0, exponent_value);
-          
-    }
-    
-    
-    return value;
-    
-}
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
@@ -654,8 +203,11 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
-int string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
+void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
+    //strcspn - should know what to look for ...
+    //Would need to confirm that we end at the correct location
+    
     //An alternative approach would be to look for the closing string
     //e.g.: ',' '}' ']' and then check all of the math when running
     //in parallel
@@ -667,325 +219,84 @@ int string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     //and checks for overflow and subtraction for populating the data
     
     
-    uint8_t data_info[4] = {0,0,0,0};
-        
     if (*p == '-'){
-        //SIGN_INFO = 1;
         ++p;
     }
-    
-    if (isdigit(*p)){
-        if(isdigit(*(++p))){
-            if(isdigit(*(++p))){
-                if(isdigit(*(++p))){
-                    if(isdigit(*(++p))){
-                        if(isdigit(*(++p))){
-                            if(isdigit(*(++p))){
-                                if(isdigit(*(++p))){
-                                    if(isdigit(*(++p))){
-                                        if(isdigit(*(++p))){
-                                            if(isdigit(*(++p))){
-                                                if(isdigit(*(++p))){
-                                                    if(isdigit(*(++p))){
-                                                        if(isdigit(*(++p))){
-                                                            if(isdigit(*(++p))){
-                                                                if(isdigit(*(++p))){
-                                                                    if(isdigit(*(++p))){
-                                                                        mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_integer_part", "too_many_numbers_in_integer_part");
-                                                                    }else{
-                                                                        N_INT_PART = 16;
-                                                                    }
-                                                                }else{
-                                                                    N_INT_PART = 15;
-                                                                }
-                                                            }else{
-                                                                N_INT_PART = 14;
-                                                            }
-                                                        }else{
-                                                            N_INT_PART = 13;
-                                                        }
-                                                    }else{
-                                                        N_INT_PART = 12;
-                                                    }
-                                                }else{
-                                                    N_INT_PART = 11;
-                                                }
-                                            }else{
-                                                N_INT_PART = 10;
-                                            }
-                                        }else{
-                                            N_INT_PART = 9;
-                                        }
-                                    }else{
-                                        N_INT_PART = 8;
-                                    }
-                                }else{
-                                    N_INT_PART = 7;
-                                }
-                            }else{
-                                N_INT_PART = 6;
-                            }
-                        }else{
-                            N_INT_PART = 5;
-                        }
-                    }else{
-                        N_INT_PART = 4;
-                    }
-                }else{
-                    N_INT_PART = 3;
-                }
-            }else{
-                N_INT_PART = 2;
-            }
-        }else{
-            N_INT_PART = 1;
-        }
-    }else{
-        mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_minus_sign", "No digit found after minus sign");
-    }
-    
-    if (*p == '.') {
-        if (isdigit(*(++p))){
-            if(isdigit(*(++p))){
-                if(isdigit(*(++p))){
-                    if(isdigit(*(++p))){
-                        if(isdigit(*(++p))){
-                            if(isdigit(*(++p))){
-                                if(isdigit(*(++p))){
-                                    if(isdigit(*(++p))){
-                                        if(isdigit(*(++p))){
-                                            if(isdigit(*(++p))){
-                                                if(isdigit(*(++p))){
-                                                    if(isdigit(*(++p))){
-                                                        if(isdigit(*(++p))){
-                                                            if(isdigit(*(++p))){
-                                                                if(isdigit(*(++p))){
-                                                                    if(isdigit(*(++p))){
-                                                                        if(isdigit(*(++p))){
-                                                                            if(isdigit(*(++p))){
-                                                                                if(isdigit(*(++p))){
-                                                                                    if(isdigit(*(++p))){
-                                                                                        if(isdigit(*(++p))){
-                                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_fractional_part", "too_many_numbers_in_fractional_part");
-                                                                                        }else{
-                                                                                            N_FRAC_PART = 20;
-                                                                                        }
-                                                                                    }else{
-                                                                                        N_FRAC_PART = 19;
-                                                                                    }
-                                                                                }else{
-                                                                                    N_FRAC_PART = 18;
-                                                                                }
-                                                                            }else{
-                                                                                N_FRAC_PART = 17;
-                                                                            }
-                                                                        }else{
-                                                                            N_FRAC_PART = 16;
-                                                                        }
-                                                                    }else{
-                                                                        N_FRAC_PART = 15;
-                                                                    }
-                                                                }else{
-                                                                    N_FRAC_PART = 14;
-                                                                }
-                                                            }else{
-                                                                N_FRAC_PART = 13;
-                                                            }
-                                                        }else{
-                                                            N_FRAC_PART = 12;
-                                                        }
-                                                    }else{
-                                                        N_FRAC_PART = 11;
-                                                    }
-                                                }else{
-                                                    N_FRAC_PART = 10;
-                                                }
-                                            }else{
-                                                N_FRAC_PART = 9;
-                                            }
-                                        }else{
-                                            N_FRAC_PART = 8;
-                                        }
-                                    }else{
-                                        N_FRAC_PART = 7;
-                                    }
-                                }else{
-                                    N_FRAC_PART = 6;
-                                }
-                            }else{
-                                N_FRAC_PART = 5;
-                            }
-                        }else{
-                            N_FRAC_PART = 4;
-                        }
-                    }else{
-                        N_FRAC_PART = 3;
-                    }
-                }else{
-                    N_FRAC_PART = 2;
-                }
-            }else{
-                N_FRAC_PART = 1;
-            }
-        }else{
-            mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_period", "No digit found after period");
-        }
-    }
 
+//     PRINT_CURRENT_CHAR
+    
+    while (isdigit(*p)) {++p;}
+       
+//     mexPrintf("End of digits\n");
+//     PRINT_CURRENT_CHAR        
+    
+    if (*p == '.'){
+        //SIGN_INFO = 1;
+        ++p;
+        while (isdigit(*p)) {++p;}
+    }
+//     mexPrintf("End of dot\n");
+// 
+//     PRINT_CURRENT_CHAR     
+    
     if (*p == 'E' || *p == 'e') {
-		++p;
-		switch (*p) {
-		case '-':
-			++p;
-			break;
-		case '+':
-			++p;
-		}
-
-        if (isdigit(*p)){
-            if (isdigit(*(++p))){
-                if (isdigit(*(++p))){
-                    if (isdigit(*(++p))){
-                        if (isdigit(*(++p))){
-                        	mexErrMsgIdAndTxt("jsmn_mex:too_many_numbers_in_exponent_part", "too_many_numbers_in_exponent");
-                        }else{
-                            N_EXP_PART = 4;
-                        }
-                    }else{
-                        N_EXP_PART = 3;
-                    }
-                }else{
-                    N_EXP_PART = 2;
-                }
-            }else{
-                N_EXP_PART = 1;
-            }
-        }else{
-            mexErrMsgIdAndTxt("jsmn_mex:missing_digit_following_exponent", "No digit found after exponent");
+        ++p;
+        if (*p == '-' || *p == '+'){
+            ++p;
         }
-	}
+        while (isdigit(*p)) {++p;}
+    }
     
-    *char_offset = p;
-    
-    return *(int *)data_info;
-    
+    *char_offset = p;    
 }
 
+void seek_string_end_v2(unsigned char *p, unsigned char **char_offset){
 
-void seek_string_end(unsigned char *js, int *input_parser_position) {
+STRING_SEEK:    
+    while(*(++p) != '"'){}
     
-	//  seek_string_end(js,&parser_position)
-
-	//TODO: This could be completely wrong if we have unicode
-	//although I think unicode has to be escaped????
-	int parser_position = *input_parser_position;
-	unsigned char c;
-
-//I had wanted to just do a search for " but then
-//I might miss the end of string
+    --p;
     
-// // // 	while ((c = js[++parser_position])) {
-// // // 		if (c == '\"') {
-// // // 			//The idea here is that we don't check this all the time
-// // // 			//If we hit \" we would need to keep going back until
-// // // 			//we determine if the '\' is real or not
-// // // 			if (js[parser_position - 1] == '\\') {
-// // //                 if (js[parser_position - 2] == '\\') {
-// // //                     //This indicates that we have '\\"'
-// // //                     //Since we don't know what's before we could
-// // //                     //have a double escape
-// // //                     //The way to fix this to walk backwards and togggle
-// // //                     //whether or not the quote '"' is escaped or not
-// // //                     //  cur_parser_position = parser_position
-// // //                     //  is_escaped = false;
-// // //                     //  while(js[--parser_position] == '\\'){
-// // //                     //     is_escaped = !is_escaped 
-// // //                     //  }
-// // //                     //  if (is_escaped) => continue
-// // //                     //  else => done
-// // //                     mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
-// // //                 }
-// // //                 //else, keep going looking for another "
-// // // 			}else{
-// // //                 *input_parser_position = parser_position;
-// // //                 return;
-// // //             }
-// // // 		}
-// // // 	}
-
-STRING_SEEK:
-    while ((c = js[++parser_position]) && c != '"'){}
-    
-    if (c == '"') { //otherwise we're at the end of the string ...
-        //The idea here is that we don't check this all the time
-        //If we hit \" we would need to keep going back until
-        //we determine if the '\' is real or not
-        if (js[parser_position - 1] == '\\') {
-            if (js[parser_position - 2] == '\\') {
-                //This indicates that we have '\\"'
-                //Since we don't know what's before we could
-                //have a double escape
-                //The way to fix this to walk backwards and togggle
-                //whether or not the quote '"' is escaped or not
-                //  cur_parser_position = parser_position
-                //  is_escaped = false;
-                //  while(js[--parser_position] == '\\'){
-                //     is_escaped = !is_escaped 
-                //  }
-                //  if (is_escaped) => continue
-                //  else => done
-                mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
-            }
-            goto STRING_SEEK;
-            //else, keep going looking for another "
-        }else{
-            *input_parser_position = parser_position;
-            return;
-        }
+    //I've padded the string with a quote that is preceeded by a null
+    if (*p == '\0'){
+        mexErrMsgIdAndTxt("jsmn_mex:missing_quotes", "Quote not found");
     }
-
-	mexErrMsgIdAndTxt("jsmn_mex:unterminated_string", "Unable to find a terminating string quote");
+    
+    if (*p == '\\'){
+        --p;
+        if (*p == '\\'){
+            mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
+        }
+        ++p;
+        goto STRING_SEEK;
+    }else{
+        *char_offset = p+1;
+    }
+    
 }
 
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
 void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
-
-// // // // // #ifdef  __AVX__
-// // // // //     mexPrintf("AVX is defined\n");
-// // // // // #endif
-// // // // // #ifdef  __AVX2__
-// // // // //     mexPrintf("AVX2 is defined\n");
-// // // // // #endif    
-// // // // //     
-// // // // //       /* Initialize the two argument vectors */
-// // // // //   __m256 evens = _mm256_set_ps(2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0);
-// // // // //   __m256 odds = _mm256_set_ps(1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0);
-// // // // // 
-// // // // //   /* Compute the difference between the two vectors */
-// // // // //   __m256 result = _mm256_sub_ps(evens, odds);
-// // // // //     
-// // // // //         //mexPrintf("AVX2 is defined\n");
-    
     
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [34]        = &&S_PARSE_STRING_IN_ARRAY, // "
+        [34]        = &&S_PARSE_STRING_IN_ARRAY,            // "
         [35 ... 44] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [45]        = &&S_PARSE_NUMBER_IN_ARRAY,
+        [45]        = &&S_PARSE_NUMBER_IN_ARRAY,            // -
         [46 ... 47] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,
+        [48 ... 57] = &&S_PARSE_NUMBER_IN_ARRAY,            // #
         [58 ... 90] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [91]        = &&S_OPEN_ARRAY_IN_ARRAY,
+        [91]        = &&S_OPEN_ARRAY_IN_ARRAY,              // [
         [92 ... 101]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [102]         = &&S_PARSE_FALSE_IN_ARRAY,
+        [102]         = &&S_PARSE_FALSE_IN_ARRAY,           // false
         [103 ... 109] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [110]         = &&S_PARSE_NULL_IN_ARRAY,    // null
+        [110]         = &&S_PARSE_NULL_IN_ARRAY,            // null
         [111 ... 115] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [116]         = &&S_PARSE_TRUE_IN_ARRAY,    // true
+        [116]         = &&S_PARSE_TRUE_IN_ARRAY,            // true
         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
-        [123]         = &&S_OPEN_OBJECT_IN_ARRAY,   // {
+        [123]         = &&S_OPEN_OBJECT_IN_ARRAY,           // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
         
     const void *key_jump[256] = {
@@ -1007,42 +318,76 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
         [123]         = &&S_OPEN_OBJECT_IN_KEY,   // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
+    unsigned char *p = js;    
 
-    int temp_n_things = 0;
-    int n_things = 0;
     
-    int n_numeric = 0;
-    int n_keys = 0;
-    int n_strings = 0;
+    const int MAX_DEPTH = 200;
+    int parent_types[201];
+    //Note, this needs to be indices instead of pointers because
+    //we might resize and the indices would become invalid
+    unsigned int parent_indices[201];
+    unsigned int parent_sizes[201];
+    unsigned int current_parent_index;
+    unsigned int current_depth = 0;
 
-	int parser_position = -1;
-	unsigned char *pEndNumber;
-    int current_data_index = -1;
+    unsigned int data_size_allocated = ceil(string_byte_length/4);
+    unsigned int data_size_index_max = data_size_allocated - 1;
+    unsigned int current_data_index = 0;
+    
+    uint8_t *types = mxMalloc(data_size_allocated);
+    //do we need to make these uint64?
+    //technically not, the start pointer is an index
+    //and not an address
+    //
+    //d1 - n_values and start pointer index
+    //d2 - tac
+    unsigned int *d1 = mxMalloc(data_size_allocated * sizeof(int));
+    unsigned int *d2 = mxMalloc(data_size_allocated * sizeof(int));
 
-    int parent_index = 0;
-
-    //This current allocation means we hit 4x the size of the file
-    //in initial memory allocation
-    int data_size_allocated = string_byte_length;
-    int data_size_index_max = data_size_allocated - 1;
-	int *data = mxMalloc(data_size_allocated * sizeof(int));
+        
+    
+    unsigned int string_size_allocated = ceil(string_byte_length/4);
+    unsigned int string_size_index_max = string_size_allocated-1;
+    unsigned int current_string_index = 0;
+    unsigned char *string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
+    
+    int numeric_size_allocated = ceil(string_byte_length/4);
+    int numeric_size_index_max = numeric_size_allocated - 1;
+    unsigned int current_numeric_index = 0;
+    unsigned char *numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
+    
     
     const double MX_NAN = mxGetNaN();
     
-    int *wtf = mxMalloc(16);
+// // // // //     int *wtf = mxMalloc(16);
+// // // // //     
+// // // // //     do_calculation(wtf);
+// // // // //     
+// // // // //     mexPrintf("wtf[1] = %d\n",wtf[0]);
+// // // // //     mexPrintf("wtf[1] = %d\n",wtf[1]);
+// // // // //     mexPrintf("wtf[1] = %d\n",wtf[2]);
+// // // // //     mexPrintf("wtf[1] = %d\n",wtf[3]);
+// // // // //     
+// // // // //     mxFree(wtf);
     
-    do_calculation(wtf);
     
-    mexPrintf("wtf[1] = %d\n",wtf[0]);
-    mexPrintf("wtf[1] = %d\n",wtf[1]);
-    mexPrintf("wtf[1] = %d\n",wtf[2]);
-    mexPrintf("wtf[1] = %d\n",wtf[3]);
     
-    mxFree(wtf);
+// // // //     unsigned char *pch;
+// // // //     pch = strchr(js,'\\');
+// // // //     if (!pch){
+// // // //         current_depth = current_depth + 1;
+// // // //         //mexPrintf("No escapes found\n");
+// // // //     }else{
+// // // //         current_depth = current_depth + 2;
+// // // //         //mexPrintf("Escape found at %d\n",pch-js+1);
+// // // //     }
+// // // //     
+// // // //     return;
     
-	SKIP_WHITESPACE;
+    DECREMENT_POINTER;
+	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
-	switch (js[parser_position]) {
+	switch (CURRENT_CHAR) {
         case '{':
             goto S_OPEN_OBJECT_IN_KEY;
         case '[':
@@ -1053,22 +398,25 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
 
 //=============================================================
 S_OPEN_OBJECT_IN_ARRAY:
-    ++n_things;
+    
+    INCREMENT_PARENT_SIZE;
 
 	//Fall Through --------------------
 S_OPEN_OBJECT_IN_KEY:
     
-    EXPAND_DATA_CHECK(N_DATA_OBJECT);
+    //1) Expand data if necessary
+    //2) setup parent info
+    
+    EXPAND_DATA_CHECK;
     
     SET_TYPE(TYPE_OBJECT);
-    STORE_AND_UPDATE_PARENT;
-    ++current_data_index; //TAC
-    INIT_N_THINGS;
+    
+    INITIALIZE_PARENT_INFO(TYPE_OBJECT);  
     
     //Navigation -----------------
-	SKIP_WHITESPACE
+	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
-    switch (js[parser_position]) {
+    switch (CURRENT_CHAR) {
         case '"':
             goto S_PARSE_KEY;
         case '}':
@@ -1081,6 +429,9 @@ S_OPEN_OBJECT_IN_KEY:
 
 S_CLOSE_KEY_AND_OBJECT:    
     //Update tac and parent
+        
+    current_parent_index = parent_indices[current_depth];
+            
     STORE_TAC;
     
     //Fall Through ------
@@ -1092,158 +443,150 @@ S_CLOSE_KEY_AND_OBJECT_SIMPLE:
 	//Fall Through ------
 S_CLOSE_OBJECT:
 
-    FINALIZE_N_THINGS;
+    current_parent_index = parent_indices[current_depth];
     STORE_TAC;
+    STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
-    if (NULL_PARENT_INDEX) {
+    if (IS_NULL_PARENT_INDEX) {
 		goto S_PARSE_END_OF_FILE;
 	}
     
     if (PARENT_TYPE == TYPE_KEY) {
-    	PROCESS_END_OF_KEY_VALUE
+    	PROCESS_END_OF_KEY_VALUE;
     } else {
-        PROCESS_END_OF_ARRAY_VALUE
+        PROCESS_END_OF_ARRAY_VALUE;
     }
     
 //=============================================================
 S_OPEN_ARRAY_IN_ARRAY:
-	++n_things;
+	INCREMENT_PARENT_SIZE;
 
 	//Fall Through -------------------------------
 S_OPEN_ARRAY_IN_KEY:
 
-    EXPAND_DATA_CHECK(N_DATA_ARRAY);
+    EXPAND_DATA_CHECK;
     
     SET_TYPE(TYPE_ARRAY);
-    STORE_AND_UPDATE_PARENT;
-    ++current_data_index; //TAC
-    INIT_N_THINGS
     
-	SKIP_WHITESPACE
-    DO_ARRAY_JUMP
+    INITIALIZE_PARENT_INFO(TYPE_ARRAY); 
+    
+	ADVANCE_TO_NON_WHITESPACE_CHAR;
+    DO_ARRAY_JUMP;
             
 	//=============================================================
 S_CLOSE_ARRAY:
 
-    FINALIZE_N_THINGS;
+    current_parent_index = parent_indices[current_depth];
     STORE_TAC;
+    STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
-	if (NULL_PARENT_INDEX) {
+	if (IS_NULL_PARENT_INDEX) {
 		goto S_PARSE_END_OF_FILE;
 	}
     
     if (PARENT_TYPE == TYPE_KEY) {
-        PROCESS_END_OF_KEY_VALUE
+        PROCESS_END_OF_KEY_VALUE;
     } else {
-        PROCESS_END_OF_ARRAY_VALUE
+        PROCESS_END_OF_ARRAY_VALUE;
     }
 
 //=============================================================
 S_PARSE_KEY:
-	++n_things;
-    ++n_keys;
+	INCREMENT_PARENT_SIZE;
     
-    EXPAND_DATA_CHECK(N_DATA_KEY);
-
+    EXPAND_STRING_CHECK;
+    
+    EXPAND_DATA_CHECK;
+    
+    INITIALIZE_PARENT_INFO(TYPE_KEY);
+    
     SET_TYPE(TYPE_KEY);
-    STORE_AND_UPDATE_PARENT;
+
+    string_p[current_string_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_string_index;
+        
+    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
     
-    //TAC handling -----------------------
-    //tac - 0, start 1 end 2 
-    //- assume 3 indices, true for string, #, null
-    //- then + 1 for pointing to after
-    ++current_data_index; 
-    data[current_data_index] = current_data_index + 6;
+    ADVANCE_TO_NON_WHITESPACE_CHAR;
 
-    //start
-    data[++current_data_index] = parser_position;
-
-	seek_string_end(js, &parser_position);
-
-    //end
-	data[++current_data_index] = parser_position;
-
-    //Navigation ------------------
-	//TODO: Assume : and space otherwise use code below
-    // if js[++parser_position] = ':' and 
-    
-    SKIP_WHITESPACE;
-
-	if (js[parser_position] == ':') {
-        SKIP_WHITESPACE
-        DO_KEY_JUMP
-        //goto *key_jump[js[parser_position]];
+	if (CURRENT_CHAR == ':') {
+        ADVANCE_TO_NON_WHITESPACE_CHAR;
+        DO_KEY_JUMP;
 	}
 	else {
 		goto S_ERROR_MISSING_COLON_AFTER_KEY;
 	}
 
-
-
-	//=============================================================
+//=============================================================
 S_PARSE_STRING_IN_ARRAY:
-	n_things++;
-
-    n_strings++;
+	INCREMENT_PARENT_SIZE;
     
-    EXPAND_DATA_CHECK(N_DATA_STRING);
+    EXPAND_STRING_CHECK;
+    
+    EXPAND_DATA_CHECK;
+    
     SET_TYPE(TYPE_STRING);
 
-	data[++current_data_index] = parser_position;
-	seek_string_end(js, &parser_position);
-    data[++current_data_index] = parser_position;
+    string_p[current_string_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_string_index;
+        
+    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
 
 	PROCESS_END_OF_ARRAY_VALUE;
 
-
-
-	//=============================================================
+//=============================================================
 S_PARSE_STRING_IN_KEY:
 
-    n_strings++;
+    EXPAND_STRING_CHECK;
     
-    EXPAND_DATA_CHECK(N_DATA_STRING)    
-	SET_TYPE(TYPE_STRING);
+    EXPAND_DATA_CHECK;
+    
+    SET_TYPE(TYPE_STRING);
 
-	data[++current_data_index] = parser_position;
-	seek_string_end(js, &parser_position);
-    data[++current_data_index] = parser_position;
+    string_p[current_string_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_string_index;
+        
+    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
 
 	PROCESS_END_OF_KEY_VALUE
 
 
-
-	//=============================================================
+//=============================================================
 S_PARSE_NUMBER_IN_KEY:
-
-    ++n_numeric;
     
-    EXPAND_DATA_CHECK(N_DATA_NUMERIC)
+    EXPAND_NUMERIC_CHECK;
+    EXPAND_DATA_CHECK;
+    
     SET_TYPE(TYPE_NUMBER);
-
-    data[++current_data_index] = parser_position;
-	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
-	parser_position = (int)(pEndNumber - js);
-	parser_position--;
+    
+    numeric_p[current_numeric_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_numeric_index;
+    
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
+    
+    DECREMENT_POINTER;
 
 	PROCESS_END_OF_KEY_VALUE;
 
 //=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
-	++n_things;
-    ++n_numeric;
     
-    EXPAND_DATA_CHECK(N_DATA_NUMERIC);
-	
+	INCREMENT_PARENT_SIZE;
+    
+    EXPAND_NUMERIC_CHECK;
+    EXPAND_DATA_CHECK;
+    
     SET_TYPE(TYPE_NUMBER);
-    data[++current_data_index] = parser_position;
-	data[++current_data_index] = string_to_double_no_math(js + parser_position, &pEndNumber);
-	parser_position = (int)(pEndNumber - js);
     
-    if (js[parser_position] == ','){
-        SKIP_WHITESPACE;
+    numeric_p[current_numeric_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_numeric_index;
+
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
+       
+    if (CURRENT_CHAR == ','){
+        ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_ARRAY_JUMP;
         
 //         if (js[++parser_position] == ' '){
@@ -1260,22 +603,23 @@ S_PARSE_NUMBER_IN_ARRAY:
 //             DO_ARRAY_JUMP;
 //         }
     }else{
-        parser_position--;
+        DECREMENT_POINTER;
         PROCESS_END_OF_ARRAY_VALUE;
     }
 
 //=============================================================
 S_PARSE_NULL_IN_KEY:
 
-    ++n_numeric;
+    EXPAND_NUMERIC_CHECK;
+    EXPAND_DATA_CHECK;
     
-    EXPAND_DATA_CHECK(N_DATA_NULL);
-	SET_TYPE(TYPE_NULL);
-    ++current_data_index;
-    ++current_data_index;
+    SET_TYPE(TYPE_NULL);
+    
+    numeric_p[current_numeric_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_numeric_index;
     
     //TODO: Add null check ...
-	parser_position += 3;
+	ADVANCE_POINTER_BY_X(3)
     
 	PROCESS_END_OF_KEY_VALUE;
 
@@ -1284,16 +628,18 @@ S_PARSE_NULL_IN_KEY:
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
 
-	n_things++;
+	INCREMENT_PARENT_SIZE;
     
-    ++n_numeric;
+    EXPAND_NUMERIC_CHECK;
+    EXPAND_DATA_CHECK;
     
-    EXPAND_DATA_CHECK(N_DATA_NULL);
-	SET_TYPE(TYPE_NULL);
-    ++current_data_index;
-    ++current_data_index;
-
-	parser_position += 3;
+    SET_TYPE(TYPE_NULL);
+    
+    numeric_p[current_numeric_index] = CURRENT_POINTER;
+    d1[current_data_index] = current_numeric_index;
+    
+    //TODO: Add null check ...
+	ADVANCE_POINTER_BY_X(3)
     
 	PROCESS_END_OF_ARRAY_VALUE;
 
@@ -1301,41 +647,47 @@ S_PARSE_NULL_IN_ARRAY:
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
     
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
+    EXPAND_DATA_CHECK;
     SET_TYPE(TYPE_TRUE);
-	parser_position += 3;
+	ADVANCE_POINTER_BY_X(3);
+    
 	PROCESS_END_OF_KEY_VALUE
 
 
 S_PARSE_TRUE_IN_ARRAY:
     
-	n_things++;
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
-	SET_TYPE(TYPE_TRUE);
-	parser_position += 3;
+	INCREMENT_PARENT_SIZE;
+    
+    EXPAND_DATA_CHECK;
+    SET_TYPE(TYPE_TRUE);
+	ADVANCE_POINTER_BY_X(3);
+    
     PROCESS_END_OF_ARRAY_VALUE;
 
     
 S_PARSE_FALSE_IN_KEY:
     
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL)
-	SET_TYPE(TYPE_FALSE);
-	parser_position += 4;
+    EXPAND_DATA_CHECK;
+    SET_TYPE(TYPE_FALSE);
+	ADVANCE_POINTER_BY_X(4);
+    
     PROCESS_END_OF_KEY_VALUE;
 
 S_PARSE_FALSE_IN_ARRAY:
     
-	n_things++;
-    EXPAND_DATA_CHECK(N_DATA_LOGICAL);
-	SET_TYPE(TYPE_FALSE);
-	parser_position += 4;
+	INCREMENT_PARENT_SIZE;
+    
+    EXPAND_DATA_CHECK;
+    SET_TYPE(TYPE_FALSE);
+	ADVANCE_POINTER_BY_X(4);
+    
 	PROCESS_END_OF_ARRAY_VALUE;
 
 	//=============================================================
 S_PARSE_END_OF_FILE:
-	SKIP_WHITESPACE
+	ADVANCE_TO_NON_WHITESPACE_CHAR
 
-		if (!(js[parser_position] == '\0')) {
+		if (!(CURRENT_CHAR == '\0')) {
 			mexErrMsgIdAndTxt("jsmn_mex:invalid_end", "non-whitespace characters found after end of root token close");
 		}
 
@@ -1360,6 +712,10 @@ S_PARSE_END_OF_FILE:
 
 
 	//=============================================================
+    
+S_ERROR_DEPTH_EXCEEDED:
+    mexErrMsgIdAndTxt("jsmn_mex:depth_exceeded", "Max depth was exceeded");
+    
 S_ERROR_OPEN_OBJECT:
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_OPEN_OBJECT");
 
@@ -1373,8 +729,8 @@ S_ERROR_END_OF_VALUE_IN_KEY:
 //This error comes when we have a comma in an array that is not followed
 // by a valid value => i.e. #, ", [, {, etc.
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
-    mexPrintf("Current character: %c\n",js[parser_position]);
-    mexPrintf("Current position in string: %d\n",parser_position);
+    mexPrintf("Current character: %c\n",CURRENT_CHAR);
+    mexPrintf("Current position in string: %d\n",CURRENT_INDEX);
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Invalid token found after a comma in an array");
 	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");
    
@@ -1392,112 +748,145 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 		//                         mexPrintf("Current type: %d\n",parent_types[current_depth-1]);
 		//                         mexPrintf("Current type: %d\n",parent_types[current_depth]);
 		//                         mexPrintf("Current char: %c\n",js[parser_position]);    
-	mexPrintf("Current position: %d\n", parser_position);
+	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
 finish_main:
     
+    types = mxRealloc(types,(current_data_index + 1));
+    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
+    
+    d1 = mxRealloc(d1,((current_data_index + 1)*sizeof(int)));
+    setStructField(plhs[0],d1,"d1",mxUINT32_CLASS,current_data_index + 1);
+    
+    d2 = mxRealloc(d2,((current_data_index + 1)*sizeof(int)));
+    setStructField(plhs[0],d2,"d2",mxUINT32_CLASS,current_data_index + 1);
+    
+    string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));
+    setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
+    
+    numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
+    setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
+        
+    
+    double *numeric_data = mxMalloc((current_numeric_index + 1)*sizeof(double));
+    
+    #pragma omp parallel num_threads(4)
+    {
+        int tid = omp_get_thread_num();
+        for (int i = tid; i <= current_numeric_index; i += 4){
+            numeric_data[i] = i;
+        }
+    }
+    
+    setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,current_numeric_index + 1);
+    
+    
+    
     //Hopefully this doesn't ever need to run ...
     //We're adding a single type value at the end to indicate we are done
     //rather than checking at each type value
-    EXPAND_DATA_CHECK(1);
-    data[++current_data_index] = TYPE_DATA_END; 
-    
-    //Set the data into storage
-    data = mxRealloc(data,(current_data_index + 1)*sizeof(int));
-	setStructField(plhs[0],data,"data",mxINT32_CLASS,current_data_index + 1);
-    
-    //Holding onto values
-    int *p_data_size_allocated = mxMalloc(sizeof(int));
-    *p_data_size_allocated = data_size_allocated;
-    int *p_n_numeric = mxMalloc(sizeof(int));
-    *p_n_numeric = n_numeric;
-    int *p_n_keys = mxMalloc(sizeof(int));
-    *p_n_keys = n_keys;
-    int *p_n_strings = mxMalloc(sizeof(int));
-    *p_n_strings= n_strings;
-
-    setStructField(plhs[0],p_data_size_allocated,"data_size_allocated",mxINT32_CLASS,1);
-    setStructField(plhs[0],p_n_numeric,"n_numeric",mxINT32_CLASS,1);
-    setStructField(plhs[0],p_n_keys,"n_keys",mxINT32_CLASS,1);
-    setStructField(plhs[0],p_n_strings,"n_strings",mxINT32_CLASS,1);
-    
-    int cur_number = -1;
-    int cur_string = -1;
-    int cur_key = -1;
-    
-    //Initialization of all numeric data
-    double *numeric_data = mxMalloc(n_numeric*sizeof(double));
-
-    unsigned char *char_start;
-    int num_info;
-    
-    clock_t start_post_process, end_post_process;
+// // // // //     EXPAND_DATA_CHECK(1);
+// // // // //     data[++current_data_index] = TYPE_DATA_END; 
+// // // // //     
+// // // // //     //Set the data into storage
+// // // // //     data = mxRealloc(data,(current_data_index + 1)*sizeof(int));
+// // // // // 	setStructField(plhs[0],data,"data",v,current_data_index + 1);
+// // // // //     
+// // // // //     //Holding onto values
+// // // // //     int *p_data_size_allocated = mxMalloc(sizeof(int));
+// // // // //     *p_data_size_allocated = data_size_allocated;
+// // // // //     int *p_n_numeric = mxMalloc(sizeof(int));
+// // // // //     *p_n_numeric = n_numeric;
+// // // // //     int *p_n_keys = mxMalloc(sizeof(int));
+// // // // //     *p_n_keys = n_keys;
+// // // // //     int *p_n_strings = mxMalloc(sizeof(int));
+// // // // //     *p_n_strings= n_strings;
+// // // // // 
+// // // // //     setStructField(plhs[0],p_data_size_allocated,"data_size_allocated",mxINT32_CLASS,1);
+// // // // //     setStructField(plhs[0],p_n_numeric,"n_numeric",mxINT32_CLASS,1);
+// // // // //     setStructField(plhs[0],p_n_keys,"n_keys",v,1);
+// // // // //     setStructField(plhs[0],p_n_strings,"n_strings",mxINT32_CLASS,1);
+// // // // //     
+// // // // //     int cur_number = -1;
+// // // // //     int cur_string = -1;
+// // // // //     int cur_key = -1;
+// // // // //     
+// // // // //     //Initialization of all numeric data
+// // // // //     double *numeric_data = mxMalloc(n_numeric*sizeof(double));
+// // // // // 
+// // // // //     unsigned char *char_start;
+// // // // //     int num_info;
     
     
-    start_post_process = clock();
-    current_data_index = -1;
-    //while (current_data_index <= data_size_index_max){
-    while (1){
-      
-// #define N_DATA_OBJECT   4
-// #define N_DATA_ARRAY    4
-// #define N_DATA_KEY      5
-// #define N_DATA_STRING   3
-// #define N_DATA_NUMERIC  3
-// #define N_DATA_LOGICAL  1
-// #define N_DATA_NULL     3
-        
-        switch(data[++current_data_index]){
-            case TYPE_DATA_END:
-                goto ALL_DONE;
-            case TYPE_OBJECT:
-                current_data_index += 3;
-                break;
-            case TYPE_ARRAY:
-                current_data_index += 3;
-                break;
-            case TYPE_KEY:
-                current_data_index += 4;
-                break;    
-            case TYPE_STRING:
-                current_data_index += 2;
-                break;
-            case TYPE_NUMBER:
-                //storage format:
-                //1) type   2) start of number 3) info about number
-                //We change #2 to pointing to the storage location of
-                //the number in the array
-//                 char_start = js + data[++current_data_index];
-//                 data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
-//                 num_info = data[++current_data_index];
-//                 numeric_data[cur_number] = string_to_double(char_start,num_info);
-                
-                current_data_index += 2;
-                break;
-            case TYPE_NULL:
-//                 data[++current_data_index] = ++cur_number;
-//                 numeric_data[cur_number] = MX_NAN;
-//                 ++current_data_index;
-                
-                current_data_index += 2;
-                break;    
-            case TYPE_TRUE:
-                break;
-            case TYPE_FALSE:
-                break;
-        }   
-    }
     
-ALL_DONE:
     
-    end_post_process = clock();
-    double *elapsed_pp_time = mxMalloc(sizeof(double));
-    *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
-    
-    setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
-    
-    setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numeric);        
+// // // // // //     clock_t start_post_process, end_post_process;
+// // // // // //     
+// // // // // //     
+// // // // // //     start_post_process = clock();
+// // // // // //     current_data_index = -1;
+// // // // // //     //while (current_data_index <= data_size_index_max){
+// // // // // //     while (1){
+// // // // // //       
+// // // // // // // #define N_DATA_OBJECT   4
+// // // // // // // #define N_DATA_ARRAY    4
+// // // // // // // #define N_DATA_KEY      5
+// // // // // // // #define N_DATA_STRING   3
+// // // // // // // #define N_DATA_NUMERIC  3
+// // // // // // // #define N_DATA_LOGICAL  1
+// // // // // // // #define N_DATA_NULL     3
+// // // // // //         
+// // // // // //         switch(data[++current_data_index]){
+// // // // // //             case TYPE_DATA_END:
+// // // // // //                 goto ALL_DONE;
+// // // // // //             case TYPE_OBJECT:
+// // // // // //                 current_data_index += 3;
+// // // // // //                 break;
+// // // // // //             case TYPE_ARRAY:
+// // // // // //                 current_data_index += 3;
+// // // // // //                 break;
+// // // // // //             case TYPE_KEY:
+// // // // // //                 current_data_index += 4;
+// // // // // //                 break;    
+// // // // // //             case TYPE_STRING:
+// // // // // //                 current_data_index += 2;
+// // // // // //                 break;
+// // // // // //             case TYPE_NUMBER:
+// // // // // //                 //storage format:
+// // // // // //                 //1) type   2) start of number 3) info about number
+// // // // // //                 //We change #2 to pointing to the storage location of
+// // // // // //                 //the number in the array
+// // // // // // //                 char_start = js + data[++current_data_index];
+// // // // // // //                 data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
+// // // // // // //                 num_info = data[++current_data_index];
+// // // // // // //                 numeric_data[cur_number] = string_to_double(char_start,num_info);
+// // // // // //                 
+// // // // // //                 current_data_index += 2;
+// // // // // //                 break;
+// // // // // //             case TYPE_NULL:
+// // // // // // //                 data[++current_data_index] = ++cur_number;
+// // // // // // //                 numeric_data[cur_number] = MX_NAN;
+// // // // // // //                 ++current_data_index;
+// // // // // //                 
+// // // // // //                 current_data_index += 2;
+// // // // // //                 break;    
+// // // // // //             case TYPE_TRUE:
+// // // // // //                 break;
+// // // // // //             case TYPE_FALSE:
+// // // // // //                 break;
+// // // // // //         }   
+// // // // // //     }
+// // // // // //     
+// // // // // // ALL_DONE:
+// // // // // //     
+// // // // // //     end_post_process = clock();
+// // // // // //     double *elapsed_pp_time = mxMalloc(sizeof(double));
+// // // // // //     *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
+// // // // // //     
+// // // // // //     setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
+// // // // // //     
+// // // // // //     setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numeric);        
 
     
     

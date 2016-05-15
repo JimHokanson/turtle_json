@@ -58,6 +58,11 @@ p1 = 'G:\repos\matlab_git\jsmn_mex\vs_project\jsmn_mex\x64\Release\jsmn_mex.mexw
 p2 = 'G:\repos\matlab_git\jsmn_mex\src\jsmn_mex.mexw64';
 copyfile(p1,p2);
 
+cd G:\repos\matlab_git\jsmn_mex\src
+setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
+mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v 
+
+
 if ismac
 file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';
 else

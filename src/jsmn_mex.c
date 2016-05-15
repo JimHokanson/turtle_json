@@ -10,10 +10,11 @@
  *
  *      mex jsmn_mex.c jsmn.c COMPFLAGS="$COMPFLAGS -O3"
  *      
+ *      //must install openmp when installing tdm-gcc
  *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  *
  *
- *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v  
+ *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v  
  *
  *
  */
@@ -179,10 +180,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
         setStructField2(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
     }
     
-
+    //Main parsing call
     jsmn_parse(json_string,string_byte_length,plhs);
   
-
+    
     
     
     

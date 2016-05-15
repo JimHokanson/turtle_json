@@ -10,6 +10,28 @@ classdef tokens
     
     %{
     
+    
+    
+    
+    object: 1) type  2) n_values        3) tac
+    array:  1) type  2) n_values        3) tac
+    key:    1) type  2) start_pointer   3) tac
+    string: 1) type  2) start_pointer
+    number: 1) type  2) start_pointer
+    null:   1) type  2) start_pointer
+    tf      1) type
+    
+    
+    
+    array:  1) type  2) parent      3) tac     4) n_values
+    key:    1) type  2) parent      3) tac     4) start/p     5) end
+    string: 1) type  2) start/p     3) end
+    number: 1) type  2) start/p     3) info
+    null:   1) type  2) <nothing>/p 3) <nothing>
+    t/f:    1) type
+    
+    
+    
     Working on new layout to save memory and time
     
     object: 1) type  2) parent      3) tac     4) n_values
@@ -52,7 +74,9 @@ classdef tokens
         file_string %string of the file
         %We might not hold onto this ...
         
-        data
+        types
+        d1
+        d2
         %type-ids
         % #define TYPE_DATA_END 0
         % #define TYPE_OBJECT 1
@@ -72,6 +96,7 @@ classdef tokens
         d_extra_info = '-------------------------------'
         mex
         data_to_string_ratio
+        toc_total_time
         toc_file_read
         toc_parse
         toc_post_process
@@ -125,6 +150,10 @@ classdef tokens
             %   json.stringToTokens
             %   json.fileToTokens
             
+            
+            
+            
+            
             in.chars_per_token = 0;
             in.n_tokens = 0;
             in.raw_string = -1;
@@ -132,11 +161,26 @@ classdef tokens
             
             t0 = tic;
             result = jsmn_mex(file_path);
-            %TODO: Build in an explicit timer on the parsing ...
-            obj.toc_parse = toc(t0)-result.elapsed_read_time;
-            obj.toc_file_read = result.elapsed_read_time;
-            obj.toc_post_process = result.elapsed_pp_time;
+            obj.mex = result;
             
+            obj.file_string = result.json_string;
+            obj.types = result.types;
+            obj.d1 = result.d1;
+            obj.d2 = result.d2;
+            obj.numeric_data = result.numeric_data;
+            
+            obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
+            
+            obj.toc_total_time = toc(t0);
+            obj.toc_file_read = result.elapsed_read_time;
+            obj.toc_parse = obj.toc_total_time - result.elapsed_read_time;
+            obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+            
+            %TODO: Build in an explicit timer on the parsing ...
+%             obj.toc_parse = toc(t0)-result.elapsed_read_time;
+%             obj.toc_file_read = result.elapsed_read_time;
+%             obj.toc_post_process = result.elapsed_pp_time;
+%             
             
             
 %             if in.raw_string == -1
@@ -168,12 +212,12 @@ classdef tokens
 %                 obj.toc_parse = toc(t1);
 %             end
             
-            obj.file_string = result.json_string;
-            obj.mex = result;
-            obj.data_to_string_ratio = length(result.data)/length(result.json_string);
-            obj.data = result.data;
-            obj.numeric_data = result.numeric_data;
-            obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+%             obj.file_string = result.json_string;
+%             obj.mex = result;
+%             obj.data_to_string_ratio = length(result.data)/length(result.json_string);
+%             obj.data = result.data;
+%             obj.numeric_data = result.numeric_data;
+%             obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
             
             %These would take some work to get, would need to make these
             %dependent ...
