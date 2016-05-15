@@ -16,7 +16,7 @@ t3 = tic;
 for i = 1:N
     jt = json.tokens(file_path);
 	%jt = json.tokens(file_path,'chars_per_token',10);
-    d1_all(i) = jt.toc_parse;
+    d1_all(i) = jt.toc_non_read_time;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/N,min(d1_all),sum(d1_all))
@@ -60,7 +60,7 @@ copyfile(p1,p2);
 
 cd G:\repos\matlab_git\jsmn_mex\src
 setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
-mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c -O -v 
+mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O
 
 
 if ismac
@@ -76,7 +76,7 @@ t3 = tic;
 for i = 1:20
     %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'chars_per_token',5);
-    d1_all(i) = jt.toc_parse;
+    d1_all(i) = jt.toc_non_read_time;
     %sobj = jt.get_parsed_data();
 end
 fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)

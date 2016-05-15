@@ -1,13 +1,4 @@
 #include "jsmn.h"
-#include "stdio.h"
-#include <stdlib.h>
-#include <ctype.h>
-#include "mex.h"
-#include <math.h>
-#include "stdint.h"  //uint_8
-#include <string.h> //strchr
-#include <time.h>
-#include <omp.h>
 
 //This is needed for AVX
 //but, we might not use AVX - SSE4
@@ -15,14 +6,12 @@
 //with define flags ...
 #include "immintrin.h"
 
-//Important characters in a quick initial search
-//---------------------
-// [
-// {
-// \
-// unicode indicators
+
+//TODO: Allow string input to function
 
 
+//TODO: store initial and final allocation sizes for each type
+//TODO: Create method for creating scalar and saving into struct
 
 
 //TODO: Pad end with nulls and maybe a string end???
@@ -59,6 +48,14 @@
         d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
     } \
 
+#define EXPAND_KEY_CHECK \
+    ++current_key_index; \
+    if (current_key_index >= key_size_index_max) { \
+        key_size_allocated = ceil(1.5*key_size_allocated); \
+        key_size_index_max = key_size_allocated - 1; \
+        key_p = mxRealloc(key_p,key_size_allocated * sizeof(unsigned char *)); \
+    } \
+            
 #define EXPAND_STRING_CHECK \
     ++current_string_index; \
     if (current_string_index >= string_size_index_max) { \
@@ -87,8 +84,43 @@
         parent_sizes[current_depth] = 0; \
             
 //=========================================================================
-    
-    
+ 
+//=================      Processing    ====================================
+//=========================================================================
+#define PROCESS_NUMBER \
+    EXPAND_NUMERIC_CHECK; \
+    EXPAND_DATA_CHECK; \
+    \
+    SET_TYPE(TYPE_NUMBER); \
+    \
+    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_numeric_index; \
+    \
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER); \
+                
+#define PROCESS_NULL \
+    EXPAND_NUMERIC_CHECK; \
+    EXPAND_DATA_CHECK; \
+    \
+    SET_TYPE(TYPE_NULL); \
+    \
+    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_numeric_index; \
+    \
+    /*TODO: Add null check ... */ \
+	ADVANCE_POINTER_BY_X(3) \
+            
+#define PROCESS_STRING \
+    EXPAND_STRING_CHECK; \
+    EXPAND_DATA_CHECK; \
+    SET_TYPE(TYPE_STRING); \
+    \
+    string_p[current_string_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_string_index; \
+    \
+    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
+            
+            
 //================    Things for closing             ======================
 //=========================================================================     
 //+1 to next element
@@ -183,7 +215,7 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 //-------------------------------------------------------------------------
 //--------------------  End of Number Parsing  ----------------------------
 //-------------------------------------------------------------------------
-void string_to_double_no_math(unsigned char *p, unsigned char **char_offset, unsigned char *d) {
+void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
     //strcspn - should know what to look for ...
     //Would need to confirm that we end at the correct location
@@ -201,52 +233,22 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset, uns
     
     if (*p == '-'){
         ++p;
-        ++d;
     }
 
-//     mexPrintf("Cur p: %c\n",*p);
-//     mexPrintf("Cur d: %c\n",*d);
-    
-//     PRINT_CURRENT_CHAR
-    
-    while (*d){
-        p += *d;
-        d += *d;
-    }
-    
-    //while (isdigit(*p)) {++p;}
-       
-//     mexPrintf("End of digits\n");
-//     PRINT_CURRENT_CHAR        
-    
+    while (isdigit(*p)) {++p;}
+
     if (*p == '.'){
-        //SIGN_INFO = 1;
         ++p;
-        ++d;
-        while (*d){
-            p += *d;
-            d += *d;
-        }
-        //while (isdigit(*p)) {++p;}
+        while (isdigit(*p)) {++p;}
     }
-    
-    
-//     mexPrintf("End of dot\n");
-// 
-//     PRINT_CURRENT_CHAR     
-    
+
     if (*p == 'E' || *p == 'e') {
         ++p;
-        ++d;
         if (*p == '-' || *p == '+'){
             ++p;
-            ++d;
         }
-        while (*d){
-            p += *d;
-            d += *d;
-        }
-        //while (isdigit(*p)) {++p;}
+
+        while (isdigit(*p)) {++p;}
     }
     
     *char_offset = p;    
@@ -330,14 +332,14 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int parent_types[201];
     //Note, this needs to be indices instead of pointers because
     //we might resize and the indices would become invalid
-    unsigned int parent_indices[201];
-    unsigned int parent_sizes[201];
-    unsigned int current_parent_index;
-    unsigned int current_depth = 0;
+    int parent_indices[201];
+    int parent_sizes[201];
+    int current_parent_index;
+    int current_depth = 0;
 
-    unsigned int data_size_allocated = ceil(string_byte_length/4);
-    unsigned int data_size_index_max = data_size_allocated - 1;
-    unsigned int current_data_index = 0;
+    int data_size_allocated = ceil(string_byte_length/4);
+    int data_size_index_max = data_size_allocated - 1;
+    int current_data_index = 0;
     
     uint8_t *types = mxMalloc(data_size_allocated);
     //do we need to make these uint64?
@@ -346,116 +348,29 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     //
     //d1 - n_values and start pointer index
     //d2 - tac
-    unsigned int *d1 = mxMalloc(data_size_allocated * sizeof(int));
-    unsigned int *d2 = mxMalloc(data_size_allocated * sizeof(int));
+    int *d1 = mxMalloc(data_size_allocated * sizeof(int));
+    int *d2 = mxMalloc(data_size_allocated * sizeof(int));
 
-        
+    int key_size_allocated = ceil(string_byte_length/20);
+    int key_size_index_max = key_size_allocated-1;
+    int current_key_index = 0;
+    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));        
     
-    unsigned int string_size_allocated = ceil(string_byte_length/4);
-    unsigned int string_size_index_max = string_size_allocated-1;
-    unsigned int current_string_index = 0;
+    int string_size_allocated = ceil(string_byte_length/20);
+    int string_size_index_max = string_size_allocated-1;
+    int current_string_index = 0;
     unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
     
     int numeric_size_allocated = ceil(string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
-    unsigned int current_numeric_index = 0;
+    int current_numeric_index = 0;
     unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
     
     
     const double MX_NAN = mxGetNaN();
     
     unsigned char *digit_info = mxMalloc(string_byte_length);
-    
-    int starts[4];
-    int stops[4];
-    //TODO: Support small strings
-    
-    int step_size = ceil(string_byte_length/4);
-    
-    starts[0] = 0;
-    starts[1] = starts[0]+step_size;
-    stops[0] = starts[1] - 1;
-    starts[2] = starts[1]+step_size;
-    stops[1] = starts[2] - 1;
-    starts[3] = starts[2]+step_size;
-    stops[2] = starts[3] - 1;
-    stops[3] = string_byte_length-1;
-    
-    //checking for a single thread
-//     starts[0] = 0;
-//     stops[0] = string_byte_length-1;
-    
-    #pragma omp parallel num_threads(4)
-    {
-        int tid = omp_get_thread_num();
-        
-        int current_index = stops[tid];
-        int stop_index = starts[tid];
-        int digit_count = 0;
-        //int space_count = 0;
 
-        unsigned char *cur_source_char = js + current_index;
-        unsigned char *cur_output_char = digit_info + current_index;
-        
-        for (;current_index >= stop_index; --current_index){
-            
-            if (isdigit(*cur_source_char)){
-                *cur_output_char = ++digit_count;
-                if (digit_count == 255){
-                    digit_count = 0;
-                }
-            }else{
-                digit_count = 0;
-                *cur_output_char = 0;
-            }
-            --cur_output_char;
-            --cur_source_char;
-            
-            
-//             if (isdigit(js[current_index])){
-//                 digit_info[current_index] = ++digit_count;
-//            
-//                 //Note, this avoids incrementing to 0 on the next
-//                 //run and implying that we don't need to move ahead at all
-//                 if (digit_count == 255){
-//                     digit_count = 0;
-//                 }
-//             }else{
-//                 digit_count = 0;
-//                 digit_info[current_index] = 0;
-//             }                
-        }
-    }
-    
-    setStructField(plhs[0],digit_info,"digit_info",mxUINT8_CLASS,string_byte_length);
-    
-    //return;
-    
-// // // // //     int *wtf = mxMalloc(16);
-// // // // //     
-// // // // //     do_calculation(wtf);
-// // // // //     
-// // // // //     mexPrintf("wtf[1] = %d\n",wtf[0]);
-// // // // //     mexPrintf("wtf[1] = %d\n",wtf[1]);
-// // // // //     mexPrintf("wtf[1] = %d\n",wtf[2]);
-// // // // //     mexPrintf("wtf[1] = %d\n",wtf[3]);
-// // // // //     
-// // // // //     mxFree(wtf);
-    
-    
-    
-// // // //     unsigned char *pch;
-// // // //     pch = strchr(js,'\\');
-// // // //     if (!pch){
-// // // //         current_depth = current_depth + 1;
-// // // //         //mexPrintf("No escapes found\n");
-// // // //     }else{
-// // // //         current_depth = current_depth + 2;
-// // // //         //mexPrintf("Escape found at %d\n",pch-js+1);
-// // // //     }
-// // // //     
-// // // //     return;
-    
     DECREMENT_POINTER;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
@@ -568,7 +483,7 @@ S_CLOSE_ARRAY:
 S_PARSE_KEY:
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_STRING_CHECK;
+    EXPAND_KEY_CHECK;
     
     EXPAND_DATA_CHECK;
     
@@ -576,51 +491,42 @@ S_PARSE_KEY:
     
     SET_TYPE(TYPE_KEY);
 
-    string_p[current_string_index] = CURRENT_POINTER;
+    key_p[current_string_index] = CURRENT_POINTER;
     d1[current_data_index] = current_string_index;
         
     seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
     
-    ADVANCE_TO_NON_WHITESPACE_CHAR;
-
-	if (CURRENT_CHAR == ':') {
+    //We're getting an extra bit of memory for storing the end :/
+    EXPAND_DATA_CHECK;
+    
+    if (ADVANCE_POINTER_AND_GET_CHAR_VALUE == ':'){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
-        DO_KEY_JUMP;
-	}
-	else {
-		goto S_ERROR_MISSING_COLON_AFTER_KEY;
-	}
+        DO_KEY_JUMP;    
+    }else{
+        DECREMENT_POINTER;
+        ADVANCE_TO_NON_WHITESPACE_CHAR;
+
+        if (CURRENT_CHAR == ':') {
+            ADVANCE_TO_NON_WHITESPACE_CHAR;
+            DO_KEY_JUMP;
+        }
+        else {
+            goto S_ERROR_MISSING_COLON_AFTER_KEY;
+        }
+    }
 
 //=============================================================
 S_PARSE_STRING_IN_ARRAY:
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_STRING_CHECK;
-    
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_STRING);
-
-    string_p[current_string_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_string_index;
-        
-    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
+    PROCESS_STRING
 
 	PROCESS_END_OF_ARRAY_VALUE;
 
 //=============================================================
 S_PARSE_STRING_IN_KEY:
 
-    EXPAND_STRING_CHECK;
-    
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_STRING);
-
-    string_p[current_string_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_string_index;
-        
-    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
+    PROCESS_STRING
 
 	PROCESS_END_OF_KEY_VALUE
 
@@ -628,15 +534,7 @@ S_PARSE_STRING_IN_KEY:
 //=============================================================
 S_PARSE_NUMBER_IN_KEY:
     
-    EXPAND_NUMERIC_CHECK;
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_NUMBER);
-    
-    numeric_p[current_numeric_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_numeric_index;
-    
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER, digit_info + (p - js));
+    PROCESS_NUMBER
     
     DECREMENT_POINTER;
 
@@ -647,33 +545,11 @@ S_PARSE_NUMBER_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_NUMERIC_CHECK;
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_NUMBER);
-    
-    numeric_p[current_numeric_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_numeric_index;
-
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER, digit_info + (p - js));
-       
+    PROCESS_NUMBER
+               
     if (CURRENT_CHAR == ','){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_ARRAY_JUMP;
-        
-//         if (js[++parser_position] == ' '){
-//             if (isdigit(js[++parser_position]) || js[parser_position] == '-'){
-//                 goto S_PARSE_NUMBER_IN_ARRAY;
-//             }else{
-//                 parser_position--;
-//                 SKIP_WHITESPACE;
-//                 DO_ARRAY_JUMP;
-//             }
-//         }else{
-//             parser_position--;
-//             SKIP_WHITESPACE;
-//             DO_ARRAY_JUMP;
-//         }
     }else{
         DECREMENT_POINTER;
         PROCESS_END_OF_ARRAY_VALUE;
@@ -682,39 +558,18 @@ S_PARSE_NUMBER_IN_ARRAY:
 //=============================================================
 S_PARSE_NULL_IN_KEY:
 
-    EXPAND_NUMERIC_CHECK;
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_NULL);
-    
-    numeric_p[current_numeric_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_numeric_index;
-    
-    //TODO: Add null check ...
-	ADVANCE_POINTER_BY_X(3)
+    PROCESS_NULL;
     
 	PROCESS_END_OF_KEY_VALUE;
-
-
 
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
 
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_NUMERIC_CHECK;
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_NULL);
-    
-    numeric_p[current_numeric_index] = CURRENT_POINTER;
-    d1[current_data_index] = current_numeric_index;
-    
-    //TODO: Add null check ...
-	ADVANCE_POINTER_BY_X(3)
+    PROCESS_NULL
     
 	PROCESS_END_OF_ARRAY_VALUE;
-
 
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
@@ -766,24 +621,9 @@ S_PARSE_END_OF_FILE:
 	goto finish_main;
 
 
-
-	//=============================================================
-// // // S_PARSE_COMMA_IN_OBJECT:
-// // // 
-// // // 	SKIP_WHITESPACE
-// // // 		--current_depth;
-// // // 
-// // // 	if (js[parser_position] == '"') {
-// // // 		goto S_PARSE_KEY;
-// // // 	}
-// // // 	else {
-// // // 		//TODO: Change this ...
-// // // 		mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected");
-// // // 	}
-
-
-
-	//=============================================================
+//===============       ERRORS   ==========================================
+//=========================================================================
+//TODO: This is going to be redone 
     
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("jsmn_mex:depth_exceeded", "Max depth was exceeded");
@@ -812,14 +652,7 @@ S_ERROR_TOKEN_AFTER_KEY:
 	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");    
     
 
-S_ERROR_END_OF_VALUE_IN_ARRAY:
-		//                         mexPrintf("Current depth: %d\n",current_depth);
-		//                         mexPrintf("Current type: %d\n",parent_types[current_depth-4]);
-		//                         mexPrintf("Current type: %d\n",parent_types[current_depth-3]);
-		//                         mexPrintf("Current type: %d\n",parent_types[current_depth-2]);
-		//                         mexPrintf("Current type: %d\n",parent_types[current_depth-1]);
-		//                         mexPrintf("Current type: %d\n",parent_types[current_depth]);
-		//                         mexPrintf("Current char: %c\n",js[parser_position]);    
+S_ERROR_END_OF_VALUE_IN_ARRAY:  
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
@@ -829,129 +662,21 @@ finish_main:
     setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
     
     d1 = mxRealloc(d1,((current_data_index + 1)*sizeof(int)));
-    setStructField(plhs[0],d1,"d1",mxUINT32_CLASS,current_data_index + 1);
+    setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
     
     d2 = mxRealloc(d2,((current_data_index + 1)*sizeof(int)));
-    setStructField(plhs[0],d2,"d2",mxUINT32_CLASS,current_data_index + 1);
+    setStructField(plhs[0],d2,"d2",mxINT32_CLASS,current_data_index + 1);
+
+    //TODO: This is only correct on 64 bit systems ...
+    key_p = mxRealloc(key_p,(current_key_index + 1)*sizeof(unsigned char *));
+    setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
     
     string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
     
     numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
     setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
-        
-    
 
-    
-    
-    
-    //Hopefully this doesn't ever need to run ...
-    //We're adding a single type value at the end to indicate we are done
-    //rather than checking at each type value
-// // // // //     EXPAND_DATA_CHECK(1);
-// // // // //     data[++current_data_index] = TYPE_DATA_END; 
-// // // // //     
-// // // // //     //Set the data into storage
-// // // // //     data = mxRealloc(data,(current_data_index + 1)*sizeof(int));
-// // // // // 	setStructField(plhs[0],data,"data",v,current_data_index + 1);
-// // // // //     
-// // // // //     //Holding onto values
-// // // // //     int *p_data_size_allocated = mxMalloc(sizeof(int));
-// // // // //     *p_data_size_allocated = data_size_allocated;
-// // // // //     int *p_n_numeric = mxMalloc(sizeof(int));
-// // // // //     *p_n_numeric = n_numeric;
-// // // // //     int *p_n_keys = mxMalloc(sizeof(int));
-// // // // //     *p_n_keys = n_keys;
-// // // // //     int *p_n_strings = mxMalloc(sizeof(int));
-// // // // //     *p_n_strings= n_strings;
-// // // // // 
-// // // // //     setStructField(plhs[0],p_data_size_allocated,"data_size_allocated",mxINT32_CLASS,1);
-// // // // //     setStructField(plhs[0],p_n_numeric,"n_numeric",mxINT32_CLASS,1);
-// // // // //     setStructField(plhs[0],p_n_keys,"n_keys",v,1);
-// // // // //     setStructField(plhs[0],p_n_strings,"n_strings",mxINT32_CLASS,1);
-// // // // //     
-// // // // //     int cur_number = -1;
-// // // // //     int cur_string = -1;
-// // // // //     int cur_key = -1;
-// // // // //     
-// // // // //     //Initialization of all numeric data
-// // // // //     double *numeric_data = mxMalloc(n_numeric*sizeof(double));
-// // // // // 
-// // // // //     unsigned char *char_start;
-// // // // //     int num_info;
-    
-    
-    
-    
-// // // // // //     clock_t start_post_process, end_post_process;
-// // // // // //     
-// // // // // //     
-// // // // // //     start_post_process = clock();
-// // // // // //     current_data_index = -1;
-// // // // // //     //while (current_data_index <= data_size_index_max){
-// // // // // //     while (1){
-// // // // // //       
-// // // // // // // #define N_DATA_OBJECT   4
-// // // // // // // #define N_DATA_ARRAY    4
-// // // // // // // #define N_DATA_KEY      5
-// // // // // // // #define N_DATA_STRING   3
-// // // // // // // #define N_DATA_NUMERIC  3
-// // // // // // // #define N_DATA_LOGICAL  1
-// // // // // // // #define N_DATA_NULL     3
-// // // // // //         
-// // // // // //         switch(data[++current_data_index]){
-// // // // // //             case TYPE_DATA_END:
-// // // // // //                 goto ALL_DONE;
-// // // // // //             case TYPE_OBJECT:
-// // // // // //                 current_data_index += 3;
-// // // // // //                 break;
-// // // // // //             case TYPE_ARRAY:
-// // // // // //                 current_data_index += 3;
-// // // // // //                 break;
-// // // // // //             case TYPE_KEY:
-// // // // // //                 current_data_index += 4;
-// // // // // //                 break;    
-// // // // // //             case TYPE_STRING:
-// // // // // //                 current_data_index += 2;
-// // // // // //                 break;
-// // // // // //             case TYPE_NUMBER:
-// // // // // //                 //storage format:
-// // // // // //                 //1) type   2) start of number 3) info about number
-// // // // // //                 //We change #2 to pointing to the storage location of
-// // // // // //                 //the number in the array
-// // // // // // //                 char_start = js + data[++current_data_index];
-// // // // // // //                 data[current_data_index] = (++cur_number) + 1; //+1 for Matlab :/
-// // // // // // //                 num_info = data[++current_data_index];
-// // // // // // //                 numeric_data[cur_number] = string_to_double(char_start,num_info);
-// // // // // //                 
-// // // // // //                 current_data_index += 2;
-// // // // // //                 break;
-// // // // // //             case TYPE_NULL:
-// // // // // // //                 data[++current_data_index] = ++cur_number;
-// // // // // // //                 numeric_data[cur_number] = MX_NAN;
-// // // // // // //                 ++current_data_index;
-// // // // // //                 
-// // // // // //                 current_data_index += 2;
-// // // // // //                 break;    
-// // // // // //             case TYPE_TRUE:
-// // // // // //                 break;
-// // // // // //             case TYPE_FALSE:
-// // // // // //                 break;
-// // // // // //         }   
-// // // // // //     }
-// // // // // //     
-// // // // // // ALL_DONE:
-// // // // // //     
-// // // // // //     end_post_process = clock();
-// // // // // //     double *elapsed_pp_time = mxMalloc(sizeof(double));
-// // // // // //     *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
-// // // // // //     
-// // // // // //     setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
-// // // // // //     
-// // // // // //     setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numeric);        
-
-    
-    
 	return;
 }
 

@@ -16,6 +16,7 @@ classdef tokens
     object: 1) type  2) n_values        3) tac
     array:  1) type  2) n_values        3) tac
     key:    1) type  2) start_pointer   3) tac
+            
     string: 1) type  2) start_pointer
     number: 1) type  2) start_pointer
     null:   1) type  2) start_pointer
@@ -74,29 +75,29 @@ classdef tokens
         file_string %string of the file
         %We might not hold onto this ...
         
+        TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
+        
         types
         d1
         d2
-        %type-ids
-        % #define TYPE_DATA_END 0
-        % #define TYPE_OBJECT 1
-        % #define TYPE_ARRAY  2
-        % #define TYPE_KEY    3
-        % #define TYPE_STRING 4
-        % #define TYPE_NUMBER 5
-        % #define TYPE_NULL   6
-        % #define TYPE_TRUE   7
-        % #define TYPE_FALSE  8
-        
-       
+
+%     object: 1) type  2) n_values        3) tac
+%     array:  1) type  2) n_values        3) tac
+%     key:    1) type  2) start_pointer   3) tac
+%             
+%     string: 1) type  2) start_pointer
+%     number: 1) type  2) start_pointer
+%     null:   1) type  2) start_pointer
+%     tf      1) type
+    
         
         numeric_data
         strings
         
         d_extra_info = '-------------------------------'
-        mex
         data_to_string_ratio
         toc_total_time
+        toc_non_read_time
         toc_file_read
         toc_parse
         toc_post_process
@@ -161,26 +162,31 @@ classdef tokens
             
             t0 = tic;
             result = jsmn_mex(file_path);
-            obj.mex = result;
+            %obj.mex = result;
             
             obj.file_string = result.json_string;
             
-% %             obj.types = result.types;
-% %             obj.d1 = result.d1;
-% %             obj.d2 = result.d2;
-% %             %obj.numeric_data = result.numeric_data;
-% %             
-% %             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
-% %             
+            obj.types = result.types;
+            obj.d1 = result.d1;
+            obj.d2 = result.d2;
+            obj.numeric_data = result.numeric_data;
+            
+            obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);
+            
             obj.toc_file_read = result.elapsed_read_time;
-            obj.toc_parse = obj.toc_total_time - result.elapsed_read_time;
-% %             obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+            obj.toc_non_read_time = obj.toc_total_time - obj.toc_file_read;
+            obj.toc_parse = result.elapsed_parse_time;
+            obj.toc_post_process = result.elapsed_pp_time;
+            obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+            
+            
+            
             
             %TODO: Build in an explicit timer on the parsing ...
 %             obj.toc_parse = toc(t0)-result.elapsed_read_time;
 %             obj.toc_file_read = result.elapsed_read_time;
-%             obj.toc_post_process = result.elapsed_pp_time;
+%             
 %             
             
             
