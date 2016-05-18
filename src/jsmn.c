@@ -5,10 +5,13 @@
 //TODO: Need to build in SSE4 and AVX testing support
 //with define flags ...
 #include "immintrin.h"
+#include "nmmintrin.h"
 
 
 //TODO: Allow string input to function
 
+//TODO: Allow type, d1, and d2 pointer walking
+//NOTE: This will require a separate pointer that gets updated on resizing
 
 //TODO: store initial and final allocation sizes for each type
 //TODO: Create method for creating scalar and saving into struct
@@ -74,6 +77,7 @@
             
 #define SET_TYPE(x) types[current_data_index] = x;
 
+//TODO: The size isn't needed for keys
 #define INITIALIZE_PARENT_INFO(x) \
         ++current_depth; \
         if (current_depth > 200){\
@@ -146,8 +150,42 @@
 #define REF_OF_CURRENT_POINTER &p;
     
 //tested that is_whitespce was faster than isspace()    
-#define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}
 
+//I'm not thrilled with the __m128i
+//Note with this mode, most of these options are defaults (i.e. 0 values)
+//_SIDD_UBYTE_OPS - unsigned 8-bit characters
+//For each character c in a, determine whether any character in b is equal to c. <= from MSDN, I think the flip
+//logic would be better
+//_SIDD_NEGATIVE_POLARITY - negation of resulting bitmask, i.e. find first non-match
+//_SIDD_BIT_MASK - mask itself is returned, each bit not expanded to bytes - I don't think this is needed
+const int ws_search_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
+//const __m128i whitespace_characters = (__m128i)(_mm_set_ss(0x090A0D20));
+//const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
+__m128i whitespace_characters;
+__m128i chars_to_search_for_ws;
+int ws_search_result;
+
+#define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}        
+   
+            
+            
+// #define ADVANCE_TO_NON_WHITESPACE_CHAR  \
+//     /* This has a lot of failures on newlines :/ */
+//     /* we might do an OR with \n */
+//     if (*(++p) == ' '){ \
+//         ++p; \
+//     } \
+//     if (*p > ' '){ \
+//         /* all done, all whitespace values are less than this */ \
+//     }else{
+//         chars_to_search_for_ws = _mm_loadu_si128((__m128i*)p);
+//         ws_search_result = _mm_cmpistri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
+// 
+//         int wtf2 = _mm_cmpistri (whitespace_characters, 16, simd_b , 4, ws_search_mode);
+//         mexPrintf("Result is: %d"\n,wtf2);
+//     }
+
+            
 #define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
      
 #define DO_ARRAY_JUMP goto *array_jump[CURRENT_CHAR]
@@ -235,6 +273,8 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         ++p;
     }
 
+    //http://stackoverflow.com/questions/15372885/if-statements-with-comparison-sse-in-c?rq=1
+    
     while (isdigit(*p)) {++p;}
 
     if (*p == '.'){
@@ -286,6 +326,8 @@ STRING_SEEK:
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
 void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
+    
+    whitespace_characters = _mm_set1_epi32(0x090A0D20);
     
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
@@ -366,11 +408,14 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int current_numeric_index = 0;
     unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
     
+                               // 123 4 5 6789
+    unsigned char *test_string = "   \t\n\ris a test of the emergency";
     
-    const double MX_NAN = mxGetNaN();
+    chars_to_search_for_ws = _mm_loadu_si128((__m128i*)(test_string+2));
+    //ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, ws_search_mode);
+    ws_search_result = _mm_cmpestri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
+    mexPrintf("Result is: %d\n",ws_search_result);
     
-    unsigned char *digit_info = mxMalloc(string_byte_length);
-
     DECREMENT_POINTER;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
 

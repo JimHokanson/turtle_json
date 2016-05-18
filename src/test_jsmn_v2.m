@@ -60,8 +60,7 @@ copyfile(p1,p2);
 
 cd G:\repos\matlab_git\jsmn_mex\src
 setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
-mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O
-
+mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge -msse4.2" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O 
 
 if ismac
 file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';
@@ -73,7 +72,7 @@ file_name = 'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.wcon';
 file_path = fullfile(file_root,file_name);
 d1_all = zeros(1,20);
 t3 = tic;
-for i = 1:20
+for i = 1:1
     %jt = json.tokens(file_path);
 	jt = json.tokens(file_path,'chars_per_token',5);
     d1_all(i) = jt.toc_non_read_time;

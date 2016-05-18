@@ -4,20 +4,21 @@
  *      //must install openmp when installing tdm-gcc
  *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  *
- *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
+ *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge -msse4.2" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
  *
  *
  */
 
 #include "jsmn.h"
 
+int N_PADDING = 17;
 
 void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
     
 	FILE *file;
     char *file_path;
 	size_t file_length;
-    int N_PADDING = 17;
+    
     unsigned char *buffer;
 
     file_path = mxArrayToString(prhs[0]);
@@ -49,18 +50,20 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
 	buffer = mxMalloc(file_length+N_PADDING);
 
 	//Read file contents into buffer
+    //---------------------------------------------------
 	fread(buffer, file_length, 1, file);
     fclose(file);
     buffer[file_length] = 0; 
-    for (int i = 0; i < N_PADDING; i++){
+    //This would allow us to only seek for "
+    buffer[file_length+1] = '"';
+    for (int i = 2; i < N_PADDING; i++){
         //length 1, index 0
         //length file_length, max index - file_length-1
         //so padding starts at file_length + 0
         buffer[file_length + i] = 0;
     }
     
-    //This would allow us to only seek for "
-    buffer[file_length+1] = '"';
+    
     
     *string_byte_length = file_length; 
     
@@ -90,109 +93,109 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //The initialization isn't really needed but it silences a warning
     //in the compiler - compiler not recognizing terminal errors in code
     //so it thinks you can pass in an uninitialized value to the main function
-    size_t string_byte_length = 0;
-    //same here 
+    size_t string_byte_length;
     unsigned char *json_string = NULL;
-    
     bool is_file_path = true;
+
+                
+//             in.chars_per_token = sl.in.NULL;
+//             in.n_tokens = sl.in.NULL;
+//             in.raw_string = sl.in.NULL;
+//             in.raw_is_padded = false;
     
-    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+
+    int chars_per_token;
+    int n_tokens;
+    unsigned char *raw_string;
+    mxLogical raw_is_padded;
+            
+    mxArray *mxArrayTemp;
+    
+    
     
     //Input Handling
     //---------------------------------------------------------------------
-    if (!(nrhs == 1 || nrhs == 2 || nrhs == 3)){
-        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of inputs ...");
+    if (!(nrhs == 1 || nrhs == 2)){
+        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of inputs, 1 or 2 expected");
     }
     
     if (!(nlhs == 1)){
-        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of outputs");
+        mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of outputs, 1 expected");
     }
     
-    TIC(start_read)
+    TIC(start_read);
     
-    if (mxIsClass(prhs[0],"char")){
+    //TODO: rewrite with less nesting
+    
+    if (!mxIsClass(prhs[0],"char")){
+        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","First input needs to be a string");   
+    }
+    
+    if (nrhs == 1){
+        readFileToString(prhs,&json_string,&string_byte_length);
+    }else{
         
-        if (nrhs > 1){
-            if (mxIsClass(prhs[1],"double")){
-                is_file_path = mxGetScalar(prhs[1]) == 0;
-            }else{
-                mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a double");    
-            }
+        if (!mxIsClass(prhs[1],"struct")){
+            mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a struct");
         }
         
-        if (is_file_path){
-            readFileToString(prhs,&json_string,&string_byte_length);
-            //mexPrintf("String byte length: %d\n",string_byte_length);
+        mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
+        
+        if (mxArrayTemp == NULL){
+        	readFileToString(prhs,&json_string,&string_byte_length);
         }else{
-            json_string = (unsigned char *) mxArrayToString(prhs[0]);
-            string_byte_length = mxGetNumberOfElements(prhs[0]);
+            if (!mxIsClass(mxArrayTemp,"char")){
+                mexErrMsgIdAndTxt("jsmn_mex:invalid_input","raw_string needs to be a string");   
+            }
             
-            //TODO: Need to buffer
-            
-            mexErrMsgIdAndTxt("jsmn_mex:not_yet_implemented","Not yet implemented");
-            
-            if (string_byte_length == 0){
-                mexErrMsgIdAndTxt("jsmn_mex:null_string","Unhandled null string case");
+            //TODO: Need to build in uint8 support
+            //TODO: Currently we pad regardless of whether or not
+            //it is needed
+            //TODO: Even if we pad, we might not get a padded result
+            //due to string handling ...
+
+            raw_string = (unsigned char *) mxArrayToString(mxArrayTemp);
+            string_byte_length = mxGetNumberOfElements(mxArrayTemp);
+
+            //For now we'll assume we're not padded
+            //-----------------------------------------------
+            json_string = mxMalloc(string_byte_length+N_PADDING);
+            memcpy(json_string,raw_string,string_byte_length);
+            mxFree(raw_string);
+
+            json_string[string_byte_length] = 0;
+            json_string[string_byte_length+1] = '"';
+            for (int i = 2; i < N_PADDING; i++){
+                json_string[string_byte_length + i] = 0;
             }
         }
-    }else {
-        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Input should be a string or null terminated uint8");
-    }
-    
-    //end_read = clock();
-    
-    
-    
-    TOC_AND_LOG(start_read,elapsed_read_time)
-//     
-//     double *elapsed_read_time = mxMalloc(sizeof(double));
-//     *elapsed_read_time = (double)(end_read - start_read)/CLOCKS_PER_SEC;
-//     
-//     setStructField(plhs[0],elapsed_read_time,,mxDOUBLE_CLASS,1);
 
-    if (is_file_path){
-        setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
     }
+
+    //Note, this needs to precede TOC_AND_LOG()
+    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+        
+    TOC_AND_LOG(start_read,elapsed_read_time);
+
+    setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
+
+    //Token parsing
+    //-------------
+    TIC(start_parse);
     
-//     clock_t start_parse, end_parse;
-//     start_parse = clock();
-//     
-    TIC(start_parse)
-    
-    //Main parsing call
     jsmn_parse(json_string,string_byte_length,plhs);
   
-    TOC_AND_LOG(start_parse,elapsed_parse_time)
+    TOC_AND_LOG(start_parse,elapsed_parse_time);
+      
     
-//     end_parse = clock();
-//     
-//     clock_t start_post_process, end_post_process;
-//     start_post_process = clock();
-//     double *elapsed_ = mxMalloc(sizeof(double));
-//     *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
-//     
-//     setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
-//     
-    TIC(start_pp)
+    //Post token parsing
+    //------------------
+    TIC(start_pp);
     
     parse_numbers(json_string,plhs);
     
-    TOC_AND_LOG(start_pp,elapsed_pp_time)
+    TOC_AND_LOG(start_pp,elapsed_pp_time);
     
-//     end_post_process = clock();
-//     double *elapsed_pp_time = mxMalloc(sizeof(double));
-//     *elapsed_pp_time = (double)(end_post_process - start_post_process)/CLOCKS_PER_SEC;
-//     
-//     setStructField(plhs[0],elapsed_pp_time,"elapsed_pp_time",mxDOUBLE_CLASS,1);
-    
-    
-    
-// // //     setStructField(plhs[0],values,"values",mxDOUBLE_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],types,"types",mxUINT8_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],sizes,"sizes",mxINT32_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],parents,"parents",mxINT32_CLASS,n_tokens_used);
-// // //     setStructField(plhs[0],tokens_after_close,"tokens_after_close",mxINT32_CLASS,n_tokens_used);
-// // //     
-// // //     setStructField(plhs[0],n_allocations,"n_allocations",mxINT32_CLASS,1);
+
 }
 

@@ -282,6 +282,7 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
 //     numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
 //     setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
     
+    const double MX_NAN = mxGetNaN();
     mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
     unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
     
@@ -304,8 +305,8 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
             //numeric_data[i] = i;
             //numeric_data[i] = string_to_double(numeric_p[i]);
             
-            if (*local_numeric_p == 'n'){
-                
+            if (**local_numeric_p == 'n'){
+                *local_numeric_data = MX_NAN;
             }else{
                 *local_numeric_data = string_to_double(*local_numeric_p);
             }

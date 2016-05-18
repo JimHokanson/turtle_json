@@ -102,45 +102,13 @@ classdef tokens
         toc_parse
         toc_post_process
         ns_per_char
+        
+        %This is approximate because we double the tokens for keys
+        chars_per_token
     end
     
-    %{
-    
-    Errors
-    ------
-    1) No opening bracket
-    str = '1,2,3,4';
-    jt = json.tokens('','raw_string',str);
-    
-    2) Trailing whitespace
-    str = '[1,2,3,4]    '
-    
-    
-    3) multiple top level tokens
-    str = '[1,2,3][4,5,6]'
-    
-    4) No terminiating quotes on string
-    str = '["This is a test';
-    
-    5) Double :
-    str = {"test"::1}
-    
-    
-    
-    str = '[1,null,2,3]';
-    jt = json.tokens('','raw_string',str);
-    obj = parse_json(str,jt.info,jt.numeric_data)
-    
-    str = '{}'
-    jt = json_tokens('','raw_string',str);
-    
-    str = '[1,null,true,false,"my_string",2.0123456789012345]'
-    jt = json.tokens('','raw_string',str);
-    obj = parse_json(str,jt.info,jt.numeric_data)
-    
-    %}
-    
-    
+
+      
     methods
         function obj = tokens(file_path,varargin)
             %
@@ -155,14 +123,14 @@ classdef tokens
             
             
             
-            in.chars_per_token = 0;
-            in.n_tokens = 0;
-            in.raw_string = -1;
-            in = sl.in.processVarargin(in,varargin);
+            in.chars_per_token = sl.in.NULL;
+            in.n_tokens = sl.in.NULL;
+            in.raw_string = sl.in.NULL;
+            in.raw_is_padded = false;
+            in = sl.in.processVarargin(in,varargin,'remove_null',true);
             
             t0 = tic;
             result = jsmn_mex(file_path);
-            %obj.mex = result;
             
             obj.file_string = result.json_string;
             
@@ -179,57 +147,11 @@ classdef tokens
             obj.toc_parse = result.elapsed_parse_time;
             obj.toc_post_process = result.elapsed_pp_time;
             obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
+            obj.chars_per_token = length(obj.file_string)/length(obj.d1);
             
-            
-            
-            
-            %TODO: Build in an explicit timer on the parsing ...
-%             obj.toc_parse = toc(t0)-result.elapsed_read_time;
-%             obj.toc_file_read = result.elapsed_read_time;
-%             
-%             
-            
-            
-%             if in.raw_string == -1
-%                 t0 = tic;
-%                 uint8_data = read_to_uint8(file_path);
-%                 obj.file_string = char(uint8_data);
-%                 obj.toc_file_read = toc(t0);
-%                 t1 = tic;
-%                 if in.n_tokens
-%                     result = jsmn_mex(uint8_data,0,in.n_tokens);
-%                 elseif in.chars_per_token
-%                     result = jsmn_mex(uint8_data,0,length(obj.file_string)/in.chars_per_token);
-%                 else
-%                     result = jsmn_mex(uint8_data);
-%                 end
-%                 obj.toc_parse = toc(t1);
-%             else
-%                 t0 = tic;
-%                 obj.file_string = in.raw_string;
-%                 obj.toc_file_read = toc(t0);
-%                 t1 = tic;
-%                 if in.n_tokens
-%                     result = jsmn_mex(in.raw_string,0,in.n_tokens);
-%                 elseif in.chars_per_token
-%                     result = jsmn_mex(in.raw_string,length(obj.file_string)/in.chars_per_token);
-%                 else
-%                     result = jsmn_mex(in.raw_string);
-%                 end
-%                 obj.toc_parse = toc(t1);
-%             end
-            
-%             obj.file_string = result.json_string;
-%             obj.mex = result;
-%             obj.data_to_string_ratio = length(result.data)/length(result.json_string);
-%             obj.data = result.data;
-%             obj.numeric_data = result.numeric_data;
-%             obj.ns_per_char = 1e9*obj.toc_parse/length(result.json_string);
-            
-            %These would take some work to get, would need to make these
-            %dependent ...
-            %             obj.chars_per_token = length(obj.file_string)/length(obj.numeric_data);
-            %             obj.ns_per_token    = 1e9*obj.d1/length(obj.numeric_data);
+            %TODO: Provide estimate of memory consumption
+            %types + 4*d1 + 4*d2 + 8*numeric_data 
+            %- also need string_p, key_p, numeric_p
         end
         function root = getRootInfo(obj)
             switch obj.data(1)
@@ -243,80 +165,8 @@ classdef tokens
                     error('Unexpected parent object')
             end
         end
-        %This no longer works since I changed the output format
-        %from the parser ...
-        %
-        %What might be nice is something that flattens "data" into
-        %a structure
         
-        function c = getDataAsStruct(obj)
-%     object: 1) type  2) parent      3) tac     4) n_values
-%     array:  1) type  2) parent      3) tac     4) n_values
-%     key:    1) type  2) parent      3) tac     4) start/p     5) end
-%     string: 1) type  2) start/p     3) end
-%     number: 1) type  2) start/p     3) info
-%     null:   1) type  2) <nothing>/p 3) <nothing>
-%     t/f:    1) type    
-
-            cur_I = 1;
-            d = obj.data;
-            n_tokens = 0;
-            %We don't know how much to allocate here, this is a poor guess
-            %that should avoid resizing
-            c = cell(1,ceil(length(d)/2));
-            while(1)
-                s = struct;
-                switch d(cur_I)
-                    case 0
-                        break;
-                    case 1
-                        s.type   = 'object';
-                        s.parent = d(cur_I+1);
-                        s.tac    = d(cur_I+2);
-                        s.n_keys = d(cur_I+3);
-                        cur_I    = cur_I + 4;
-                    case 2
-                        s.type   = 'array';
-                        s.parent = d(cur_I+1);
-                        s.tac    = d(cur_I+2);
-                        s.n_token_values = d(cur_I+3);
-                        cur_I    = cur_I + 4; 
-                    case 3
-                        s.type = 'key';
-                        s.parent = d(cur_I+1);
-                        s.tac = d(cur_I+2);
-                        s.start = d(cur_I+3);
-                        s.end = d(cur_I+4);
-                        cur_I    = cur_I + 5; 
-                    case 4
-                        s.type = 'string';
-                        s.start_p = d(cur_I+1);
-                        s.end = d(cur_I+2);
-                        cur_I    = cur_I + 3; 
-                    case 5
-                         s.type = 'number';
-                         s.start_p = d(cur_I+1);
-                         s.info = d(cur_I+2);
-                         cur_I    = cur_I + 3; 
-                    case 6
-                         s.type = 'null';
-                         s.p = d(cur_I+1);
-                         cur_I    = cur_I + 3; 
-                    case 7
-                         s.type = 'true';
-                         cur_I    = cur_I + 1; 
-                    case 8
-                         s.type = 'false';
-                         cur_I    = cur_I + 1; 
-                    otherwise
-                        error('Unexpected type')
-                end
-                n_tokens = n_tokens + 1;
-                c{n_tokens} = s;
-            end
-            c = c(1:n_tokens);
-        end
-        
+        %TODO: This needs to be redone
 %         function output = viewOldInfo(obj,indices)
 %             output = [num2cell(indices);
 %                 json.TYPES(obj.types(indices));
