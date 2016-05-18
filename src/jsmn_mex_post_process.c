@@ -135,7 +135,7 @@ double string_to_double(char *p) {
             value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
             break;
         case 1:
-            //TODO: Provide a location
+            //TODO: This will likely cause a problem since we have multiple threads
             mexErrMsgIdAndTxt("jsmn_mex:no_number","Too many #s");
         default:
             mexErrMsgIdAndTxt("jsmn_mex:too_many_integers","The integer component of the number had too many digits");

@@ -4,7 +4,7 @@
  *      //must install openmp when installing tdm-gcc
  *      setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  *
- *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mtune=ivybridge -msse4.2" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
+ *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
  *
  *
  */
@@ -33,13 +33,6 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
     #endif
         mexErrMsgIdAndTxt("jsmn_mex:file_open","Unable to open file");
     }
-    
-    
-// 	fopen_s(&file, file_path, "rb");
-//     if (!file)
-// 	{
-//         mexErrMsgIdAndTxt("jsmn_mex:file_open","Unable to open file");
-// 	}
 	
 	//Get file length
 	fseek(file, 0, SEEK_END);

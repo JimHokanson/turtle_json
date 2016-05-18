@@ -158,32 +158,40 @@
 //logic would be better
 //_SIDD_NEGATIVE_POLARITY - negation of resulting bitmask, i.e. find first non-match
 //_SIDD_BIT_MASK - mask itself is returned, each bit not expanded to bytes - I don't think this is needed
-const int ws_search_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
+const int simd_search_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
 //const __m128i whitespace_characters = (__m128i)(_mm_set_ss(0x090A0D20));
 //const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
-__m128i whitespace_characters;
+//__m128i whitespace_characters;
 __m128i chars_to_search_for_ws;
 int ws_search_result;
 
-#define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}        
-   
-            
-            
-// #define ADVANCE_TO_NON_WHITESPACE_CHAR  \
-//     /* This has a lot of failures on newlines :/ */
-//     /* we might do an OR with \n */
-//     if (*(++p) == ' '){ \
-//         ++p; \
-//     } \
-//     if (*p > ' '){ \
-//         /* all done, all whitespace values are less than this */ \
-//     }else{
-//         chars_to_search_for_ws = _mm_loadu_si128((__m128i*)p);
-//         ws_search_result = _mm_cmpistri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
-// 
-//         int wtf2 = _mm_cmpistri (whitespace_characters, 16, simd_b , 4, ws_search_mode);
-//         mexPrintf("Result is: %d"\n,wtf2);
-//     }
+
+// const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
+// #define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}        
+    
+//_mm_cmpestri turns out to be slower :/
+
+#define INIT_LOCAL_WS_CHARS \
+    const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20); \
+
+#define ADVANCE_TO_NON_WHITESPACE_CHAR  \
+    /* This might fail alot on newlines :/ */ \
+    /* we might do an OR with \n => == ' ' OR = '\n' */ \
+    if (*(++p) == ' '){ \
+        ++p; \
+    } \
+    if (*p <= ' '){ \
+        chars_to_search_for_ws = _mm_loadu_si128((__m128i*)p); \
+        ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, simd_search_mode); \
+        p += ws_search_result; \
+        if (ws_search_result == 16) { \
+            while (ws_search_result == 16){ \
+                chars_to_search_for_ws = _mm_loadu_si128((__m128i*)p); \
+                ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, simd_search_mode); \
+                p += ws_search_result; \
+            } \
+        } \
+    } \
 
             
 #define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
@@ -225,7 +233,6 @@ int ws_search_result;
 
 //=========================================================================
             
-const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
@@ -268,28 +275,53 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     //TODO: test the alternative code with loops
     //and checks for overflow and subtraction for populating the data
     
+    const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','.','-','e','E','0','0');
     
-    if (*p == '-'){
-        ++p;
-    }
-
-    //http://stackoverflow.com/questions/15372885/if-statements-with-comparison-sse-in-c?rq=1
+    //const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','0','0','0','0','0','0');
+    __m128i chars_to_search_for_digits;
     
-    while (isdigit(*p)) {++p;}
-
-    if (*p == '.'){
-        ++p;
-        while (isdigit(*p)) {++p;}
-    }
-
-    if (*p == 'E' || *p == 'e') {
-        ++p;
-        if (*p == '-' || *p == '+'){
-            ++p;
+    int digit_search_result;
+    
+    chars_to_search_for_digits = _mm_loadu_si128((__m128i*)p);
+    digit_search_result = _mm_cmpistri(digit_characters, chars_to_search_for_digits, simd_search_mode);
+    p += digit_search_result;
+    if (digit_search_result == 16){
+        chars_to_search_for_digits = _mm_loadu_si128((__m128i*)p);
+        digit_search_result = _mm_cmpistri(digit_characters, chars_to_search_for_digits, simd_search_mode);
+        p += digit_search_result;
+        if (digit_search_result == 16){
+        	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too much info in digit parsing");
         }
-
-        while (isdigit(*p)) {++p;}
     }
+    
+    
+//     if (*p == '-'){
+//         ++p;
+//     }
+// 
+//     //http://stackoverflow.com/questions/15372885/if-statements-with-comparison-sse-in-c?rq=1
+//     
+//     while (isdigit(*p)) {++p;}
+// 
+//     if (*p == '.'){
+//         ++p;
+//         while (isdigit(*p)) {++p;}
+//     }
+// 
+//     if (*p == 'E' || *p == 'e') {
+//         ++p;
+//         if (*p == '-' || *p == '+'){
+//             ++p;
+//         }
+// //         while (isdigit(*p)) {++p;}
+//         
+//         chars_to_search_for_digits = _mm_loadu_si128((__m128i*)p); 
+//         digit_search_result = _mm_cmpistri(digit_characters, chars_to_search_for_digits, simd_search_mode);
+//         p += digit_search_result;
+//         if (digit_search_result == 16){
+//             while (isdigit(*p)) {++p;}
+//         }
+//     }
     
     *char_offset = p;    
 }
@@ -307,9 +339,7 @@ STRING_SEEK:
     //so a null indicates that there really was no "
     if (*p == '\0'){
         mexErrMsgIdAndTxt("jsmn_mex:missing_quotes", "Quote not found");
-    }
-    
-    if (*p == '\\'){
+    }else if (*p == '\\'){
         --p;
         if (*p == '\\'){
             mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
@@ -327,7 +357,7 @@ STRING_SEEK:
 //=========================================================================
 void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     
-    whitespace_characters = _mm_set1_epi32(0x090A0D20);
+    INIT_LOCAL_WS_CHARS;
     
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
@@ -409,12 +439,12 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
     
                                // 123 4 5 6789
-    unsigned char *test_string = "   \t\n\ris a test of the emergency";
-    
-    chars_to_search_for_ws = _mm_loadu_si128((__m128i*)(test_string+2));
-    //ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, ws_search_mode);
-    ws_search_result = _mm_cmpestri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
-    mexPrintf("Result is: %d\n",ws_search_result);
+// // // //     unsigned char *test_string = "   \t\n\ris a test of the emergency";
+// // // //     
+// // // //     chars_to_search_for_ws = _mm_loadu_si128((__m128i*)(test_string+2));
+// // // //     //ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, ws_search_mode);
+// // // //     ws_search_result = _mm_cmpestri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
+// // // //     mexPrintf("Result is: %d\n",ws_search_result);
     
     DECREMENT_POINTER;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
