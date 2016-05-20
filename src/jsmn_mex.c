@@ -6,7 +6,6 @@
  *
  *      mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
  *
- *
  */
 
 #include "jsmn.h"
@@ -192,3 +191,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 
 }
 
+// int main(){
+//     mxArray **plhs;
+//     const mxArray **prhs;
+//     *prhs = mxCreateString("H:/example_data/1.json\0");
+//     mexFunction(1, plhs, 1, prhs);
+// }

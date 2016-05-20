@@ -22,26 +22,7 @@ classdef tokens
     null:   1) type  2) start_pointer
     tf      1) type
     
-    
-    
-    array:  1) type  2) parent      3) tac     4) n_values
-    key:    1) type  2) parent      3) tac     4) start/p     5) end
-    string: 1) type  2) start/p     3) end
-    number: 1) type  2) start/p     3) info
-    null:   1) type  2) <nothing>/p 3) <nothing>
-    t/f:    1) type
-    
-    
-    
-    Working on new layout to save memory and time
-    
-    object: 1) type  2) parent      3) tac     4) n_values
-    array:  1) type  2) parent      3) tac     4) n_values
-    key:    1) type  2) parent      3) tac     4) start/p     5) end
-    string: 1) type  2) start/p     3) end
-    number: 1) type  2) start/p     3) info
-    null:   1) type  2) <nothing>/p 3) <nothing>
-    t/f:    1) type
+
     
     RULES:
     1) parent-1 => type
@@ -93,6 +74,7 @@ classdef tokens
         
         numeric_data
         strings
+        keys
         
         d_extra_info = '-------------------------------'
         data_to_string_ratio
@@ -131,6 +113,9 @@ classdef tokens
             
             t0 = tic;
             result = jsmn_mex(file_path);
+            
+            obj.strings = result.string_p;
+            obj.keys = result.key_p;
             
             obj.file_string = result.json_string;
             

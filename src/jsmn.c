@@ -47,6 +47,7 @@
         data_size_index_max = data_size_allocated-1; \
         \
         types = mxRealloc(types,data_size_allocated); \
+        types_move = types + current_data_index; \
         d1 = mxRealloc(d1,data_size_allocated*sizeof(int)); \
         d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
     } \
@@ -75,8 +76,11 @@
         numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
     } \
             
-#define SET_TYPE(x) types[current_data_index] = x;
-
+//#define SET_TYPE(x) types[current_data_index] = x;
+            
+#define SET_TYPE(x) *(++types_move) = x;
+            
+            
 //TODO: The size isn't needed for keys
 #define INITIALIZE_PARENT_INFO(x) \
         ++current_depth; \
@@ -85,7 +89,7 @@
         }\
         parent_types[current_depth] = x; \
         parent_indices[current_depth] = current_data_index; \
-        parent_sizes[current_depth] = 0; \
+        parent_sizes[current_depth] = 0;
             
 //=========================================================================
  
@@ -100,7 +104,7 @@
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_numeric_index; \
     \
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER); \
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
                 
 #define PROCESS_NULL \
     EXPAND_NUMERIC_CHECK; \
@@ -110,9 +114,8 @@
     \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_numeric_index; \
-    \
     /*TODO: Add null check ... */ \
-	ADVANCE_POINTER_BY_X(3) \
+	ADVANCE_POINTER_BY_X(3)
             
 #define PROCESS_STRING \
     EXPAND_STRING_CHECK; \
@@ -121,15 +124,24 @@
     \
     string_p[current_string_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_string_index; \
-    \
     seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
             
+#define PROCESS_TRUE \
+    EXPAND_DATA_CHECK; \
+    SET_TYPE(TYPE_TRUE); \
+	ADVANCE_POINTER_BY_X(3);
             
+#define PROCESS_FALSE \
+    EXPAND_DATA_CHECK; \
+    SET_TYPE(TYPE_FALSE); \
+	ADVANCE_POINTER_BY_X(4);
+                
 //================    Things for closing             ======================
 //=========================================================================     
 //+1 to next element
 //+1 for Matlab 1 based indexing
-#define STORE_TAC  d2[current_parent_index] = current_data_index + 2;
+#define STORE_TAC d2[current_parent_index] = current_data_index + 2;
+            
 #define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
             
 #define MOVE_UP_PARENT_INDEX --current_depth;
@@ -145,7 +157,9 @@
 #define CURRENT_POINTER p
 #define CURRENT_INDEX p - js
 #define ADVANCE_POINTER_AND_GET_CHAR_VALUE *(++p)
+    
 #define DECREMENT_POINTER --p
+    
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
     
@@ -262,22 +276,11 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 //-------------------------------------------------------------------------
 void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
-    //strcspn - should know what to look for ...
-    //Would need to confirm that we end at the correct location
+    //In this approach we look for math like characters. We parser for
+    //validity at a later point in time.
     
-    //An alternative approach would be to look for the closing string
-    //e.g.: ',' '}' ']' and then check all of the math when running
-    //in parallel
+    const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','.','-','+','e','E','0');
     
-    //We're point at a negative or a digit
-    
-    //I'm not necessarily thrilled with this approach
-    //TODO: test the alternative code with loops
-    //and checks for overflow and subtraction for populating the data
-    
-    const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','.','-','e','E','0','0');
-    
-    //const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','0','0','0','0','0','0');
     __m128i chars_to_search_for_digits;
     
     int digit_search_result;
@@ -289,43 +292,17 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         chars_to_search_for_digits = _mm_loadu_si128((__m128i*)p);
         digit_search_result = _mm_cmpistri(digit_characters, chars_to_search_for_digits, simd_search_mode);
         p += digit_search_result;
+        //At this point we've traversed 32 characters
+        //This code is easily rewriteable if in reality we need more
         if (digit_search_result == 16){
         	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too much info in digit parsing");
         }
     }
     
-    
-//     if (*p == '-'){
-//         ++p;
-//     }
-// 
-//     //http://stackoverflow.com/questions/15372885/if-statements-with-comparison-sse-in-c?rq=1
-//     
-//     while (isdigit(*p)) {++p;}
-// 
-//     if (*p == '.'){
-//         ++p;
-//         while (isdigit(*p)) {++p;}
-//     }
-// 
-//     if (*p == 'E' || *p == 'e') {
-//         ++p;
-//         if (*p == '-' || *p == '+'){
-//             ++p;
-//         }
-// //         while (isdigit(*p)) {++p;}
-//         
-//         chars_to_search_for_digits = _mm_loadu_si128((__m128i*)p); 
-//         digit_search_result = _mm_cmpistri(digit_characters, chars_to_search_for_digits, simd_search_mode);
-//         p += digit_search_result;
-//         if (digit_search_result == 16){
-//             while (isdigit(*p)) {++p;}
-//         }
-//     }
-    
     *char_offset = p;    
 }
 
+//TODO: We might get better results
 void seek_string_end_v2(unsigned char *p, unsigned char **char_offset){
 
 STRING_SEEK:    
@@ -414,6 +391,8 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int current_data_index = 0;
     
     uint8_t *types = mxMalloc(data_size_allocated);
+    uint8_t *types_move = types;
+            
     //do we need to make these uint64?
     //technically not, the start pointer is an index
     //and not an address
@@ -422,21 +401,26 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     //d2 - tac
     int *d1 = mxMalloc(data_size_allocated * sizeof(int));
     int *d2 = mxMalloc(data_size_allocated * sizeof(int));
-
+    
     int key_size_allocated = ceil(string_byte_length/20);
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = 0;
-    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));        
+    
+    //unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));        
+    unsigned char **key_p = mxMalloc(600 * sizeof(unsigned char *));  
     
     int string_size_allocated = ceil(string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = 0;
-    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
+    
+    //unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
+    unsigned char **string_p = mxMalloc(30 * sizeof(unsigned char *));
     
     int numeric_size_allocated = ceil(string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = 0;
-    unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
+    //unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
+    unsigned char **numeric_p = mxMalloc(7300000 * sizeof(unsigned char *));
     
                                // 123 4 5 6789
 // // // //     unsigned char *test_string = "   \t\n\ris a test of the emergency";
@@ -473,8 +457,8 @@ S_OPEN_OBJECT_IN_KEY:
     
     SET_TYPE(TYPE_OBJECT);
     
-    INITIALIZE_PARENT_INFO(TYPE_OBJECT);  
-    
+    INITIALIZE_PARENT_INFO(TYPE_OBJECT);
+        
     //Navigation -----------------
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
@@ -531,8 +515,8 @@ S_OPEN_ARRAY_IN_KEY:
     
     SET_TYPE(TYPE_ARRAY);
     
-    INITIALIZE_PARENT_INFO(TYPE_ARRAY); 
-    
+    INITIALIZE_PARENT_INFO(TYPE_ARRAY);
+        
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
     DO_ARRAY_JUMP;
             
@@ -567,12 +551,14 @@ S_PARSE_KEY:
     SET_TYPE(TYPE_KEY);
 
     key_p[current_string_index] = CURRENT_POINTER;
+    
     d1[current_data_index] = current_string_index;
-        
+    
     seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
     
     //We're getting an extra bit of memory for storing the end :/
     EXPAND_DATA_CHECK;
+    //TODO: End not yet stored ...
     
     if (ADVANCE_POINTER_AND_GET_CHAR_VALUE == ':'){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
@@ -621,7 +607,8 @@ S_PARSE_NUMBER_IN_ARRAY:
 	INCREMENT_PARENT_SIZE;
     
     PROCESS_NUMBER
-               
+   
+    //This normally happens, trying to optimize progression of #s in array
     if (CURRENT_CHAR == ','){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_ARRAY_JUMP;
@@ -649,9 +636,7 @@ S_PARSE_NULL_IN_ARRAY:
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
     
-    EXPAND_DATA_CHECK;
-    SET_TYPE(TYPE_TRUE);
-	ADVANCE_POINTER_BY_X(3);
+    PROCESS_TRUE
     
 	PROCESS_END_OF_KEY_VALUE
 
@@ -660,18 +645,14 @@ S_PARSE_TRUE_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_DATA_CHECK;
-    SET_TYPE(TYPE_TRUE);
-	ADVANCE_POINTER_BY_X(3);
+    PROCESS_TRUE
     
     PROCESS_END_OF_ARRAY_VALUE;
 
     
 S_PARSE_FALSE_IN_KEY:
     
-    EXPAND_DATA_CHECK;
-    SET_TYPE(TYPE_FALSE);
-	ADVANCE_POINTER_BY_X(4);
+    PROCESS_FALSE
     
     PROCESS_END_OF_KEY_VALUE;
 
@@ -679,9 +660,7 @@ S_PARSE_FALSE_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_DATA_CHECK;
-    SET_TYPE(TYPE_FALSE);
-	ADVANCE_POINTER_BY_X(4);
+    PROCESS_FALSE
     
 	PROCESS_END_OF_ARRAY_VALUE;
 
