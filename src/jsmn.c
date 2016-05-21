@@ -158,7 +158,9 @@
 #define STORE_TAC d2[current_parent_index] = current_data_index + 2;
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
-#define STORE_TAC_KEY_SIMPLE d2[current_parent_index] = current_data_index + 3;     
+
+#define STORE_TAC_KEY_SIMPLE d2[current_data_index] = current_data_index + 3;  
+    
 #define STORE_TAC_KEY_COMPLEX d2[current_parent_index+1] = current_data_index + 2;    
             
 #define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
@@ -181,23 +183,6 @@
     
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
-    
-//tested that is_whitespce was faster than isspace()    
-
-//I'm not thrilled with the __m128i
-//Note with this mode, most of these options are defaults (i.e. 0 values)
-//_SIDD_UBYTE_OPS - unsigned 8-bit characters
-//For each character c in a, determine whether any character in b is equal to c. <= from MSDN, I think the flip
-//logic would be better
-//_SIDD_NEGATIVE_POLARITY - negation of resulting bitmask, i.e. find first non-match
-//_SIDD_BIT_MASK - mask itself is returned, each bit not expanded to bytes - I don't think this is needed
-const int simd_search_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
-//const __m128i whitespace_characters = (__m128i)(_mm_set_ss(0x090A0D20));
-//const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
-//__m128i whitespace_characters;
-__m128i chars_to_search_for_ws;
-int ws_search_result;
-
 
 // const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
 // #define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}        
@@ -205,7 +190,7 @@ int ws_search_result;
 //_mm_cmpestri turns out to be slower :/
 
 #define INIT_LOCAL_WS_CHARS \
-    const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20); \
+    const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
 
 #define ADVANCE_TO_NON_WHITESPACE_CHAR  \
     /* This might fail alot on newlines :/ */ \
@@ -295,8 +280,23 @@ int ws_search_result;
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
 	}
 
+#define NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY \
+    ADVANCE_TO_NON_WHITESPACE_CHAR; \
+    DO_ARRAY_JUMP;
+    
+#define NAVIGATE_AFTER_CLOSING_COMPLEX \
+	if (IS_NULL_PARENT_INDEX) { \
+		goto S_PARSE_END_OF_FILE; \
+	} else if (PARENT_TYPE == TYPE_KEY) { \
+        PROCESS_END_OF_KEY_VALUE_COMPLEX; \
+    } else { \
+        PROCESS_END_OF_ARRAY_VALUE; \
+    }    
+    
 //=========================================================================
-            
+const int simd_search_mode = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
+__m128i chars_to_search_for_ws;
+int ws_search_result;            
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
@@ -518,58 +518,44 @@ S_CLOSE_OBJECT:
     STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
-    if (IS_NULL_PARENT_INDEX) {
-		goto S_PARSE_END_OF_FILE;
-	}
-        
-    if (PARENT_TYPE == TYPE_KEY) {
-    	PROCESS_END_OF_KEY_VALUE_COMPLEX;
-    } else {
-        PROCESS_END_OF_ARRAY_VALUE;
-    }
+    NAVIGATE_AFTER_CLOSING_COMPLEX
     
 //=============================================================
 S_OPEN_ARRAY_IN_ARRAY:
 	
+    //mexPrintf("Opening array in array: %d\n",CURRENT_INDEX);
+    
     INCREMENT_PARENT_SIZE;
     PROCESS_OPENING_ARRAY;   
-	ADVANCE_TO_NON_WHITESPACE_CHAR;
-    DO_ARRAY_JUMP;
+    NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
     
-	//Fall Through -------------------------------
+//=============================================================
 S_OPEN_ARRAY_IN_KEY:
-    
+        
+    //mexPrintf("Opening array in key: %d\n",CURRENT_INDEX);
     
     INITIALIZE_PARENT_INFO(TYPE_KEY);
     PROCESS_OPENING_ARRAY;
-	ADVANCE_TO_NON_WHITESPACE_CHAR;
-    DO_ARRAY_JUMP;
+	NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
             
-	//=============================================================
+//=============================================================
 S_CLOSE_ARRAY:
-
-    //mexPrintf("Current index 4:%d\n",CURRENT_INDEX);
     
     current_parent_index = parent_indices[current_depth];
     STORE_TAC;
     STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
-	if (IS_NULL_PARENT_INDEX) {
-		goto S_PARSE_END_OF_FILE;
-	}
-    
-    if (PARENT_TYPE == TYPE_KEY) {
-        PROCESS_END_OF_KEY_VALUE_COMPLEX;
-    } else {
-        PROCESS_END_OF_ARRAY_VALUE;
-    }
+    NAVIGATE_AFTER_CLOSING_COMPLEX;
 
 //=============================================================
 S_PARSE_KEY:
+    
+    //mexPrintf("Parsing a key: %d\n",CURRENT_INDEX);
+    
 	INCREMENT_PARENT_SIZE;
     
-    PROCESS_KEY
+    PROCESS_KEY;
     
     if (ADVANCE_POINTER_AND_GET_CHAR_VALUE == ':'){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
@@ -599,29 +585,34 @@ S_PARSE_STRING_IN_ARRAY:
 S_PARSE_STRING_IN_KEY:
 
     STORE_TAC_KEY_SIMPLE;
-    
     PROCESS_STRING;
-
 	PROCESS_END_OF_KEY_VALUE_SIMPLE
 
 
 //=============================================================
 S_PARSE_NUMBER_IN_KEY:
     
+//     if (CURRENT_INDEX < 1000){
+//         mexPrintf("Parse # in key 1: %d\n",CURRENT_INDEX);
+//         mexPrintf("Current parent: %d\n",CURRENT_INDEX);
+//     }
+    
     STORE_TAC_KEY_SIMPLE;
+    
+//     if (CURRENT_INDEX < 1000){
+//         mexPrintf("Parse # in key 2: %d\n",CURRENT_INDEX);
+//     }
     
     PROCESS_NUMBER;
     
     DECREMENT_POINTER;
-
 	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 //=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
-    
-    PROCESS_NUMBER
+    PROCESS_NUMBER;
    
     //This normally happens, trying to optimize progression of #s in array
     if (CURRENT_CHAR == ','){
