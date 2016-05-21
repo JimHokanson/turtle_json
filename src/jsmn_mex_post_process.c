@@ -5,6 +5,9 @@
 #include <math.h>
 #include "stdint.h"  //uint_8
 
+
+
+
 //Values for Integer portion of number
 //------------------------------------
 //Note that I'm avoiding subtracting 0 which makes these arrays rather large ...
@@ -286,17 +289,17 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
     unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
     
-    double *numeric_data = mxMalloc(mxGetN(temp)*sizeof(double));
+    //double *numeric_data = mxMalloc(mxGetN(temp)*sizeof(double));
     
     int n_numbers = mxGetN(temp);
     #pragma omp parallel num_threads(4)
     {
         int tid = omp_get_thread_num();
         unsigned char **local_numeric_p = numeric_p;
-        double *local_numeric_data = numeric_data;
+        //double *local_numeric_data = numeric_data;
         
         local_numeric_p += tid + 1;
-        local_numeric_data += tid; //We'll shift so that we remove
+        //local_numeric_data += tid; //We'll shift so that we remove
         //the off by 1 in Matlab
         
         //+1 is because we currently have the first value as null
@@ -305,17 +308,24 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
             //numeric_data[i] = i;
             //numeric_data[i] = string_to_double(numeric_p[i]);
             
+            double temp;
+            
+            //TODO: We should make the pointer to 0 rather than checking the character
+            //TODO: Return an error that is processed
             if (**local_numeric_p == 'n'){
-                *local_numeric_data = MX_NAN;
+                //*local_numeric_p = MX_NAN;
+                *local_numeric_p = (unsigned char *) &MX_NAN;
             }else{
-                *local_numeric_data = string_to_double(*local_numeric_p);
+                //*local_numeric_p = string_to_double(*local_numeric_p);
+                temp = string_to_double(*local_numeric_p);
+                *local_numeric_p = (unsigned char *) &temp;
             }
-            local_numeric_data += 4;
+            //local_numeric_data += 4;
             local_numeric_p += 4;
             
         }
     }
     
-    setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numbers);    
+    //setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numbers);    
 
 }

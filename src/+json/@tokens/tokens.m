@@ -15,8 +15,8 @@ classdef tokens
     
     object: 1) type  2) n_values        3) tac
     array:  1) type  2) n_values        3) tac
-    key:    1) type  2) start_pointer   3) tac
-            
+    key:    1) type  2) start_pointer   3) empty
+                     2) n_chars         3) tac
     string: 1) type  2) start_pointer
     number: 1) type  2) start_pointer
     null:   1) type  2) start_pointer
@@ -122,7 +122,8 @@ classdef tokens
             obj.types = result.types;
             obj.d1 = result.d1;
             obj.d2 = result.d2;
-            obj.numeric_data = result.numeric_data;
+            obj.numeric_data = result.numeric_p;
+            %obj.numeric_data = result.numeric_data;
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);

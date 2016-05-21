@@ -7,6 +7,17 @@
 #include <string.h> //strchr
 #include <time.h>   //required for clock
 #include <omp.h>
+//This is needed for AVX
+//but, we might not use AVX - SSE4
+//TODO: Need to build in SSE4 and AVX testing support
+//with define flags ...
+
+//AVX
+//#include "immintrin.h"
+
+//TODO: Need to build in checks for support 
+//SSE4.2
+#include "nmmintrin.h"
 
 #define TYPE_OBJECT 1
 #define TYPE_ARRAY  2

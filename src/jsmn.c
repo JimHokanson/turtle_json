@@ -1,34 +1,32 @@
 #include "jsmn.h"
 
-//This is needed for AVX
-//but, we might not use AVX - SSE4
-//TODO: Need to build in SSE4 and AVX testing support
-//with define flags ...
-#include "immintrin.h"
-#include "nmmintrin.h"
 
+//KEY PROCESSING
+//---------------
+//In order to improve processing we make value of the key handle parent
+//processing for the key
+//
+//number, string, null, true, false - store TAC, 
+//array - store parent info
+//
+//When closing, we need to call different comma processors or closers
+//if we are calling from simple values or complex (object or array)
+
+
+// parent type - use pointers
 
 //TODO: Allow string input to function
 
-//TODO: Allow type, d1, and d2 pointer walking
-//NOTE: This will require a separate pointer that gets updated on resizing
-
 //TODO: store initial and final allocation sizes for each type
-//TODO: Create method for creating scalar and saving into struct
+//TODO: Create method for creating scalar and saving into struct - for above TODO
 
 
-//TODO: Pad end with nulls and maybe a string end???
-//TODO: Figure out SSE2/SSE4/AVX
 //TODO: Assume TAC is 1 ahead
 //TODO: Build in if statements on keys
 //TODO: Pad with empty first setting to allow using uint instead of int (padding would allow removal of -1)
 
 //TODO: replace with a goto for more information
 #define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
-
-#define N_INT_PART  data_info[0]
-#define N_FRAC_PART data_info[1]
-#define N_EXP_PART  data_info[2]
 
 //DEBUGGING
 
@@ -47,11 +45,13 @@
         data_size_index_max = data_size_allocated-1; \
         \
         types = mxRealloc(types,data_size_allocated); \
-        types_move = types + current_data_index; \
         d1 = mxRealloc(d1,data_size_allocated*sizeof(int)); \
         d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
-    } \
+    }
 
+            
+//types_move = types + current_data_index; \
+            
 #define EXPAND_KEY_CHECK \
     ++current_key_index; \
     if (current_key_index >= key_size_index_max) { \
@@ -76,9 +76,9 @@
         numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
     } \
             
-//#define SET_TYPE(x) types[current_data_index] = x;
+#define SET_TYPE(x) types[current_data_index] = x;
             
-#define SET_TYPE(x) *(++types_move) = x;
+//#define SET_TYPE(x) *(++types_move) = x;
             
             
 //TODO: The size isn't needed for keys
@@ -95,37 +95,52 @@
  
 //=================      Processing    ====================================
 //=========================================================================
-#define PROCESS_NUMBER \
-    EXPAND_NUMERIC_CHECK; \
+#define PROCESS_OPENING_OBJECT \
     EXPAND_DATA_CHECK; \
-    \
-    SET_TYPE(TYPE_NUMBER); \
-    \
-    numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    d1[current_data_index] = current_numeric_index; \
-    \
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);
-                
-#define PROCESS_NULL \
-    EXPAND_NUMERIC_CHECK; \
+    SET_TYPE(TYPE_OBJECT); \
+    INITIALIZE_PARENT_INFO(TYPE_OBJECT);
+    
+#define PROCESS_OPENING_ARRAY \
     EXPAND_DATA_CHECK; \
-    \
-    SET_TYPE(TYPE_NULL); \
-    \
-    numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    d1[current_data_index] = current_numeric_index; \
-    /*TODO: Add null check ... */ \
-	ADVANCE_POINTER_BY_X(3)
-            
+    SET_TYPE(TYPE_ARRAY); \
+    INITIALIZE_PARENT_INFO(TYPE_ARRAY);    
+
 #define PROCESS_STRING \
     EXPAND_STRING_CHECK; \
     EXPAND_DATA_CHECK; \
     SET_TYPE(TYPE_STRING); \
-    \
     string_p[current_string_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_string_index; \
     seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
-            
+
+#define PROCESS_KEY \
+    EXPAND_KEY_CHECK; \
+    EXPAND_DATA_CHECK; \
+    /*INITIALIZE_PARENT_INFO(TYPE_KEY); */ \
+    SET_TYPE(TYPE_KEY); \
+    key_p[current_key_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_key_index; \
+    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
+    /* TODO: log ned of string */ \
+    EXPAND_DATA_CHECK;
+
+#define PROCESS_NUMBER \
+    EXPAND_NUMERIC_CHECK; \
+    EXPAND_DATA_CHECK; \
+    SET_TYPE(TYPE_NUMBER); \
+    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_numeric_index; \
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
+    
+#define PROCESS_NULL \
+    EXPAND_NUMERIC_CHECK; \
+    EXPAND_DATA_CHECK; \
+    SET_TYPE(TYPE_NULL); \
+    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    d1[current_data_index] = current_numeric_index; \
+    /*TODO: Add null check ... */ \
+	ADVANCE_POINTER_BY_X(3)    
+           
 #define PROCESS_TRUE \
     EXPAND_DATA_CHECK; \
     SET_TYPE(TYPE_TRUE); \
@@ -141,6 +156,10 @@
 //+1 to next element
 //+1 for Matlab 1 based indexing
 #define STORE_TAC d2[current_parent_index] = current_data_index + 2;
+//This is called before the simple value, so we need to advance to the simple
+//value and then do the next value (i.e the token after close)
+#define STORE_TAC_KEY_SIMPLE d2[current_parent_index] = current_data_index + 3;     
+#define STORE_TAC_KEY_COMPLEX d2[current_parent_index+1] = current_data_index + 2;    
             
 #define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
             
@@ -212,6 +231,18 @@ int ws_search_result;
      
 #define DO_ARRAY_JUMP goto *array_jump[CURRENT_CHAR]
                 
+#define NAVIGATE_AFTER_OPENING_OBJECT \
+	ADVANCE_TO_NON_WHITESPACE_CHAR; \
+    switch (CURRENT_CHAR) { \
+        case '"': \
+            goto S_PARSE_KEY; \
+        case '}': \
+            goto S_CLOSE_OBJECT; \
+        default: \
+            goto S_ERROR_OPEN_OBJECT; \
+    }            
+            
+            
 #define PROCESS_END_OF_ARRAY_VALUE \
 	ADVANCE_TO_NON_WHITESPACE_CHAR; \
 	switch (CURRENT_CHAR) { \
@@ -222,28 +253,47 @@ int ws_search_result;
             goto S_CLOSE_ARRAY; \
         default: \
             goto S_ERROR_END_OF_VALUE_IN_ARRAY; \
-	} \
-             
-#define PROCESS_END_OF_KEY_VALUE \
+	}
+    
+//This is for values following a key that are simple such as:
+//number, string, null, fales, true    
+    
+#define PROCESS_END_OF_KEY_VALUE_SIMPLE \
+    ADVANCE_TO_NON_WHITESPACE_CHAR; \
+	switch (CURRENT_CHAR) { \
+        case ',': \
+            ADVANCE_TO_NON_WHITESPACE_CHAR; \
+            if (CURRENT_CHAR == '"') { \
+                goto S_PARSE_KEY; \
+            } \
+            else { \
+                goto S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA; \
+            } \
+        case '}': \
+            goto S_CLOSE_OBJECT; \
+        default: \
+            goto S_ERROR_END_OF_VALUE_IN_KEY; \
+	}          
+            
+#define PROCESS_END_OF_KEY_VALUE_COMPLEX \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
 	switch (CURRENT_CHAR) { \
         case ',': \
             current_parent_index = parent_indices[current_depth]; \
-            STORE_TAC; \
+            STORE_TAC_KEY_COMPLEX; \
             MOVE_UP_PARENT_INDEX; \
             ADVANCE_TO_NON_WHITESPACE_CHAR; \
             if (CURRENT_CHAR == '"') { \
                 goto S_PARSE_KEY; \
             } \
             else { \
-                mexPrintf("Position %d\n",CURRENT_INDEX); \
-                mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key expected"); \
+                goto S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA; \
             } \
         case '}': \
-            goto S_CLOSE_KEY_AND_OBJECT; \
+            goto S_CLOSE_KEY_COMPLEX_AND_OBJECT; \
         default: \
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
-	} \
+	}
 
 //=========================================================================
             
@@ -252,14 +302,7 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
 {
     
     //This function is used to set a field in the output struct
-    
-    //setStructField(plhs[0],data_ptr,"name",mxINT32_CLASS,N)
-    
-    //mwSize ndim, const mwSize *dims, mxClassID classid, mxComplexity ComplexFlag
-    //void mxSetM(mxArray *pm, mwSize m);
-    //void mxSetData(mxArray *pm, void *pr);
-    //extern int mxAddField(mxArray *pm, const char *fieldname);
-    
+        
     mxArray *pm;
     
     pm = mxCreateNumericArray(0, 0, classid, mxREAL);
@@ -268,7 +311,6 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
     mxSetN(pm, N);
     mxAddField(s,fieldname);
     mxSetField(s,0,fieldname,pm);
-
 }
 
 //-------------------------------------------------------------------------
@@ -302,7 +344,7 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     *char_offset = p;    
 }
 
-//TODO: We might get better results
+
 void seek_string_end_v2(unsigned char *p, unsigned char **char_offset){
 
 STRING_SEEK:    
@@ -325,8 +367,7 @@ STRING_SEEK:
         goto STRING_SEEK;
     }else{
         *char_offset = p+1;
-    }
-    
+    }    
 }
 
 //=========================================================================
@@ -402,93 +443,76 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int *d1 = mxMalloc(data_size_allocated * sizeof(int));
     int *d2 = mxMalloc(data_size_allocated * sizeof(int));
     
+    //TODO: track reallocations
+    int n_key_allocations  = 1;
     int key_size_allocated = ceil(string_byte_length/20);
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = 0;
     
     //unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));        
-    unsigned char **key_p = mxMalloc(600 * sizeof(unsigned char *));  
+    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));  
     
+    int n_string_allocations = 1;
     int string_size_allocated = ceil(string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = 0;
     
     //unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
-    unsigned char **string_p = mxMalloc(30 * sizeof(unsigned char *));
+    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
     
+    int n_numeric_allocations = 1;
     int numeric_size_allocated = ceil(string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = 0;
     //unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
-    unsigned char **numeric_p = mxMalloc(7300000 * sizeof(unsigned char *));
+    unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
     
-                               // 123 4 5 6789
-// // // //     unsigned char *test_string = "   \t\n\ris a test of the emergency";
-// // // //     
-// // // //     chars_to_search_for_ws = _mm_loadu_si128((__m128i*)(test_string+2));
-// // // //     //ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, ws_search_mode);
-// // // //     ws_search_result = _mm_cmpestri(whitespace_characters, 4, chars_to_search_for_ws, 16, ws_search_mode);
-// // // //     mexPrintf("Result is: %d\n",ws_search_result);
     
+    
+//Start of the parsing ====================================================
     DECREMENT_POINTER;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
 	switch (CURRENT_CHAR) {
         case '{':
-            goto S_OPEN_OBJECT_IN_KEY;
+        	PROCESS_OPENING_OBJECT;
+            NAVIGATE_AFTER_OPENING_OBJECT;
         case '[':
-            goto S_OPEN_ARRAY_IN_KEY;
+            PROCESS_OPENING_ARRAY;
+        
+            ADVANCE_TO_NON_WHITESPACE_CHAR;
+            DO_ARRAY_JUMP;
         default:
             mexErrMsgIdAndTxt("jsmn_mex:invalid_start", "Starting token needs to be an opening object or array");
 	}
 
-//=============================================================
+//    [ {            ======================================================
 S_OPEN_OBJECT_IN_ARRAY:
     
+    
     INCREMENT_PARENT_SIZE;
+    PROCESS_OPENING_OBJECT;
+    NAVIGATE_AFTER_OPENING_OBJECT;
+    
 
-	//Fall Through --------------------
+//   "key": {        ====================================================== 
 S_OPEN_OBJECT_IN_KEY:
     
-    //1) Expand data if necessary
-    //2) setup parent info
-    
-    EXPAND_DATA_CHECK;
-    
-    SET_TYPE(TYPE_OBJECT);
-    
-    INITIALIZE_PARENT_INFO(TYPE_OBJECT);
-        
-    //Navigation -----------------
-	ADVANCE_TO_NON_WHITESPACE_CHAR;
-
-    switch (CURRENT_CHAR) {
-        case '"':
-            goto S_PARSE_KEY;
-        case '}':
-            goto S_CLOSE_OBJECT;
-        default:
-            goto S_ERROR_OPEN_OBJECT;
-    }
-
+    INITIALIZE_PARENT_INFO(TYPE_KEY);
+    PROCESS_OPENING_OBJECT;
+    NAVIGATE_AFTER_OPENING_OBJECT;
+  
 //=============================================================
-
-S_CLOSE_KEY_AND_OBJECT:    
+S_CLOSE_KEY_COMPLEX_AND_OBJECT:    
     //Update tac and parent
         
-    current_parent_index = parent_indices[current_depth];
-            
-    STORE_TAC;
-    
-    //Fall Through ------
-S_CLOSE_KEY_AND_OBJECT_SIMPLE:
-    
-    //Only update parent
+    current_parent_index = parent_indices[current_depth];    
+    STORE_TAC_KEY_COMPLEX;
     MOVE_UP_PARENT_INDEX;
 
-	//Fall Through ------
+    //Fall Through ------
 S_CLOSE_OBJECT:
-
+    
     current_parent_index = parent_indices[current_depth];
     STORE_TAC;
     STORE_SIZE;
@@ -497,32 +521,35 @@ S_CLOSE_OBJECT:
     if (IS_NULL_PARENT_INDEX) {
 		goto S_PARSE_END_OF_FILE;
 	}
-    
+        
     if (PARENT_TYPE == TYPE_KEY) {
-    	PROCESS_END_OF_KEY_VALUE;
+    	PROCESS_END_OF_KEY_VALUE_COMPLEX;
     } else {
         PROCESS_END_OF_ARRAY_VALUE;
     }
     
 //=============================================================
 S_OPEN_ARRAY_IN_ARRAY:
-	INCREMENT_PARENT_SIZE;
-
+	
+    INCREMENT_PARENT_SIZE;
+    PROCESS_OPENING_ARRAY;   
+	ADVANCE_TO_NON_WHITESPACE_CHAR;
+    DO_ARRAY_JUMP;
+    
 	//Fall Through -------------------------------
 S_OPEN_ARRAY_IN_KEY:
-
-    EXPAND_DATA_CHECK;
     
-    SET_TYPE(TYPE_ARRAY);
     
-    INITIALIZE_PARENT_INFO(TYPE_ARRAY);
-        
+    INITIALIZE_PARENT_INFO(TYPE_KEY);
+    PROCESS_OPENING_ARRAY;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
     DO_ARRAY_JUMP;
             
 	//=============================================================
 S_CLOSE_ARRAY:
 
+    //mexPrintf("Current index 4:%d\n",CURRENT_INDEX);
+    
     current_parent_index = parent_indices[current_depth];
     STORE_TAC;
     STORE_SIZE;
@@ -533,7 +560,7 @@ S_CLOSE_ARRAY:
 	}
     
     if (PARENT_TYPE == TYPE_KEY) {
-        PROCESS_END_OF_KEY_VALUE;
+        PROCESS_END_OF_KEY_VALUE_COMPLEX;
     } else {
         PROCESS_END_OF_ARRAY_VALUE;
     }
@@ -542,23 +569,7 @@ S_CLOSE_ARRAY:
 S_PARSE_KEY:
 	INCREMENT_PARENT_SIZE;
     
-    EXPAND_KEY_CHECK;
-    
-    EXPAND_DATA_CHECK;
-    
-    INITIALIZE_PARENT_INFO(TYPE_KEY);
-    
-    SET_TYPE(TYPE_KEY);
-
-    key_p[current_string_index] = CURRENT_POINTER;
-    
-    d1[current_data_index] = current_string_index;
-    
-    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER);
-    
-    //We're getting an extra bit of memory for storing the end :/
-    EXPAND_DATA_CHECK;
-    //TODO: End not yet stored ...
+    PROCESS_KEY
     
     if (ADVANCE_POINTER_AND_GET_CHAR_VALUE == ':'){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
@@ -587,19 +598,23 @@ S_PARSE_STRING_IN_ARRAY:
 //=============================================================
 S_PARSE_STRING_IN_KEY:
 
-    PROCESS_STRING
+    STORE_TAC_KEY_SIMPLE;
+    
+    PROCESS_STRING;
 
-	PROCESS_END_OF_KEY_VALUE
+	PROCESS_END_OF_KEY_VALUE_SIMPLE
 
 
 //=============================================================
 S_PARSE_NUMBER_IN_KEY:
     
-    PROCESS_NUMBER
+    STORE_TAC_KEY_SIMPLE;
+    
+    PROCESS_NUMBER;
     
     DECREMENT_POINTER;
 
-	PROCESS_END_OF_KEY_VALUE;
+	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 //=============================================================
 S_PARSE_NUMBER_IN_ARRAY:
@@ -619,10 +634,12 @@ S_PARSE_NUMBER_IN_ARRAY:
 
 //=============================================================
 S_PARSE_NULL_IN_KEY:
+    
+    STORE_TAC_KEY_SIMPLE;
 
     PROCESS_NULL;
     
-	PROCESS_END_OF_KEY_VALUE;
+	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
@@ -636,25 +653,29 @@ S_PARSE_NULL_IN_ARRAY:
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
     
+    STORE_TAC_KEY_SIMPLE;
+    
     PROCESS_TRUE
     
-	PROCESS_END_OF_KEY_VALUE
+	PROCESS_END_OF_KEY_VALUE_SIMPLE
 
 
 S_PARSE_TRUE_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
     
-    PROCESS_TRUE
+    PROCESS_TRUE;
     
     PROCESS_END_OF_ARRAY_VALUE;
 
     
 S_PARSE_FALSE_IN_KEY:
     
+    STORE_TAC_KEY_SIMPLE;
+    
     PROCESS_FALSE
     
-    PROCESS_END_OF_KEY_VALUE;
+    PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 S_PARSE_FALSE_IN_ARRAY:
     
@@ -678,6 +699,14 @@ S_PARSE_END_OF_FILE:
 //===============       ERRORS   ==========================================
 //=========================================================================
 //TODO: This is going to be redone 
+  
+S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
+    // {"key": value, #ERROR
+    //  e.g.
+    // {"key": value, 1
+    //
+	mexPrintf("Position %d\n",CURRENT_INDEX); \
+	mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key or closing of object expected"); \
     
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("jsmn_mex:depth_exceeded", "Max depth was exceeded");
