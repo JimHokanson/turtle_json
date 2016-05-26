@@ -139,7 +139,7 @@ double string_to_double(char *p) {
             break;
         case 1:
             //TODO: This will likely cause a problem since we have multiple threads
-            mexErrMsgIdAndTxt("jsmn_mex:no_number","Too many #s");
+            mexErrMsgIdAndTxt("jsmn_mex:no_number","No numbers were found, at position: %d");
         default:
             mexErrMsgIdAndTxt("jsmn_mex:too_many_integers","The integer component of the number had too many digits");
     }
@@ -269,63 +269,85 @@ double string_to_double(char *p) {
         value *= pow(10.0, exponent_value);
     }
     
+    //TODO: I need to check for invalid values at the end of the string
+    //With our string skipping we skip all parts of the number so
+    //something like this would get by:
+    //  1.2345E123E
+    
     return value;
 }
 
-
 void parse_numbers(unsigned char *js,mxArray *plhs[]) {
-
-//Next steps:
-//-----------
-//1) 
     
-//     string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));
-//     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
-//     
-//     numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
-//     setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
-    
-    const double MX_NAN = mxGetNaN();
     mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
+    
+    //Casting for input handling
     unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
-    
-    //double *numeric_data = mxMalloc(mxGetN(temp)*sizeof(double));
-    
+    //Casting for output handling
+    double *numeric_p_double = (double *)mxGetData(temp);
     int n_numbers = mxGetN(temp);
-    #pragma omp parallel num_threads(4)
-    {
-        int tid = omp_get_thread_num();
-        unsigned char **local_numeric_p = numeric_p;
-        //double *local_numeric_data = numeric_data;
-        
-        local_numeric_p += tid + 1;
-        //local_numeric_data += tid; //We'll shift so that we remove
-        //the off by 1 in Matlab
-        
-        //+1 is because we currently have the first value as null
-        //when trying to avoid an initial negative value (int vs uint)
-        for (int i = tid + 1; i < n_numbers; i += 4){
-            //numeric_data[i] = i;
-            //numeric_data[i] = string_to_double(numeric_p[i]);
-            
-            double temp;
-            
-            //TODO: We should make the pointer to 0 rather than checking the character
-            //TODO: Return an error that is processed
-            if (**local_numeric_p == 'n'){
-                //*local_numeric_p = MX_NAN;
-                *local_numeric_p = (unsigned char *) &MX_NAN;
-            }else{
-                //*local_numeric_p = string_to_double(*local_numeric_p);
-                temp = string_to_double(*local_numeric_p);
-                *local_numeric_p = (unsigned char *) &temp;
-            }
-            //local_numeric_data += 4;
-            local_numeric_p += 4;
-            
-        }
-    }
+     
+    const double MX_NAN = mxGetNaN();
     
-    //setStructField(plhs[0],numeric_data,"numeric_data",mxDOUBLE_CLASS,n_numbers);    
+    #pragma omp parallel for
+    for (int i = 0; i < n_numbers; i++){
+        if (numeric_p[i]){
+            numeric_p_double[i] = string_to_double(numeric_p[i]);
+        }else{
+            numeric_p_double[i] = MX_NAN;
+        }
+    }  
+}
 
+//http://www.mathworks.com/matlabcentral/answers/3198-convert-matlab-string-to-wchar-in-c-mex-under-windows-and-linux
+//http://stackoverflow.com/questions/14942097/accessing-matlabs-unicode-strings-from-c
+//
+//It looks like windows-1252 is really UTF-16?
+//
+//feature('DefaultCharacterSet')
+//malloc/free then memcpy
+void parse_strings(unsigned char *js,mxArray *plhs[]) {
+
+    mxArray *temp = mxGetField(plhs[0],0,"key_p");
+    
+    //Create a string array and replace d1 and d2 with start and end
+    //pointers
+    
+    //Start - in data
+    //End - in array
+    
+    //
+    
+    //Casting for input handling
+    unsigned char **keys_p = (unsigned char **)mxGetData(temp);
+    int n_keys = mxGetN(temp);
+    
+    temp = mxGetField(plhs[0],0,"n_key_chars");
+    int *n_key_chars = (int *)mxGetData(temp);
+    
+    TIC(key_parse);
+    
+    mxArray  **mxStrings = mxMalloc( n_keys * sizeof(mxArray *));
+    uint16_t *key_data = mxMalloc( (*n_key_chars) * sizeof(uint16_t *));
+    
+    //TODO: Move this 
+    temp = mxGetField(plhs[0],0,"key_start_indices");
+    int *key_start_indices = (int *)mxGetData(temp);
+    
+    #pragma omp parallel for
+    for (int i = 0; i < n_keys; i++){
+        //Algorithm
+        //1) Grab start from 
+        unsigned char *p = keys_p[i];
+        int start_index = key_start_indices[i];
+        //key_start_indices[i] = start_index;
+        
+        //Start parsing of the current key
+        key_data[start_index] = *p;
+    } 
+        
+    TOC_AND_LOG(key_parse,key_parsing_time);    
+    
+    setStructField(plhs[0],key_data,"key_data",mxCHAR_CLASS,*n_key_chars);
+    
 }

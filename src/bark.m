@@ -1,4 +1,4 @@
-function bark()
+function jt = bark()
 
 if ismac
 file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';

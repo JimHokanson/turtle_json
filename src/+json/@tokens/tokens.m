@@ -15,7 +15,7 @@ classdef tokens
     
     object: 1) type  2) n_values        3) tac
     array:  1) type  2) n_values        3) tac
-    key:    1) type  2) start_pointer   3) empty
+    key:    1) type  2) start_pointer   3) <empty>
                      2) n_chars         3) tac
     string: 1) type  2) start_pointer
     number: 1) type  2) start_pointer
@@ -66,15 +66,18 @@ classdef tokens
 %     array:  1) type  2) n_values        3) tac
 %     key:    1) type  2) start_pointer   3) tac
 %             
-%     string: 1) type  2) start_pointer
+%     string: 1) type  2) start_pointer   3) end of string
 %     number: 1) type  2) start_pointer
 %     null:   1) type  2) start_pointer
 %     tf      1) type
     
         
         numeric_data
+        key_strings
         strings
         keys
+        
+        mex
         
         d_extra_info = '-------------------------------'
         data_to_string_ratio
@@ -114,6 +117,8 @@ classdef tokens
             t0 = tic;
             result = jsmn_mex(file_path);
             
+            obj.mex = result;
+            
             obj.strings = result.string_p;
             obj.keys = result.key_p;
             
@@ -124,6 +129,8 @@ classdef tokens
             obj.d2 = result.d2;
             obj.numeric_data = result.numeric_p;
             %obj.numeric_data = result.numeric_data;
+            
+            obj.key_strings = result.key_data;
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);

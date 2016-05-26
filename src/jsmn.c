@@ -1,16 +1,17 @@
 #include "jsmn.h"
 
-
 //KEY PROCESSING
 //---------------
-//In order to improve processing we make value of the key handle parent
-//processing for the key
+//In order to improve processing we key TAC and parent information
+//processing in the key's value. For simple values such as numbers or
+//strings we have relatively little to do. For complex values (objects 
+//and arrays) we log the key as a parent node which will have subsequent 
+//children.
 //
 //number, string, null, true, false - store TAC, 
 //array - store parent info
 //
-//When closing, we need to call different comma processors or closers
-//if we are calling from simple values or complex (object or array)
+//When closing, we need to call different comma processors or closers.
 
 
 // parent type - use pointers
@@ -33,12 +34,11 @@
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
 
+//=========================================================================
+//              Data Allocation and index advancement
+//=========================================================================
 
-//Things for opening ======================================================
-
-#define INCREMENT_PARENT_SIZE parent_sizes[current_depth] += 1
-
-#define EXPAND_DATA_CHECK \
+#define INCREMENT_DATA_INDEX \
     ++current_data_index; \
 	if (current_data_index >= data_size_index_max){ \
         data_size_allocated = ceil(1.5*data_size_allocated); \
@@ -49,37 +49,49 @@
         d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
     }
 
-            
-//types_move = types + current_data_index; \
-            
-#define EXPAND_KEY_CHECK \
+#define ALLOCATE_KEY_DATA \
+    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *)); \
+    int *key_end_indices = mxMalloc(key_size_allocated * sizeof(int)); \
+    int *key_start_indices = mxMalloc(key_size_allocated * sizeof(int));
+#define INCREMENT_KEY_INDEX \
     ++current_key_index; \
     if (current_key_index >= key_size_index_max) { \
         key_size_allocated = ceil(1.5*key_size_allocated); \
         key_size_index_max = key_size_allocated - 1; \
         key_p = mxRealloc(key_p,key_size_allocated * sizeof(unsigned char *)); \
-    } \
-            
-#define EXPAND_STRING_CHECK \
+        key_end_indices = mxRealloc(key_end_indices,key_size_allocated * sizeof(int)); \
+        key_start_indices = mxRealloc(key_start_indices,key_size_allocated * sizeof(int)); \
+    }
+#define TRUNCATE_KEY_DATA \
+    key_p = mxRealloc(key_p,(current_key_index + 1)*sizeof(unsigned char *)); \
+    key_end_indices = mxRealloc(key_end_indices,(current_key_index + 1) * sizeof(int)); \
+    key_start_indices = mxRealloc(key_start_indices,(current_key_index + 1) * sizeof(int));
+    
+#define ALLOCATE_STRING_DATA  unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *)); 
+#define INCREMENT_STRING_INDEX \
     ++current_string_index; \
     if (current_string_index >= string_size_index_max) { \
         string_size_allocated = ceil(1.5*string_size_allocated); \
         string_size_index_max = string_size_allocated - 1; \
         string_p = mxRealloc(string_p,string_size_allocated * sizeof(unsigned char *)); \
-    } \
-            
+    }
+#define TRUNCATE_STRING_DATA  string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));   
+    
+#define ALLOCATE_NUMERIC_DATA unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));  
+//uint64_t *numeric_p = mxMalloc(numeric_size_allocated * sizeof(uint64_t));    
 #define EXPAND_NUMERIC_CHECK \
     ++current_numeric_index; \
     if (current_numeric_index >= numeric_size_index_max) { \
         numeric_size_allocated = ceil(1.5*numeric_size_allocated); \
         numeric_size_index_max = numeric_size_allocated - 1; \
         numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
-    } \
-            
-#define SET_TYPE(x) types[current_data_index] = x;
-            
-//#define SET_TYPE(x) *(++types_move) = x;
-            
+    }
+#define TRUNCATE_NUMERIC_DATA numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
+
+//Things for opening ======================================================
+#define INCREMENT_PARENT_SIZE parent_sizes[current_depth] += 1
+
+#define SET_TYPE(x) types[current_data_index] = x;            
             
 //TODO: The size isn't needed for keys
 #define INITIALIZE_PARENT_INFO(x) \
@@ -92,41 +104,73 @@
         parent_sizes[current_depth] = 0;
             
 //=========================================================================
- 
 //=================      Processing    ====================================
 //=========================================================================
+// The main code is essentially a state machine. States within the machine
+// have the following rough layout:
+//
+//      1) key or array specific initialization code
+//      2) common processing
+//      3) navigation to the next state
+//        
+//  Code below is for #2, the processing that is commen to the type
+//  regardless of whether or not it is in a key or array
+        
 #define PROCESS_OPENING_OBJECT \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
     INITIALIZE_PARENT_INFO(TYPE_OBJECT);
     
 #define PROCESS_OPENING_ARRAY \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
     INITIALIZE_PARENT_INFO(TYPE_ARRAY);    
 
 #define PROCESS_STRING \
-    EXPAND_STRING_CHECK; \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_STRING_INDEX; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_STRING); \
+    temp_p = CURRENT_POINTER; \
     string_p[current_string_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_string_index; \
-    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
+    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
+    d2[current_data_index] = CURRENT_POINTER - temp_p;        
+            
+    //d2[current_data_index] = CURRENT_POINTER - string_p[current_string_index];
 
 #define PROCESS_KEY \
-    EXPAND_KEY_CHECK; \
-    EXPAND_DATA_CHECK; \
-    /*INITIALIZE_PARENT_INFO(TYPE_KEY); */ \
+    INCREMENT_KEY_INDEX; \
+    INCREMENT_DATA_INDEX; \
+    /* This step is now done in some key values */ \
+    /* //INITIALIZE_PARENT_INFO(TYPE_KEY); */ \
     SET_TYPE(TYPE_KEY); \
-    key_p[current_key_index] = CURRENT_POINTER; \
-    d1[current_data_index] = current_key_index; \
-    seek_string_end_v2(CURRENT_POINTER,&CURRENT_POINTER); \
-    /* TODO: log ned of string */ \
-    EXPAND_DATA_CHECK;
-
+    /* We want to skip the opening quotes */ \
+    key_p[current_key_index] = CURRENT_POINTER + 1; \
+    key_start_indices[current_key_index]   = n_key_chars; \
+    d1[current_data_index]   = current_key_index + 1; \
+    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
+    /* We won't count the closing quote, but we would normally add 1 to be inclusive on a count, so they cancel out */ \
+    n_key_chars += CURRENT_POINTER - key_p[current_key_index]; \
+    key_end_indices[current_key_index] = n_key_chars;
+    
+// Option 1            
+//     if ((CURRENT_POINTER - key_p[current_key_index]) > max_key_size){ \
+//         max_key_size = CURRENT_POINTER - key_p[current_key_index]; \
+//     }
+           
+// Option 2    
+//     n_chars_key = CURRENT_POINTER - key_p[current_key_index]; \
+//     max_key_size = (n_chars_key > max_key_size) ? n_chars_key : max_key_size;
+    
+// Option 3    
+//      n_chars_key = CURRENT_POINTER - key_p[current_key_index]; \    
+//     if (n_chars_key > max_key_size){ \
+//         max_key_size = n_chars_key; \
+//     }
+            
 #define PROCESS_NUMBER \
     EXPAND_NUMERIC_CHECK; \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_NUMBER); \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
     d1[current_data_index] = current_numeric_index; \
@@ -134,28 +178,28 @@
     
 #define PROCESS_NULL \
     EXPAND_NUMERIC_CHECK; \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_NULL); \
-    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    numeric_p[current_numeric_index] = 0; \
     d1[current_data_index] = current_numeric_index; \
     /*TODO: Add null check ... */ \
 	ADVANCE_POINTER_BY_X(3)    
            
 #define PROCESS_TRUE \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_TRUE); \
 	ADVANCE_POINTER_BY_X(3);
             
 #define PROCESS_FALSE \
-    EXPAND_DATA_CHECK; \
+    INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_FALSE); \
 	ADVANCE_POINTER_BY_X(4);
                 
-//================    Things for closing             ======================
-//=========================================================================     
+//Things for closing  =====================================================
 //+1 to next element
 //+1 for Matlab 1 based indexing
-#define STORE_TAC d2[current_parent_index] = current_data_index + 2;
+#define STORE_TAC_OF_OBJECT_OR_ARRAY d2[current_parent_index] = current_data_index + 2;
+    
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
 
@@ -178,9 +222,7 @@
 #define CURRENT_POINTER p
 #define CURRENT_INDEX p - js
 #define ADVANCE_POINTER_AND_GET_CHAR_VALUE *(++p)
-    
-#define DECREMENT_POINTER --p
-    
+#define DECREMENT_POINTER --p 
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
 
@@ -226,8 +268,7 @@
         default: \
             goto S_ERROR_OPEN_OBJECT; \
     }            
-            
-            
+                        
 #define PROCESS_END_OF_ARRAY_VALUE \
 	ADVANCE_TO_NON_WHITESPACE_CHAR; \
 	switch (CURRENT_CHAR) { \
@@ -313,8 +354,26 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
     mxSetField(s,0,fieldname,pm);
 }
 
-//-------------------------------------------------------------------------
-//--------------------  End of Number Parsing  ----------------------------
+void setIntScalar(mxArray *s, const char *fieldname, int value){
+
+    //This function allows us to hold onto integer scalars
+    //We need to make an allocation to grab a value off the stack
+    
+    mxArray *pm;
+    
+    int *temp_value = mxMalloc(sizeof(double));
+    
+    *temp_value = value;
+    
+    pm = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
+    mxSetData(pm, temp_value);
+    mxSetM(pm, 1);
+    mxSetN(pm, 1);
+    mxAddField(s,fieldname);
+    mxSetField(s,0,fieldname,pm);    
+    
+}
+
 //-------------------------------------------------------------------------
 void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
@@ -344,30 +403,20 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     *char_offset = p;    
 }
 
-
-void seek_string_end_v2(unsigned char *p, unsigned char **char_offset){
+//-------------------------------------------------------------------------
+void seek_string_end(unsigned char *p, unsigned char **char_offset){
 
 STRING_SEEK:    
     //p+1 to advance past initial '"'
     p = strchr(p+1,'"');
     
     //Back up to verify 
-    --p;
     
-    //I've padded the string with a quote that is preceeded by a null
-    //so a null indicates that there really was no "
-    if (*p == '\0'){
-        mexErrMsgIdAndTxt("jsmn_mex:missing_quotes", "Quote not found");
-    }else if (*p == '\\'){
-        --p;
-        if (*p == '\\'){
-            mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
-        }
-        ++p;
-        goto STRING_SEEK;
+    if (*(--p) == '\\'){
+        mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
     }else{
         *char_offset = p+1;
-    }    
+    } 
 }
 
 //=========================================================================
@@ -416,20 +465,22 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_KEY};        
     
     unsigned char *p = js;    
-
+    unsigned char *temp_p;
     
+    //---------------------------------------------------------------------
     const int MAX_DEPTH = 200;
     int parent_types[201];
     //Note, this needs to be indices instead of pointers because
-    //we might resize and the indices would become invalid
+    //we might resize (resize types, d1, d2) and the pointers would become 
+    //invalid
     int parent_indices[201];
     int parent_sizes[201];
     int current_parent_index;
     int current_depth = 0;
-
+    //---------------------------------------------------------------------
     int data_size_allocated = ceil(string_byte_length/4);
     int data_size_index_max = data_size_allocated - 1;
-    int current_data_index = 0;
+    int current_data_index = -1;
     
     uint8_t *types = mxMalloc(data_size_allocated);
     uint8_t *types_move = types;
@@ -442,31 +493,27 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     //d2 - tac
     int *d1 = mxMalloc(data_size_allocated * sizeof(int));
     int *d2 = mxMalloc(data_size_allocated * sizeof(int));
+    //---------------------------------------------------------------------
     
     //TODO: track reallocations
+    int n_key_chars = 0;
     int n_key_allocations  = 1;
     int key_size_allocated = ceil(string_byte_length/20);
     int key_size_index_max = key_size_allocated-1;
-    int current_key_index = 0;
-    
-    //unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));        
-    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *));  
+    int current_key_index = -1;
+    ALLOCATE_KEY_DATA 
     
     int n_string_allocations = 1;
     int string_size_allocated = ceil(string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
-    int current_string_index = 0;
-    
-    //unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
-    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *));
-    
+    int current_string_index = -1;
+    ALLOCATE_STRING_DATA
+   
     int n_numeric_allocations = 1;
     int numeric_size_allocated = ceil(string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
-    int current_numeric_index = 0;
-    //unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
-    unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));
-    
+    int current_numeric_index = -1;
+    ALLOCATE_NUMERIC_DATA
     
     
 //Start of the parsing ====================================================
@@ -479,9 +526,7 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
             NAVIGATE_AFTER_OPENING_OBJECT;
         case '[':
             PROCESS_OPENING_ARRAY;
-        
-            ADVANCE_TO_NON_WHITESPACE_CHAR;
-            DO_ARRAY_JUMP;
+            NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
         default:
             mexErrMsgIdAndTxt("jsmn_mex:invalid_start", "Starting token needs to be an opening object or array");
 	}
@@ -514,7 +559,7 @@ S_CLOSE_KEY_COMPLEX_AND_OBJECT:
 S_CLOSE_OBJECT:
     
     current_parent_index = parent_indices[current_depth];
-    STORE_TAC;
+    STORE_TAC_OF_OBJECT_OR_ARRAY;
     STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
@@ -542,7 +587,7 @@ S_OPEN_ARRAY_IN_KEY:
 S_CLOSE_ARRAY:
     
     current_parent_index = parent_indices[current_depth];
-    STORE_TAC;
+    STORE_TAC_OF_OBJECT_OR_ARRAY;
     STORE_SIZE;
     MOVE_UP_PARENT_INDEX;
     
@@ -740,19 +785,28 @@ finish_main:
     
     d2 = mxRealloc(d2,((current_data_index + 1)*sizeof(int)));
     setStructField(plhs[0],d2,"d2",mxINT32_CLASS,current_data_index + 1);
-
-    //TODO: This is only correct on 64 bit systems ...
-    key_p = mxRealloc(key_p,(current_key_index + 1)*sizeof(unsigned char *));
-    setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
+     
+    setIntScalar(plhs[0],"n_key_allocations",n_key_allocations);
+    setIntScalar(plhs[0],"n_key_chars",n_key_chars);
+    setIntScalar(plhs[0],"n_string_allocations",n_string_allocations);
+    setIntScalar(plhs[0],"n_numeric_allocations",n_numeric_allocations);
     
-    string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));
+    
+    //TODO: This is only correct on 64 bit systems ...
+    TRUNCATE_KEY_DATA
+    setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
+    setStructField(plhs[0],key_end_indices,"key_end_indices",mxINT32_CLASS,current_key_index + 1);
+    setStructField(plhs[0],key_start_indices,"key_start_indices",mxINT32_CLASS,current_key_index + 1);
+    
+    TRUNCATE_STRING_DATA
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
     
-    numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
-    setStructField(plhs[0],numeric_p,"numeric_p",mxUINT64_CLASS,current_numeric_index + 1);
+    TRUNCATE_NUMERIC_DATA
+    //Note, it seems the class type may only be needed for viewing in Matlab
+    //Internally it is just bytes (assuming sizeof is the same)
+    setStructField(plhs[0],numeric_p,"numeric_p",mxDOUBLE_CLASS,current_numeric_index + 1);
+
 
 	return;
+    
 }
-
-
-

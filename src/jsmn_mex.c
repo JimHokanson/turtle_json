@@ -46,16 +46,14 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
 	fread(buffer, file_length, 1, file);
     fclose(file);
     buffer[file_length] = 0; 
-    //This would allow us to only seek for "
-    buffer[file_length+1] = '"';
-    for (int i = 2; i < N_PADDING; i++){
+    buffer[file_length+1] = '\\';
+     buffer[file_length+2] = '"';
+    for (int i = 3; i < N_PADDING; i++){
         //length 1, index 0
         //length file_length, max index - file_length-1
         //so padding starts at file_length + 0
         buffer[file_length + i] = 0;
     }
-    
-    
     
     *string_byte_length = file_length; 
     
@@ -155,9 +153,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             memcpy(json_string,raw_string,string_byte_length);
             mxFree(raw_string);
 
+            //TODO: I'm not thrilled with this being here and above
             json_string[string_byte_length] = 0;
-            json_string[string_byte_length+1] = '"';
-            for (int i = 2; i < N_PADDING; i++){
+            json_string[string_byte_length+1] = '\\';
+            json_string[string_byte_length+2] = '"';
+            for (int i = 3; i < N_PADDING; i++){
                 json_string[string_byte_length + i] = 0;
             }
         }
@@ -171,6 +171,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 
     setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
 
+// // //     //mxArray testing = mxCreateNumericArray(0,0,mxCHAR_CLAS,0);
+// // //     int16_t *char_data = mxMalloc(10*2);
+// // //     char_data[0] = 116;
+// // //     char_data[1] = 101;
+// // //     char_data[2] = 115;
+// // //     char_data[3] = 116;
+// // //     char_data[4] = 105;
+// // //     
+// // //     setStructField(plhs[0],char_data,"testing",mxCHAR_CLASS,10);
+    
+    
     //Token parsing
     //-------------
     TIC(start_parse);
@@ -185,6 +196,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     TIC(start_pp);
     
     parse_numbers(json_string,plhs);
+    
+    parse_strings(json_string,plhs);
     
     TOC_AND_LOG(start_pp,elapsed_pp_time);
     

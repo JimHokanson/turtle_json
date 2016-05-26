@@ -1,9 +1,9 @@
-function bark2()
-file_path = 'H:\example_data\1.json';
-N = 5;
+function jt = bark2()
+file_path = 'C:\D\example_JSON\1.json';
+N = 20;
 d1_all = zeros(1,N);
 t3 = tic;
-for i = 1:20
+for i = 1:N
     jt = json.tokens(file_path);
 	%jt = json.tokens(file_path,'chars_per_token',10);
     d1_all(i) = jt.toc_non_read_time;
