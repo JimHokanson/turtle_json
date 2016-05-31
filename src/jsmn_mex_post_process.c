@@ -330,20 +330,30 @@ void parse_strings(unsigned char *js,mxArray *plhs[]) {
     mxArray  **mxStrings = mxMalloc( n_keys * sizeof(mxArray *));
     uint16_t *key_data = mxMalloc( (*n_key_chars) * sizeof(uint16_t *));
     
-    //TODO: Move this 
     temp = mxGetField(plhs[0],0,"key_start_indices");
     int *key_start_indices = (int *)mxGetData(temp);
     
+    temp = mxGetField(plhs[0],0,"key_end_indices");
+    int *key_end_indices = (int *)mxGetData(temp);
+    
     #pragma omp parallel for
     for (int i = 0; i < n_keys; i++){
-        //Algorithm
-        //1) Grab start from 
+
         unsigned char *p = keys_p[i];
-        int start_index = key_start_indices[i];
-        //key_start_indices[i] = start_index;
+        int cur_index = key_start_indices[i];
+
+        //Shifting to Matlab numbering - might do earlier
+        key_start_indices[i] += 1;
         
-        //Start parsing of the current key
-        key_data[start_index] = *p;
+        while (*p != '"') {
+            //TODO:
+            //1) check for \
+            //2) check for non-ASCII
+            key_data[cur_index] = *p;
+            ++p;
+            ++cur_index;
+        }
+        key_end_indices[i] = cur_index;
     } 
         
     TOC_AND_LOG(key_parse,key_parsing_time);    

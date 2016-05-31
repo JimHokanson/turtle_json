@@ -73,9 +73,10 @@ classdef tokens
     
         
         numeric_data
-        key_strings
+        key_data
+        key_starts
+        key_ends
         strings
-        keys
         
         mex
         
@@ -120,7 +121,6 @@ classdef tokens
             obj.mex = result;
             
             obj.strings = result.string_p;
-            obj.keys = result.key_p;
             
             obj.file_string = result.json_string;
             
@@ -130,7 +130,10 @@ classdef tokens
             obj.numeric_data = result.numeric_p;
             %obj.numeric_data = result.numeric_data;
             
-            obj.key_strings = result.key_data;
+            obj.key_data = result.key_data;
+            obj.key_starts = result.key_start_indices;
+            obj.key_ends = result.key_end_indices;
+            
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);
