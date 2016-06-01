@@ -22,14 +22,13 @@
 //TODO: Create method for creating scalar and saving into struct - for above TODO
 
 
-//TODO: Assume TAC is 1 ahead
 //TODO: Build in if statements on keys
-//TODO: Pad with empty first setting to allow using uint instead of int (padding would allow removal of -1)
 
 //TODO: replace with a goto for more information
-#define ERROR_DEPTH mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+
 
 //DEBUGGING
+#define ERROR_DEPTH goto S_ERROR_DEPTH;
 
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
@@ -67,16 +66,26 @@
     key_end_indices = mxRealloc(key_end_indices,(current_key_index + 1) * sizeof(int)); \
     key_start_indices = mxRealloc(key_start_indices,(current_key_index + 1) * sizeof(int));
     
-#define ALLOCATE_STRING_DATA  unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *)); 
+    
+#define ALLOCATE_STRING_DATA \
+    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *)); \
+    int *string_end_indices = mxMalloc(string_size_allocated * sizeof(int)); \
+    int *string_start_indices = mxMalloc(string_size_allocated * sizeof(int));
 #define INCREMENT_STRING_INDEX \
     ++current_string_index; \
     if (current_string_index >= string_size_index_max) { \
         string_size_allocated = ceil(1.5*string_size_allocated); \
         string_size_index_max = string_size_allocated - 1; \
         string_p = mxRealloc(string_p,string_size_allocated * sizeof(unsigned char *)); \
+        string_end_indices = mxRealloc(string_end_indices,string_size_allocated * sizeof(int)); \
+        string_start_indices = mxRealloc(string_start_indices,string_size_allocated * sizeof(int)); \
     }
-#define TRUNCATE_STRING_DATA  string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *));   
+#define TRUNCATE_STRING_DATA \
+    string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *)); \
+	string_end_indices = mxRealloc(string_end_indices,(current_string_index + 1) * sizeof(int)); \
+ 	string_start_indices = mxRealloc(string_start_indices,(current_string_index + 1) * sizeof(int));
     
+
 #define ALLOCATE_NUMERIC_DATA unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));  
 //uint64_t *numeric_p = mxMalloc(numeric_size_allocated * sizeof(uint64_t));    
 #define EXPAND_NUMERIC_CHECK \
@@ -131,10 +140,14 @@
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_STRING); \
     temp_p = CURRENT_POINTER; \
-    string_p[current_string_index] = CURRENT_POINTER; \
-    d1[current_data_index] = current_string_index; \
+    string_p[current_string_index] = CURRENT_POINTER + 1; \
+    string_start_indices[current_string_index] = n_string_chars; \
+    d1[current_data_index] = current_string_index + 1; \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
-    d2[current_data_index] = CURRENT_POINTER - temp_p;        
+    n_string_chars += CURRENT_POINTER - string_p[current_string_index]; \
+    string_end_indices[current_string_index] = n_string_chars;
+            
+    //d2[current_data_index] = CURRENT_POINTER - temp_p;        
             
     //d2[current_data_index] = CURRENT_POINTER - string_p[current_string_index];
 
@@ -495,7 +508,6 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int *d2 = mxMalloc(data_size_allocated * sizeof(int));
     //---------------------------------------------------------------------
     
-    //TODO: track reallocations
     int n_key_chars = 0;
     int n_key_allocations  = 1;
     int key_size_allocated = ceil(string_byte_length/20);
@@ -503,6 +515,7 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int current_key_index = -1;
     ALLOCATE_KEY_DATA 
     
+    int n_string_chars = 0;
     int n_string_allocations = 1;
     int string_size_allocated = ceil(string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
@@ -775,6 +788,9 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
+S_ERROR_DEPTH:
+    mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+    
 finish_main:
     
     types = mxRealloc(types,(current_data_index + 1));
@@ -788,6 +804,7 @@ finish_main:
      
     setIntScalar(plhs[0],"n_key_allocations",n_key_allocations);
     setIntScalar(plhs[0],"n_key_chars",n_key_chars);
+    setIntScalar(plhs[0],"n_string_chars",n_string_chars);
     setIntScalar(plhs[0],"n_string_allocations",n_string_allocations);
     setIntScalar(plhs[0],"n_numeric_allocations",n_numeric_allocations);
     
@@ -800,6 +817,8 @@ finish_main:
     
     TRUNCATE_STRING_DATA
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
+    setStructField(plhs[0],string_end_indices,"string_end_indices",mxINT32_CLASS,current_string_index + 1);
+    setStructField(plhs[0],string_start_indices,"string_start_indices",mxINT32_CLASS,current_string_index + 1);
     
     TRUNCATE_NUMERIC_DATA
     //Note, it seems the class type may only be needed for viewing in Matlab

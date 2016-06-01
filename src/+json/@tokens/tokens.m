@@ -76,7 +76,9 @@ classdef tokens
         key_data
         key_starts
         key_ends
-        strings
+        string_data
+        string_starts
+        string_ends
         
         mex
         
@@ -119,9 +121,7 @@ classdef tokens
             result = jsmn_mex(file_path);
             
             obj.mex = result;
-            
-            obj.strings = result.string_p;
-            
+                        
             obj.file_string = result.json_string;
             
             obj.types = result.types;
@@ -133,6 +133,10 @@ classdef tokens
             obj.key_data = result.key_data;
             obj.key_starts = result.key_start_indices;
             obj.key_ends = result.key_end_indices;
+            
+            obj.string_data = result.string_data;
+            obj.string_starts = result.string_start_indices;
+            obj.string_ends = result.string_end_indices;
             
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
@@ -150,7 +154,7 @@ classdef tokens
             %- also need string_p, key_p, numeric_p
         end
         function root = getRootInfo(obj)
-            switch obj.data(1)
+            switch obj.types(1)
                 case 1
                     %name,full_name,index,parse_object
                     root = json.token_info.object_token_info('root','root',1,obj);

@@ -41,23 +41,29 @@ classdef object_token_info
             
             p = parse_object;
             
-%         1) object: 1) type  2) parent      3) tac     4) n_values
-%         2) array:  1) type  2) parent      3) tac     4) n_values
-%         3) key:    1) type  2) parent      3) tac     4) start/p     5) end
-%         4) string: 1) type  2) start/p     3) end
-%         5) number: 1) type  2) start/p     3) info
-%         6) null:   1) type  2) <nothing>/p 3) <nothing>
-%         t/f:    1) type
+%     object: 1) type  2) n_values        3) tac
+%     array:  1) type  2) n_values        3) tac
+%     key:    1) type  2) start_pointer   3) tac
+%             
+%     string: 1) type  2) start_pointer   3) end of string
+%     number: 1) type  2) start_pointer
+%     null:   1) type  2) start_pointer
+%     tf      1) type
+    
             
-
-            data = p.data;
             
-            n_attributes = data(index+3);
-            key_start_I  = index+4;
+            key_data = p.key_data;
+            key_starts = p.key_starts;
+            key_ends = p.key_ends;
+            
+            n_attributes = p.d1(index);
+            key_start_I  = index + 1;
             
             a_indices = zeros(1,n_attributes,'int32');
             a_names   = cell(1,n_attributes);
-                        
+            
+            keyboard
+            
             %Value: integer
             %TODO: initialize map with string and indices
             map = containers.Map;

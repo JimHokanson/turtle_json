@@ -306,7 +306,9 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
 //
 //feature('DefaultCharacterSet')
 //malloc/free then memcpy
-void parse_strings(unsigned char *js,mxArray *plhs[]) {
+//
+//We might eventually parse keys and strings differently ...
+void parse_keys(unsigned char *js,mxArray *plhs[]) {
 
     mxArray *temp = mxGetField(plhs[0],0,"key_p");
     
@@ -359,5 +361,61 @@ void parse_strings(unsigned char *js,mxArray *plhs[]) {
     TOC_AND_LOG(key_parse,key_parsing_time);    
     
     setStructField(plhs[0],key_data,"key_data",mxCHAR_CLASS,*n_key_chars);
+    
+}
+
+void parse_strings(unsigned char *js,mxArray *plhs[]) {
+
+    mxArray *temp = mxGetField(plhs[0],0,"string_p");
+    
+    //Create a string array and replace d1 and d2 with start and end
+    //pointers
+    
+    //Start - in data
+    //End - in array
+    
+    //
+    
+    //Casting for input handling
+    unsigned char **strings_p = (unsigned char **)mxGetData(temp);
+    int n_strings = mxGetN(temp);
+    
+    temp = mxGetField(plhs[0],0,"n_string_chars");
+    int *n_string_chars = (int *)mxGetData(temp);
+    
+    TIC(string_parse);
+    
+    mxArray  **mxStrings = mxMalloc( n_strings * sizeof(mxArray *));
+    uint16_t *string_data = mxMalloc( (*n_string_chars) * sizeof(uint16_t *));
+    
+    temp = mxGetField(plhs[0],0,"string_start_indices");
+    int *string_start_indices = (int *)mxGetData(temp);
+    
+    temp = mxGetField(plhs[0],0,"string_end_indices");
+    int *string_end_indices = (int *)mxGetData(temp);
+    
+    #pragma omp parallel for
+    for (int i = 0; i < n_strings; i++){
+
+        unsigned char *p = strings_p[i];
+        int cur_index = string_start_indices[i];
+
+        //Shifting to Matlab numbering - might do earlier
+        string_start_indices[i] += 1;
+        
+        while (*p != '"') {
+            //TODO:
+            //1) check for \
+            //2) check for non-ASCII
+            string_data[cur_index] = *p;
+            ++p;
+            ++cur_index;
+        }
+        string_end_indices[i] = cur_index;
+    } 
+        
+    TOC_AND_LOG(string_parse,string_parsing_time);    
+    
+    setStructField(plhs[0],string_data,"string_data",mxCHAR_CLASS,*n_string_chars);
     
 }

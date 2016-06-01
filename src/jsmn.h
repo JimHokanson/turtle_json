@@ -57,6 +57,8 @@
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
 
+void parse_keys(unsigned char *js,mxArray *plhs[]);    
+    
 void parse_strings(unsigned char *js,mxArray *plhs[]);
     
 void parse_numbers(unsigned char *js, mxArray *plhs[]);

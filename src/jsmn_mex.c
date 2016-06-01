@@ -197,6 +197,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     
     parse_numbers(json_string,plhs);
     
+    parse_keys(json_string,plhs);
+    
     parse_strings(json_string,plhs);
     
     TOC_AND_LOG(start_pp,elapsed_pp_time);
