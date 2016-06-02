@@ -39,47 +39,35 @@ classdef array_token_info
     end
     
     methods
-        function obj = array_token_info(name,full_name,index,parse_object)
+        function obj = array_token_info(name,full_name,index,p)
             obj.name = name;
             obj.full_name = full_name;
             obj.index = index;
-            obj.p = parse_object;
+            obj.p = p;
             
-            obj.n_elements = parse_object.sizes(index);
-        end
-        % % % % %         function output = getIndex(obj,index)
-        % % % % %
-        % % % % %            p = obj.p;
-        % % % % %            I = obj.index+1;
-        % % % % %            %TODO: Make this a lazy attribute
-        % % % % %            tokens_after_close = p.tokens_after_close;
-        % % % % %            for iIndex = 2:index
-        % % % % %               I = tokens_after_close(I);
-        % % % % %            end
-        % % % % %
-        % % % % %            name = sprintf('(%d)',index);
-        % % % % %            full_name = [obj.full_name name];
-        % % % % %
-        % % % % %            switch obj.p.types(1)
-        % % % % %                case 1
-        % % % % %                    output = json.token_info.object_token_info(name,full_name,I,p);
-        % % % % %                case 2
-        % % % % %                    error('NYI');
-        % % % % %                case 3
-        % % % % %                    error('NYI');
-        % % % % %                case 4
-        % % % % %                    error('NYI');
-        % % % % %                otherwise
-        % % % % %                    error('Not yet supported')
-        % % % % %            end
-        % % % % %         end
+%     object: 1) type  2) n_values        3) tac
+%     array:  1) type  2) n_values        3) tac
+%     key:    1) type  2) start_pointer   3) tac
+%             
+%     string: 1) type  2) start_pointer   3) end of string
+%     number: 1) type  2) start_pointer
+%     null:   1) type  2) start_pointer
+%     tf      1) type
+            
+            obj.n_elements = p.d1(index);
+        end        
         function output = getCellstr(obj)
+        
+           keyboard
+            
            %TODO: Add on optional error check ...  
            start_index = obj.index + 1;
            end_index   = obj.index + obj.n_elements;
            output      = obj.p.strings(start_index:end_index); 
         end
         function output = get1dNumericArray(obj)
+            
+            keyboard
            %TODO: Add on optional error check ... 
            start_index = obj.index + 1;
            end_index   = obj.index + obj.n_elements;
@@ -90,9 +78,13 @@ classdef array_token_info
 % % %            end
         end
         function output = get2dNumericArray(obj)
+            
+            keyboard
            error('Not yet implemented') 
         end
         function output = getArrayOf1dNumericArrays(obj)
+            
+            keyboard
            output = cell(1,obj.n_elements);
            array_I = obj.index + 1;
 
@@ -109,10 +101,20 @@ classdef array_token_info
         function output = getObjectArray(obj)
             %
             %   Use this when the array holds all objects
-            %
+            
+%     object: 1) type  2) n_values        3) tac
+%     array:  1) type  2) n_values        3) tac
+%     key:    1) type  2) start_pointer   3) tac
+%             
+%     string: 1) type  2) start_pointer   3) end of string
+%     number: 1) type  2) start_pointer
+%     null:   1) type  2) start_pointer
+%     tf      1) type
+            
+            
             local_p = obj.p;
+            tokens_after_close = local_p.d2;
             I = obj.index+1;
-            tokens_after_close = local_p.tokens_after_close;
             n_objects = obj.n_elements;
             temp_output = cell(1,n_objects);
             for iObject = 1:n_objects
@@ -125,17 +127,6 @@ classdef array_token_info
             
             output = [temp_output{:}];
         end
-% % % % %         function output = getNumericArray(obj,dims)
-% % % % %             
-% % % % %             if nargin == 0
-% % % % %                 dims = 1;
-% % % % %             end
-% % % % %             
-% % % % %             if dims == 1
-% % % % %                 keyboard
-% % % % %             end
-% % % % %             output = [];
-% % % % %         end
     end
     
 end

@@ -215,11 +215,16 @@
     
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
-
+//Note that we're working with the current_data_index since we haven't
+//advanced it yet and don't need to rely on a parent index (which hasn't even
+//been set since the value is simple)
 #define STORE_TAC_KEY_SIMPLE d2[current_data_index] = current_data_index + 3;  
     
-#define STORE_TAC_KEY_COMPLEX d2[current_parent_index+1] = current_data_index + 2;    
+//#define STORE_TAC_KEY_COMPLEX d2[current_parent_index+1] = current_data_index + 2;    
+
+#define STORE_TAC_KEY_COMPLEX d2[current_parent_index] = current_data_index + 2;    
             
+    
 #define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
             
 #define MOVE_UP_PARENT_INDEX --current_depth;

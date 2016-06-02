@@ -8,24 +8,23 @@ classdef object_token_info
         name
         full_name
         index
-        attribute_names
+        key_indices
+        key_names
         attribute_indices
-    end
-    
-    properties (Dependent)
         attribute_types
-        attribute_sizes
+        
+
     end
     
-    methods
-        function value = get.attribute_types(obj)
-            temp  = obj.p.types(obj.attribute_indices);
-            value = json.TYPES(temp);
-        end
-        function value = get.attribute_sizes(obj)
-            value = obj.p.sizes(obj.attribute_indices);
-        end
-    end
+%     properties (Dependent)
+%         attribute_sizes
+%     end
+%     
+%     methods
+%         function value = get.attribute_sizes(obj)
+%             value = obj.p.sizes(obj.attribute_indices);
+%         end
+%     end
     
     properties (Hidden)
         map
@@ -50,45 +49,45 @@ classdef object_token_info
 %     null:   1) type  2) start_pointer
 %     tf      1) type
     
+            d2 = p.d2;
+            d1 = p.d1;
             
+            %We might change this approach later on ...
             
-            key_data = p.key_data;
-            key_starts = p.key_starts;
-            key_ends = p.key_ends;
+           key_data = p.key_data;
+           key_starts = p.key_starts;
+           key_ends = p.key_ends;
+            
             
             n_attributes = p.d1(index);
             key_start_I  = index + 1;
             
-            a_indices = zeros(1,n_attributes,'int32');
-            a_names   = cell(1,n_attributes);
+            local_key_indices = zeros(1,n_attributes,'int32');
+            local_key_names = cell(1,n_attributes);
             
-            keyboard
-            
-            %Value: integer
-            %TODO: initialize map with string and indices
-            map = containers.Map;
             for iItem = 1:n_attributes
-                cur_value_I =  key_start_I + 5;
-                
-                a_indices(iItem) = cur_value_I;
-                
-                temp_name = sprintf('wtf%d',iItem);
-                
-                %TODO: Fix string parsing so that this works
-                %temp_name = p.string{key_start_I+3};
-                
-                map(temp_name) = iItem;
-                a_names{iItem} = temp_name;
-                key_start_I = data(key_start_I+2);
+               
+               local_key_indices(iItem) = key_start_I;
+               
+               cur_I = d1(key_start_I);
+               local_key_names{iItem} = key_data(key_starts(cur_I):key_ends(cur_I));
+               key_start_I = d2(key_start_I);
             end
-            obj.map = map;
-            obj.attribute_indices = a_indices;
-            obj.attribute_names = a_names;
+            
+            obj.key_indices = local_key_indices;
+            obj.key_names = local_key_names;
+            obj.attribute_indices = local_key_indices + 1;
+            obj.attribute_types = p.types(obj.attribute_indices);
+            
+            obj.map = containers.Map(obj.key_names,1:n_attributes);
+            
         end
         function output = getToken(obj,name)
             
-            I = h__getMapIndex(obj,name);
+            keyboard
             
+            I = h__getMapIndex(obj,name);
+
             local_full_name = [obj.full_name '.' name];
             local_index = obj.attribute_indices(I);
             
@@ -129,7 +128,10 @@ classdef object_token_info
             output = json.token_info.array_token_info(name,local_full_name,local_index,local_p);
         end
         function output = getNumericToken(obj,name)
-                      I = h__getMapIndex(obj,name); 
+           
+           keyboard
+            
+           I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
            %TODO: Check type
            output = obj.p.numeric_data(local_index); 
@@ -139,12 +141,17 @@ classdef object_token_info
            %    Use this to retrieve a string token. This function also
            %    checks that the name of the requested key is a string
            
+           keyboard
+           
            I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
            %TODO: Check type
            output = obj.p.strings{local_index};
         end
         function output = getStringOrCellstr(obj,name)
+            
+           keyboard 
+            
            I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
            if obj.p.types(local_index) == 2
