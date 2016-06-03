@@ -67,15 +67,17 @@ classdef array_token_info
         end
         function output = get1dNumericArray(obj)
             
-            keyboard
-           %TODO: Add on optional error check ... 
+           lp = obj.p;
            start_index = obj.index + 1;
            end_index   = obj.index + obj.n_elements;
-           output      = obj.p.numeric_data(start_index:end_index);
+           start_numeric_index = lp.d1(start_index);
+           end_numeric_index = lp.d1(end_index);
+           if (end_index-start_index) ~= (end_numeric_index-start_numeric_index)
+              error('Array is not purely numeric') 
+           end
            
-% % %            if any(obj.p.types(start_index:end_index) ~= 4)
-% % %               error('Not all values were numeric') 
-% % %            end
+           output = lp.numeric_data(start_numeric_index:end_numeric_index);
+
         end
         function output = get2dNumericArray(obj)
             

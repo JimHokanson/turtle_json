@@ -186,7 +186,8 @@
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_NUMBER); \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    d1[current_data_index] = current_numeric_index; \
+    /* Add 1 for Matlab indexing */ \
+    d1[current_data_index] = current_numeric_index + 1; \
     string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
     
 #define PROCESS_NULL \
@@ -338,10 +339,14 @@
         default: \
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
 	}
-
-#define NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY \
+    
+#define NAVIGATE_AFTER_OPENING_ARRAY \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
-    DO_ARRAY_JUMP;
+    if (CURRENT_CHAR == ']'){ \
+       goto S_CLOSE_ARRAY; \
+    }else{ \
+       DO_ARRAY_JUMP; \
+    }
     
 #define NAVIGATE_AFTER_CLOSING_COMPLEX \
 	if (IS_NULL_PARENT_INDEX) { \
@@ -544,7 +549,7 @@ void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
             NAVIGATE_AFTER_OPENING_OBJECT;
         case '[':
             PROCESS_OPENING_ARRAY;
-            NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
+            NAVIGATE_AFTER_OPENING_ARRAY;
         default:
             mexErrMsgIdAndTxt("jsmn_mex:invalid_start", "Starting token needs to be an opening object or array");
 	}
@@ -590,7 +595,7 @@ S_OPEN_ARRAY_IN_ARRAY:
     
     INCREMENT_PARENT_SIZE;
     PROCESS_OPENING_ARRAY;   
-    NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
+    NAVIGATE_AFTER_OPENING_ARRAY;
     
 //=============================================================
 S_OPEN_ARRAY_IN_KEY:
@@ -599,7 +604,7 @@ S_OPEN_ARRAY_IN_KEY:
     
     INITIALIZE_PARENT_INFO(TYPE_KEY);
     PROCESS_OPENING_ARRAY;
-	NAVIGATE_AFTER_OPENING_ARRAY_OR_AFTER_COMMA_IN_ARRAY;
+	NAVIGATE_AFTER_OPENING_ARRAY;
             
 //=============================================================
 S_CLOSE_ARRAY:

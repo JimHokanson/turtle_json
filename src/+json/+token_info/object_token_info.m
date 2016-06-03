@@ -83,29 +83,44 @@ classdef object_token_info
             
         end
         function output = getToken(obj,name)
-            
-            keyboard
-            
+
             I = h__getMapIndex(obj,name);
 
             local_full_name = [obj.full_name '.' name];
             local_index = obj.attribute_indices(I);
             
-            local_p = obj.p;
+            lp = obj.p;
             
-            switch local_p.types(local_index)
+            
+            % #define TYPE_OBJECT 1
+            % #define TYPE_ARRAY  2
+            % #define TYPE_KEY    3
+            % #define TYPE_STRING 4
+            % #define TYPE_NUMBER 5
+            % #define TYPE_NULL   6
+            % #define TYPE_TRUE   7
+            % #define TYPE_FALSE  8
+            
+            
+            switch lp.types(local_index)
                 case 1
-                    output = json.token_info.object_token_info(name,local_full_name,local_index,local_p);
+                    output = json.token_info.object_token_info(name,local_full_name,local_index,lp);
                 case 2
-                    output = json.token_info.array_token_info(name,local_full_name,local_index,local_p);
+                    output = json.token_info.array_token_info(name,local_full_name,local_index,lp);
                 case 3
-                    output = obj.p.strings{local_index};
+                    error('Unexpected value type of key')
                 case 4
-                    output = obj.p.numeric_data(local_index);
+                    output = lp.strings(lp.d1(local_index));
                 case 5
-                    output = logical(obj.p.numeric_data(local_index));
+                    output = lp.numeric_data(lp.d1(local_index));
+                case 6
+                    output = NaN;
+                case 7
+                    output = true;
+                case 8
+                    output = false;
                 otherwise
-                    error('Unrecognized token type: %d',local_p.types(local_index))
+                    error('Unrecognized token type: %d',lp.types(local_index))
             end
         end
         function output = getParsedToken(obj,name)
@@ -140,13 +155,11 @@ classdef object_token_info
            %
            %    Use this to retrieve a string token. This function also
            %    checks that the name of the requested key is a string
-           
-           keyboard
-           
+
+           lp = obj.p;
            I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
-           %TODO: Check type
-           output = obj.p.strings{local_index};
+           output = lp.strings{lp.d1(local_index)};
         end
         function output = getStringOrCellstr(obj,name)
             
