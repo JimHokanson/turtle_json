@@ -66,39 +66,61 @@ classdef array_token_info
            output      = obj.p.strings(start_index:end_index); 
         end
         function output = get1dNumericArray(obj)
-            
-           lp = obj.p;
-           start_index = obj.index + 1;
-           end_index   = obj.index + obj.n_elements;
-           start_numeric_index = lp.d1(start_index);
-           end_numeric_index = lp.d1(end_index);
-           if (end_index-start_index) ~= (end_numeric_index-start_numeric_index)
-              error('Array is not purely numeric') 
-           end
            
-           output = lp.numeric_data(start_numeric_index:end_numeric_index);
+           lp = obj.p;
+           n_values = lp.d1;
+           local_index = obj.index;
+           if (n_values(local_index))
+               tac = lp.d2;
+                numeric_pointer = lp.d1;
+                start_numeric_I = numeric_pointer(local_index+1);
+                end_numeric_I = numeric_pointer(tac(local_index)-1);
+                output = lp.numeric_data(start_numeric_I:end_numeric_I);
+           else
+              output = []; 
+           end
 
         end
         function output = get2dNumericArray(obj)
             
+%            lp = obj.p;
+%            local_index = obj.index;
+%            start_index = local_index + 2;
+%            end_index   = lp.d2(local_index)-1;
+%            start_numeric_index = lp.d1(start_index);
+%            end_numeric_index = lp.d1(end_index);
+%            d1_size = lp.d1(local_index+1);
+%            d2_size = (end_numeric_index-start_numeric_index+1)/d1_size)
+           
             keyboard
            error('Not yet implemented') 
         end
         function output = getArrayOf1dNumericArrays(obj)
             
-            keyboard
            output = cell(1,obj.n_elements);
-           array_I = obj.index + 1;
+           
+           lp = obj.p;
+           tac = lp.d2;
+           n_values = lp.d1;
+           numeric_pointer = lp.d1;
+           
+           numeric_data = lp.numeric_data;
 
-           local_numeric_data = obj.p.numeric_data;
-           local_tokens_after_close = obj.p.tokens_after_close;
-           for iCell = 1:obj.n_elements
-              end_I = local_tokens_after_close(array_I)-1;
-              output{iCell} = local_numeric_data(array_I+1:end_I);
-              array_I = local_tokens_after_close(array_I);
+           cur_array_index = obj.index + 1;
+           
+           local_n = obj.n_elements;
+           
+           for iCell = 1:local_n
+              if n_values(cur_array_index)
+                  start_numeric_I = numeric_pointer(cur_array_index+1);
+                  cur_array_index = tac(cur_array_index);
+                  end_numeric_I = numeric_pointer(cur_array_index-1); %Get last value before the start of the next array
+                  output{iCell} = numeric_data(start_numeric_I:end_numeric_I);              
+              else
+                 cur_array_index = cur_array_index + 1;
+              end
            end
-%            keyboard 
-%            error('Not yet implemented')  
+
         end
         function output = getObjectArray(obj)
             %

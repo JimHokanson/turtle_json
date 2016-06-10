@@ -1,29 +1,53 @@
 function output = get_parsed_data(obj,varargin)
-
+%
 %   json.tokens.get_parsed_data
+%   
+%   This should return a generic representation for data.
+%
+%   Optional Inputs
+%   ---------------
+%   index : integer
+%       The current index to parse
+%
+%   TODO: Pass in custom function handles ...
+%       
 
+% #define TYPE_OBJECT 1
+% #define TYPE_ARRAY  2
+% #define TYPE_KEY    3
+% #define TYPE_STRING 4
+% #define TYPE_NUMBER 5
+% #define TYPE_NULL   6
+% #define TYPE_TRUE   7
+% #define TYPE_FALSE  8
 
 in.index = 1;
 in.collapse_array = true;
 in = sl.in.processVarargin(in,varargin);
 
-s = struct;
-s.types = obj.types;
-s.starts = obj.starts;
-s.ends = obj.ends;
-s.sizes = obj.sizes;
-s.parents = obj.parents;
-s.tokens_after_close = obj.tokens_after_close;
-s.numeric_data = obj.numeric_data;
-s.strings = obj.strings;
+s = obj;
 
-
-if s.types(in.index) == 1
-    output = parse_object(in.index,s,in);
-elseif s.types(1) == 2
-    output = parse_array(in.index,s,in);
-else
-    error('Unexpected parent object')
+switch s.types(in.index)
+    case 1
+        output = parse_object(in.index,s,in);
+    case 2
+        output = parse_array(in.index,s,in);
+    case 3
+        %We parse the value from the key
+        in.index = in.index + 1;
+        output = obj.get_parsed_data(in);
+    case 4
+        keyboard
+    case 5
+        keyboard
+    case 6
+        output = NaN;
+    case 7
+        output = true;
+    case 8
+        output = false;
+    otherwise
+        error('Unexpected type')
 end
 
 end
@@ -35,6 +59,8 @@ obj = sl.obj.dict;
 %3 - string
 %2 - array
 cur_name_I = index+1;
+
+keyboard
 
 for iItem = 1:s.sizes(index)
     cur_value_I =  cur_name_I + 1;
