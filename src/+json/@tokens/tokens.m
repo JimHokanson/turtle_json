@@ -8,50 +8,6 @@ classdef tokens
     %   json.fileToTokens
     %   json.stringToTokens
     
-    %{
-    
-    
-    
-    
-    object: 1) type  2) n_values        3) tac
-    array:  1) type  2) n_values        3) tac
-    key:    1) type  2) start_pointer   3) <empty>
-                     2) n_chars         3) tac
-    string: 1) type  2) start_pointer
-    number: 1) type  2) start_pointer
-    null:   1) type  2) start_pointer
-    tf      1) type
-    
-
-    
-    RULES:
-    1) parent-1 => type
-    2) parent+2 => n_values (for array and object)
-    3
-    
-    
-    array
-    - token after close
-    - n_elements
-    - parent
-    
-    key
-    - token_after_close
-    - parent
-    - start/pointer
-    - end
-    
-    string
-    - start/pointer
-    - end
-    
-    number/null/true/false
-    - pointer
-    
-    
-    
-    %}
-    
     properties
         file_string %string of the file
         %We might not hold onto this ...
@@ -61,16 +17,18 @@ classdef tokens
         types
         d1
         d2
-
-%     object: 1) type  2) n_values        3) tac
-%     array:  1) type  2) n_values        3) tac
-%     key:    1) type  2) start_pointer   3) tac
-%             
-%     string: 1) type  2) start_pointer   3) end of string
-%     number: 1) type  2) start_pointer
-%     null:   1) type  2) start_pointer
-%     tf      1) type
-    
+        
+        %************ Current Definitions ************
+        %                       d1                  d2
+        %     object: 1) type  2) n_values        3) tac
+        %     array:  1) type  2) n_values        3) tac
+        %     key:    1) type  2) start_pointer   3) tac
+        %
+        %     string: 1) type  2) start_pointer   3) end of string
+        %     number: 1) type  2) start_pointer
+        %     null:   1) type  2) start_pointer
+        %     tf      1) type
+        
         
         numeric_data
         key_data
@@ -96,8 +54,8 @@ classdef tokens
         chars_per_token
     end
     
-
-      
+    
+    
     methods
         function obj = tokens(file_path,varargin)
             %
@@ -122,7 +80,7 @@ classdef tokens
             result = jsmn_mex(file_path);
             
             obj.mex = result;
-                        
+            
             obj.file_string = result.json_string;
             
             obj.types = result.types;
@@ -145,7 +103,7 @@ classdef tokens
             n_strings = length(result.string_end_indices);
             temp_strings = cell(1,n_strings);
             for iString = 1:n_strings
-               temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString)); 
+                temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString));
             end
             
             obj.strings = temp_strings;
@@ -164,7 +122,7 @@ classdef tokens
             obj.chars_per_token = length(obj.file_string)/length(obj.d1);
             
             %TODO: Provide estimate of memory consumption
-            %types + 4*d1 + 4*d2 + 8*numeric_data 
+            %types + 4*d1 + 4*d2 + 8*numeric_data
             %- also need string_p, key_p, numeric_p
         end
         function root = getRootInfo(obj)
@@ -181,18 +139,19 @@ classdef tokens
         end
         
         %TODO: This needs to be redone
-%         function output = viewOldInfo(obj,indices)
-%             output = [num2cell(indices);
-%                 json.TYPES(obj.types(indices));
-%                 num2cell(obj.starts(indices));
-%                 num2cell(obj.ends(indices));
-%                 num2cell(obj.sizes(indices));
-%                 num2cell(obj.parents(indices));
-%                 num2cell(obj.tokens_after_close(indices));
-%                 num2cell(obj.numeric_data(indices));
-%                 obj.strings(indices)];
-%             output = [{'indices','type','start','end','size','parent','token_after_close','value','string'}' output];
-%         end
+        %         function output = viewOldInfo(obj,indices)
+        %             output = [num2cell(indices);
+        %                 json.TYPES(obj.types(indices));
+        %                 num2cell(obj.starts(indices));
+        %                 num2cell(obj.ends(indices));
+        %                 num2cell(obj.sizes(indices));
+        %                 num2cell(obj.parents(indices));
+        %                 num2cell(obj.tokens_after_close(indices));
+        %                 num2cell(obj.numeric_data(indices));
+        %                 obj.strings(indices)];
+        %             output = [{'indices','type','start','end','size','parent','token_after_close','value','string'}' output];
+        %         end
+
     end
     
 end

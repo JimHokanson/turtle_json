@@ -48,31 +48,10 @@ classdef object_token_info
 %     number: 1) type  2) start_pointer
 %     null:   1) type  2) start_pointer
 %     tf      1) type
-    
-            d2 = p.d2;
-            d1 = p.d1;
-            
-            %We might change this approach later on ...
-            
-           key_data = p.key_data;
-           key_starts = p.key_starts;
-           key_ends = p.key_ends;
-            
             
             n_attributes = p.d1(index);
-            key_start_I  = index + 1;
             
-            local_key_indices = zeros(1,n_attributes,'int32');
-            local_key_names = cell(1,n_attributes);
-            
-            for iItem = 1:n_attributes
-               
-               local_key_indices(iItem) = key_start_I;
-               
-               cur_I = d1(key_start_I);
-               local_key_names{iItem} = key_data(key_starts(cur_I):key_ends(cur_I));
-               key_start_I = d2(key_start_I);
-            end
+            [local_key_names,local_key_indices] = p.getKeyInfo(index);
             
             obj.key_indices = local_key_indices;
             obj.key_names = local_key_names;
@@ -110,7 +89,7 @@ classdef object_token_info
                 case 3
                     error('Unexpected value type of key')
                 case 4
-                    output = lp.strings(lp.d1(local_index));
+                    output = lp.strings{lp.d1(local_index)};
                 case 5
                     output = lp.numeric_data(lp.d1(local_index));
                 case 6
@@ -143,13 +122,14 @@ classdef object_token_info
             output = json.token_info.array_token_info(name,local_full_name,local_index,local_p);
         end
         function output = getNumericToken(obj,name)
+                      
+           lp = obj.p;
+           numeric_pointer = lp.d1;
            
-           keyboard
-            
            I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
            %TODO: Check type
-           output = obj.p.numeric_data(local_index); 
+           output = obj.p.numeric_data(numeric_pointer(local_index)); 
         end
         function output = getTokenString(obj,name)
            %
@@ -162,18 +142,19 @@ classdef object_token_info
            output = lp.strings{lp.d1(local_index)};
         end
         function output = getStringOrCellstr(obj,name)
-            
-           keyboard 
-            
+           
+           lp = obj.p;
            I = h__getMapIndex(obj,name); 
            local_index = obj.attribute_indices(I);
-           if obj.p.types(local_index) == 2
+           if lp.types(local_index) == 2
                %array
                %TODO: We can avoid the object creation ...
                temp = json.token_info.array_token_info('','',local_index,obj.p);
                output = temp.getCellstr();
            else
-               output = obj.p.strings{local_index};
+               %TODO: Verify type is string
+               string_pointer = lp.d1(local_index);
+               output = lp.strings{string_pointer};
            end
         end
     end

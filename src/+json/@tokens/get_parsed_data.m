@@ -1,7 +1,7 @@
 function output = get_parsed_data(obj,varargin)
 %
 %   json.tokens.get_parsed_data
-%   
+%
 %   This should return a generic representation for data.
 %
 %   Optional Inputs
@@ -10,7 +10,8 @@ function output = get_parsed_data(obj,varargin)
 %       The current index to parse
 %
 %   TODO: Pass in custom function handles ...
-%       
+%
+%   TODO: Ideally this portion would be written in C
 
 % #define TYPE_OBJECT 1
 % #define TYPE_ARRAY  2
@@ -58,39 +59,63 @@ obj = sl.obj.dict;
 
 %3 - string
 %2 - array
-cur_name_I = index+1;
 
-keyboard
+n_keys = s.d1;
 
-for iItem = 1:s.sizes(index)
-    cur_value_I =  cur_name_I + 1;
-    key = s.strings{cur_name_I};
-    switch s.types(cur_value_I)
+types = s.types;
+
+[local_key_names,local_key_indices] = s.getKeyInfo(index);
+
+% #define TYPE_OBJECT 1
+% #define TYPE_ARRAY  2
+% #define TYPE_KEY    3
+% #define TYPE_STRING 4
+% #define TYPE_NUMBER 5
+% #define TYPE_NULL   6
+% #define TYPE_TRUE   7
+% #define TYPE_FALSE  8
+
+attribute_indices = local_key_indices + 1;
+
+
+for iItem = 1:n_keys(index)
+    cur_key = local_key_names(iItem);
+    cur_value_I = attribute_indices(iItem);
+    
+    switch types(cur_value_I)
         case 1
             value = parse_object(cur_value_I,s,in);
         case 2
             value = parse_array(cur_value_I,s,in);
         case 3
-            value = s.strings{cur_value_I};
+            %This should never happen because the JSON parser won't allow
+            %it
+            error('A key should not contain a key')
         case 4
-            value = s.numeric_data(cur_value_I);
+            value = s.strings(cur_value_I);
         case 5
-            value = logical(s.numeric_data(cur_value_I));
+            value = s.numeric_data(cur_value_I);
+        case 6
+            value = NaN;
+        case 7
+            value = true;
+        case 8
+            value = false;
         otherwise
-            error('Unexpected value')
+            error('Unexpected type')
     end
-    obj.(key) = value;
-    cur_name_I = s.tokens_after_close(cur_name_I);
+    obj.(cur_key) = value;
 end
 end
 
 function output = parse_array(index,s,in)
 
-n_items = s.sizes(index);
+n_items = s.d1(index);
+tac = s.d2;
 
 if n_items == 0
-   output = [];
-   return
+    output = [];
+    return
 end
 
 % output = [];
@@ -103,28 +128,57 @@ types = s.types;
 %3) value - same - single array
 %         - diff - go to full loop
 
+
+% #define TYPE_OBJECT 1
+% #define TYPE_ARRAY  2
+% #define TYPE_KEY    3
+% #define TYPE_STRING 4
+% #define TYPE_NUMBER 5
+% #define TYPE_NULL   6
+% #define TYPE_TRUE   7
+% #define TYPE_FALSE  8
+
 switch types(index+1)
     case 1 %object
         %pass
     case 2 %array
         %pass - for now
-    case 3 %string
-        if s.tokens_after_close(index)-index == n_items + 1 && ...
-                all(s.types(index+1:index+n_items) == 3)
-           output = s.strings(index+1:index+n_items);
-           return
+    case 3 %key
+        error('Unexpected type: key')
+    case 4 %string
+        keyboard
+        if tac(index)-index == n_items + 1 && ...
+                all(types(index+1:index+n_items) == 3)
+
+                string_pointer = s.d1;
+                tac = lp.d2;
+                start_index = string_pointer(index+1);
+                end_index = string_pointer(tac(index)-1);
+
+                output      = s.strings(start_index:end_index);
+            
+            return
         end
-    case 4
-        if s.tokens_after_close(index)-index == n_items + 1 && ...
-                all(s.types(index+1:index+n_items) == 4)
-           output = s.numeric_data(index+1:index+n_items); 
-           return
+    case {5,6}
+        if tac(index)-index == n_items + 1 && types(index+n_items) == 5
+            
+            numeric_pointer = s.d1;
+            start_numeric_I = numeric_pointer(index+1);
+            end_numeric_I = numeric_pointer(tac(index)-1);
+            
+            if end_numeric_I - start_numeric_I == n_items - 1
+                output = s.numeric_data(start_numeric_I:end_numeric_I);
+            end
+            
+            return
         end
-    case 5
-        if s.tokens_after_close(index)-index == n_items + 1 && ...
-                all(s.types(index+1:index+n_items) == 5)
-           output = logical(s.numeric_data(index+1:index+n_items)); 
-           return
+        
+    case {7,8} %logical
+        if tac(index)-index == n_items + 1
+            if all(types(index+1:index+n_items) == 7 | types(index+1:index+n_items) == 8);
+                output = types(index+1:index+n_items) == 7;
+                return
+            end
         end
     otherwise
         error('unexpected type')
@@ -132,7 +186,7 @@ end
 
 output = cell(1,n_items);
 cur_I  = index+1;
-tokens_after_close = s.tokens_after_close;
+tokens_after_close = tac;
 for iItem = 1:n_items
     switch s.types(cur_I)
         case 1
@@ -150,71 +204,5 @@ for iItem = 1:n_items
     end
     cur_I = tokens_after_close(cur_I);
 end
-        
-%Old code related to matrix parsing ...            
-
-% % % % next_type = j(1,index+1);
-% % % % if next_type == 1
-% % % %     %This let's avoid a lot of work up front
-% % % %     
-% % % %     %full_parse = true;
-% % % % elseif j(6,index)-index == n_items + 1
-% % % %    %Then we are not nested, only need to check for
-% % % %    %same value type
-% % % %    types = str(j(2,index+1:index+n_items));
-% % % %    
-% % % %    %TODO: build in type check
-% % % %    %array = numeric_data(j(2,index)+1:j(3,index)-1);
-% % % %    output = numeric_data(index+1:j(6,index)-1);
-% % % %    %temp = textscan(str(j(2,index)+1:j(3,index)-1),'%f','Delimiter',',');
-% % % %    %array = temp{1}';
-% % % %    return
-% % % % else
-% % % %     
-% % % %     %We are nested, objects or arrays present ...
-% % % %     %-----------------------------------------------
-% % % %     
-% % % %     %TODO: Validate that we have [[ %2d array
-% % % %     %any objects - need full parse
-% % % %     %TODO: Need to check data types
-% % % %    %TODO: Build in multi-array support, this only works for 2d
-% % % %    I = (index+1):(j(6,index)-1);
-% % % %    if I(1) == 2
-% % % %        
-% % % %        
-% % % %    end
-% % % %    
-% % % %    array_mask = j(1,I) == 2;
-% % % %    if ~any(array_mask)
-% % % %        
-% % % %    end
-% % % %    %array_I = find(j(1,index+1:j(6,index)-1)==2)+(double(index));
-% % % %    array_sizes = j(4,I(array_mask));
-% % % %    n_arrays = length(array_sizes);
-% % % %    
-% % % %    
-% % % % %        temp = textscan(str(j(2,index)+1:j(3,index)-1),'%f',...
-% % % % %            'Delimiter',{',','[',']'},'MultipleDelimsAsOne',1);
-% % % % %        raw_array_data = temp{1}';
-% % % %    
-% % % %    raw_array_data = numeric_data(I(~array_mask));
-% % % % 
-% % % %    %raw_array_data = numeric_data(j(2,index)+1:j(3,index)-1);    
-% % % %        
-% % % %    if all(array_sizes == array_sizes(1))
-% % % %        output = reshape(raw_array_data,array_sizes(1),n_arrays);
-% % % %    else
-% % % %        output = cell(1,n_arrays);
-% % % %        end_I = 0;
-% % % %        for iArray = 1:n_arrays
-% % % %           start_I = end_I + 1;
-% % % %           end_I = start_I + array_sizes(iArray)-1;
-% % % %           output{iArray} = raw_array_data(start_I:end_I);
-% % % %        end
-% % % %    end
-% % % %    return
-% % % % end
-
-
 
 end
