@@ -1,16 +1,12 @@
 #include "stdio.h" //fopen_s?
 #include <stdlib.h>
 #include <ctype.h>
-#include "mex.h"
+#include "mex.h"        //Matlab mex
 #include <math.h>
-#include "stdint.h"  //uint_8
-#include <string.h> //strchr
-#include <time.h>   //required for clock
-#include <omp.h>
-//This is needed for AVX
-//but, we might not use AVX - SSE4
-//TODO: Need to build in SSE4 and AVX testing support
-//with define flags ...
+#include "stdint.h"     //uint_8
+#include <string.h>     //strchr()
+#include <time.h>       //clock()
+#include <omp.h>        //openmp
 
 //AVX
 //#include "immintrin.h"
@@ -28,8 +24,6 @@
 #define TYPE_TRUE   7
 #define TYPE_FALSE  8
 
-#define JSMN_ERROR_NOMEM -2
-
 /*
  *
  *  Example Usage:
@@ -40,20 +34,20 @@
  *
  */
 
-//TODO: It would be nice to get higher resolution
+//These two MACROS are meant to be used like TIC and TOC in Matlab
+
 #define TIC(x)\
     clock_t x;\
-    x = clock();\
+    x = clock();
             
+//The toc_and_log() macro saves the timing to a field with the name 
+//specified by y
+//#y => y as a string, not as a value "stringification"
 #define TOC_AND_LOG(x,y) \
     double *y = mxMalloc(sizeof(double)); \
     *y = (double)(clock() - x)/CLOCKS_PER_SEC; \
-    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1); \
+    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
     
-
-
-
-
 
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
 
@@ -63,4 +57,4 @@ void parse_strings(unsigned char *js,mxArray *plhs[]);
     
 void parse_numbers(unsigned char *js, mxArray *plhs[]);
 
-void jsmn_parse(unsigned char *js, size_t len, mxArray *plhs[]);
+void parse_json(unsigned char *js, size_t len, mxArray *plhs[]);

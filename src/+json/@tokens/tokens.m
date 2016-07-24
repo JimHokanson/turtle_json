@@ -69,15 +69,17 @@ classdef tokens
             
             
             
-            
-            in.chars_per_token = sl.in.NULL;
-            in.n_tokens = sl.in.NULL;
-            in.raw_string = sl.in.NULL;
+            %These still need to be reimplemented ...
+            in.chars_per_token = json.sl.in.NULL;
+            in.n_tokens = json.sl.in.NULL;
+            in.raw_string = json.sl.in.NULL;
             in.raw_is_padded = false;
-            in = sl.in.processVarargin(in,varargin,'remove_null',true);
+            in = json.sl.in.processVarargin(in,varargin,'remove_null',true);
             
             t0 = tic;
-            result = jsmn_mex(file_path);
+            
+            %The main call
+            result = turtle_json_mex(file_path);
             
             obj.mex = result;
             

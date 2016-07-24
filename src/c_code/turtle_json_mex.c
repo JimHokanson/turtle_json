@@ -6,9 +6,9 @@
  //Windows
  setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
 
- mex CC='/usr/local/Cellar/gcc6/6.1.0/bin/gcc-6' CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
+ mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v
 
-  mex CC='/usr/local/Cellar/gcc6/6.1.0/bin/gcc-6' CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" jsmn_mex.c jsmn.c jsmn_mex_post_process.c -O -v
+ mex CC='/usr/local/Cellar/gcc6/6.1.0/bin/gcc-6' CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v
 
  *
  brew update
@@ -27,7 +27,7 @@
  *
  */
 
-#include "jsmn.h"
+#include "turtle_json.h"
 
 int N_PADDING = 17;
 
@@ -184,28 +184,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     }
 
     //Note, this needs to precede TOC_AND_LOG()
+    //since the logging touches plhs[0]
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
         
     TOC_AND_LOG(start_read,elapsed_read_time);
 
+    //Let's hold onto this for the user. Technically it isn't needed
+    //once we exit this function, since all information is contained in
+    //the other variables
     setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length);
-
-// // //     //mxArray testing = mxCreateNumericArray(0,0,mxCHAR_CLAS,0);
-// // //     int16_t *char_data = mxMalloc(10*2);
-// // //     char_data[0] = 116;
-// // //     char_data[1] = 101;
-// // //     char_data[2] = 115;
-// // //     char_data[3] = 116;
-// // //     char_data[4] = 105;
-// // //     
-// // //     setStructField(plhs[0],char_data,"testing",mxCHAR_CLASS,10);
-    
     
     //Token parsing
     //-------------
     TIC(start_parse);
     
-    jsmn_parse(json_string,string_byte_length,plhs);
+    parse_json(json_string,string_byte_length,plhs);
   
     TOC_AND_LOG(start_parse,elapsed_parse_time);
       
@@ -225,9 +218,3 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 
 }
 
-// int main(){
-//     mxArray **plhs;
-//     const mxArray **prhs;
-//     *prhs = mxCreateString("H:/example_data/1.json\0");
-//     mexFunction(1, plhs, 1, prhs);
-// }

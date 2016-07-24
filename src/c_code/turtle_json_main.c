@@ -1,4 +1,4 @@
-#include "jsmn.h"
+#include "turtle_json.h"
 
 //KEY PROCESSING
 //---------------
@@ -445,8 +445,9 @@ STRING_SEEK:
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
-void jsmn_parse(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
+void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     
+    //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
     
     const void *array_jump[256] = {
