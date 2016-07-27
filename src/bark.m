@@ -1,4 +1,4 @@
-function jt = bark()
+function varargout = bark()
 
 if ismac
 file_root = '/Users/jameshokanson/Google Drive/OpenWorm/OpenWorm Public/Movement Analysis/example_data/WCON';
@@ -18,5 +18,8 @@ for i = 1:20
 end
 fprintf('%g, %g, %g\n',toc(t3)/20,min(d1_all),sum(d1_all)/2)
 
+if nargout
+   varargout{1} = jt; 
+end
 
 end

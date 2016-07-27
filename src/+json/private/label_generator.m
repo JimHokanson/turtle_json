@@ -1,3 +1,5 @@
+%This is some code I wrote to generate code
+
 %http://llvm.org/builds/
 
 
@@ -15,17 +17,17 @@ clipboard('copy',['const void *array_jump[256] = {' sl.cellstr.join(temp,'d',','
 
 %TODO: Fix this, it is incorrect - fix negative
 
-/*
- * temp = cell(1,256);
- * temp(:)={'false'};
- * temp([45 49:58]) = {'true'};
- * clipboard('copy',['const bool is_start_of_number[256] = {' sl.cellstr.join(temp,'d',',') '};'])
- *
- temp = cell(1,256);
- temp(:)={'false'};
- temp(49:58) = {'true'};
- clipboard('copy',['const bool is_number_array[256] = {' sl.cellstr.join(temp,'d',',') '};'])
- *
+temp = cell(1,256);
+temp(:)={'false'};
+temp([45 49:58]) = {'true'};
+clipboard('copy',['const bool is_start_of_number[256] = {' sl.cellstr.join(temp,'d',',') '};'])
+ 
+temp = cell(1,256);
+temp(:)={'false'};
+temp(49:58) = {'true'};
+clipboard('copy',['const bool is_number_array[256] = {' sl.cellstr.join(temp,'d',',') '};'])
+ 
+
  %NOTE: the ascii table is actually 1 based as well so we add 1
  %i.e. in Matlab, space is 32
  %in c, space is also 32
@@ -35,7 +37,8 @@ clipboard('copy',['const void *array_jump[256] = {' sl.cellstr.join(temp,'d',','
  ws_chars = [' ',sprintf('\n'),sprintf('\r'),sprintf('\t')];
  temp(double(ws_chars)+1) = {'true'};
  clipboard('copy',['const bool is_whitespace[256] = {' sl.cellstr.join(temp,'d',',') '};'])
- *
+ 
+ 
  %POSITIVE_VALUES
  values = 1:9;
  n_entries = 16;
@@ -47,7 +50,9 @@ clipboard('copy',['const void *array_jump[256] = {' sl.cellstr.join(temp,'d',','
  str{i} = ['const double p1e' int2str(i-1) '[58] = {' sl.cellstr.join(temp,'d',',') '};'];
  end
  clipboard('copy',sl.cellstr.join(str,'d',char(10)))
- *
+
+ 
+ 
  values = 1:9;
  %   1.json had 20 :/
  n_entries = 20;
@@ -60,6 +65,3 @@ clipboard('copy',['const void *array_jump[256] = {' sl.cellstr.join(temp,'d',','
  str{i} = ['const double p1e_' int2str(i) '[58] = {' sl.cellstr.join(temp,'d',',') '};'];
  end
  clipboard('copy',sl.cellstr.join(str,'d',char(10)))
- *
- *
- */

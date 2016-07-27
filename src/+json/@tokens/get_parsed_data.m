@@ -24,7 +24,7 @@ function output = get_parsed_data(obj,varargin)
 
 in.index = 1;
 in.collapse_array = true;
-in = sl.in.processVarargin(in,varargin);
+in = json.sl.in.processVarargin(in,varargin);
 
 s = obj;
 

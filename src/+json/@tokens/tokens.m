@@ -79,7 +79,7 @@ classdef tokens
             t0 = tic;
             
             %The main call
-            result = turtle_json_mex(file_path);
+            result = turtle_json_mex(file_path,in);
             
             obj.mex = result;
             

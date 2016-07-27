@@ -154,7 +154,7 @@ elseif iscell(v) && length(v) == 1 && isempty(v{1})
     parse_input = false;
 else
     parse_input = true;
-    v = sl.in.propValuePairsToStruct(v,'allow_spaces',c.allow_spaces);
+    v = json.sl.in.propValuePairsToStruct(v,'allow_spaces',c.allow_spaces);
 end
 
 if ~parse_input
@@ -198,7 +198,7 @@ if ~all(is_present)
         error(['Bad variable names given in input structure: ' ...
             '\n--------------------------------- \n %s' ...
             ' \n--------------------------------------'],...
-            sl.cellstr.join(badVariables,'d',','))
+            json.sl.cellstr.join(badVariables,'d',','))
     end
 end
 

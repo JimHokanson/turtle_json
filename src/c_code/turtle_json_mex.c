@@ -42,7 +42,6 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
     file_path = mxArrayToString(prhs[0]);
     
     //http://stackoverflow.com/questions/2575116/fopen-fopen-s-and-writing-to-files
-    
     #ifdef WIN32
         errno_t err;
         if( (err  = fopen_s( &file, file_path, "rb" )) !=0 ) {
@@ -64,7 +63,8 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
     //---------------------------------------------------
 	fread(buffer, file_length, 1, file);
     fclose(file);
-    buffer[file_length] = 0; 
+    buffer[file_length] = 0;
+    //On encountering a quote, we always need to look back.
     buffer[file_length+1] = '\\';
      buffer[file_length+2] = '"';
     for (int i = 3; i < N_PADDING; i++){
@@ -85,12 +85,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     //  Usage:
     //  ------
-    //  token_info = jsmn_mex(file_path,*is_string,*allocation_size)
+    //  token_info = jsmn_mex(file_path,options_struct)
     //
-    //  Inputs #2 and #3 are not yet implemented
+    //  token_info = jsmn_mex(raw_string,options_struct)
     //
-    //  TODO: Eventually we should allow passing in a padded version
-    //  of the string rather than expanding it ourselves
+    //  Inputs
+    //  ------
+    //  file_path
+    //  raw_string
+    //
     //
     //  Outputs:
     //  --------
@@ -139,50 +142,57 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     if (!mxIsClass(prhs[0],"char")){
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","First input needs to be a string");   
     }
+    //TODO: Let's rewrite this as a function
     
+    //If only a single input
     if (nrhs == 1){
         readFileToString(prhs,&json_string,&string_byte_length);
-    }else{
+        goto S_DONE_PARSING;
+    }
+    
+    //Two inputs ...
+    if (!mxIsClass(prhs[1],"struct")){
+        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a struct");
+        goto S_DONE_PARSING;
+    }
         
-        if (!mxIsClass(prhs[1],"struct")){
-            mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a struct");
-        }
-        
-        mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
-        
-        if (mxArrayTemp == NULL){
-        	readFileToString(prhs,&json_string,&string_byte_length);
-        }else{
-            if (!mxIsClass(mxArrayTemp,"char")){
-                mexErrMsgIdAndTxt("jsmn_mex:invalid_input","raw_string needs to be a string");   
-            }
+    mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
+    if (mxArrayTemp == NULL){
+        readFileToString(prhs,&json_string,&string_byte_length);
+        goto S_DONE_PARSING;
+    }
+    
+    //Extraction of the string pointer
+    //---------------------------------------------------------------------
+    //TODO: Need to build in uint8 support
+    if (!mxIsClass(mxArrayTemp,"char")){
+        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","raw_string needs to be a string");   
+    }
             
-            //TODO: Need to build in uint8 support
-            //TODO: Currently we pad regardless of whether or not
-            //it is needed
-            //TODO: Even if we pad, we might not get a padded result
-            //due to string handling ...
+    
+    //TODO: Currently we pad regardless of whether or not
+    //it is needed
 
-            raw_string = (unsigned char *) mxArrayToString(mxArrayTemp);
-            string_byte_length = mxGetNumberOfElements(mxArrayTemp);
+    raw_string = (unsigned char *) mxArrayToString(mxArrayTemp);
+    string_byte_length = mxGetNumberOfElements(mxArrayTemp);
 
-            //For now we'll assume we're not padded
-            //-----------------------------------------------
-            json_string = mxMalloc(string_byte_length+N_PADDING);
-            memcpy(json_string,raw_string,string_byte_length);
-            mxFree(raw_string);
+    //For now we'll assume we're not padded
+    //-----------------------------------------------
+    json_string = mxMalloc(string_byte_length+N_PADDING);
+    memcpy(json_string,raw_string,string_byte_length);
+    mxFree(raw_string);
 
-            //TODO: I'm not thrilled with this being here and above
-            json_string[string_byte_length] = 0;
-            json_string[string_byte_length+1] = '\\';
-            json_string[string_byte_length+2] = '"';
-            for (int i = 3; i < N_PADDING; i++){
-                json_string[string_byte_length + i] = 0;
-            }
-        }
-
+    //TODO: I'm not thrilled with this being here and above
+    json_string[string_byte_length] = 0;
+    json_string[string_byte_length+1] = '\\';
+    json_string[string_byte_length+2] = '"';
+    for (int i = 3; i < N_PADDING; i++){
+        json_string[string_byte_length + i] = 0;
     }
 
+    
+S_DONE_PARSING:
+    
     //Note, this needs to precede TOC_AND_LOG()
     //since the logging touches plhs[0]
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
@@ -198,9 +208,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //-------------
     TIC(start_parse);
     
-    parse_json(json_string,string_byte_length,plhs);
+    parse_json(json_string, string_byte_length, plhs);
   
-    TOC_AND_LOG(start_parse,elapsed_parse_time);
+    TOC_AND_LOG(start_parse, elapsed_parse_time);
       
     
     //Post token parsing

@@ -16,7 +16,9 @@
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
-      char *str;
+    
+    
+      char *str = mxGetData(prhs[1]);
       double *data = mxGetData(prhs[0]);
       int n_data = mxGetNumberOfElements(prhs[0]);
       str = mxMalloc(n_data*20);

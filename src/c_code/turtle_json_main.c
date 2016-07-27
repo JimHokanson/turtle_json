@@ -133,15 +133,17 @@
 #define PROCESS_OPENING_ARRAY \
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
-    INITIALIZE_PARENT_INFO(TYPE_ARRAY);    
+    INITIALIZE_PARENT_INFO(TYPE_ARRAY); \
 
 #define PROCESS_STRING \
     INCREMENT_STRING_INDEX; \
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_STRING); \
     temp_p = CURRENT_POINTER; \
+    /* +1 to point past the opening quote */ \
     string_p[current_string_index] = CURRENT_POINTER + 1; \
     string_start_indices[current_string_index] = n_string_chars; \
+    /* + 1 for Matlab indexing */ \
     d1[current_data_index] = current_string_index + 1; \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     n_string_chars += CURRENT_POINTER - string_p[current_string_index]; \
@@ -341,7 +343,7 @@
 	}
     
 #define NAVIGATE_AFTER_OPENING_ARRAY \
-    ADVANCE_TO_NON_WHITESPACE_CHAR; \
+    ADVANCE_TO_NON_WHITESPACE_CHAR; \   
     if (CURRENT_CHAR == ']'){ \
        goto S_CLOSE_ARRAY; \
     }else{ \
@@ -447,9 +449,17 @@ STRING_SEEK:
 //=========================================================================
 void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     
+    //TODO: Check string_byte_length - can't be zero ...
+    
     //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
     
+    //Note, this occurs after we've opened an array
+    //or a comma. In the case of opening an array, we've already verified
+    //that we aren't closing right away. We can't put this here as
+    //it wouldn't be correct following a comma:
+    //[] ok
+    //["value",]
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [34]        = &&S_PARSE_STRING_IN_ARRAY,            // "
@@ -502,7 +512,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int current_parent_index;
     int current_depth = 0;
     //---------------------------------------------------------------------
-    int data_size_allocated = ceil(string_byte_length/4);
+    int data_size_allocated = ceil((double)string_byte_length/4);
     int data_size_index_max = data_size_allocated - 1;
     int current_data_index = -1;
     
@@ -521,20 +531,20 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     
     int n_key_chars = 0;
     int n_key_allocations  = 1;
-    int key_size_allocated = ceil(string_byte_length/20);
+    int key_size_allocated = ceil((double)string_byte_length/20);
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = -1;
     ALLOCATE_KEY_DATA 
     
     int n_string_chars = 0;
     int n_string_allocations = 1;
-    int string_size_allocated = ceil(string_byte_length/20);
+    int string_size_allocated = ceil((double)string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = -1;
     ALLOCATE_STRING_DATA
    
     int n_numeric_allocations = 1;
-    int numeric_size_allocated = ceil(string_byte_length/4);
+    int numeric_size_allocated = ceil((double)string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = -1;
     ALLOCATE_NUMERIC_DATA
@@ -644,10 +654,9 @@ S_PARSE_KEY:
 
 //=============================================================
 S_PARSE_STRING_IN_ARRAY:
-	INCREMENT_PARENT_SIZE;
     
+	INCREMENT_PARENT_SIZE;
     PROCESS_STRING
-
 	PROCESS_END_OF_ARRAY_VALUE;
 
 //=============================================================
@@ -796,11 +805,15 @@ S_ERROR_TOKEN_AFTER_KEY:
     
 
 S_ERROR_END_OF_VALUE_IN_ARRAY:  
+    //TODO: Print the character
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
 S_ERROR_DEPTH:
     mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+    
+S_ERROR_DEBUG:
+    mexErrMsgIdAndTxt("turtle_json:debug_error","Debug error");
     
 finish_main:
     
