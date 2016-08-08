@@ -5,8 +5,8 @@ function [local_key_names,local_key_indices] = getKeyInfo(p,object_index)
 %function
 
 
-%I moved this to a different file to avoid the, are you sure you didn't
-%want to reference a property warning, since unfortunately you can't
+%I moved this to a different file to avoid the, "are you sure you didn't
+%want to reference a property" warning, since unfortunately you can't
 %disable warnings on a function level
 
 d2 = p.d2;

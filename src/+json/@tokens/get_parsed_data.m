@@ -12,6 +12,8 @@ function output = get_parsed_data(obj,varargin)
 %   TODO: Pass in custom function handles ...
 %
 %   TODO: Ideally this portion would be written in C
+%
+%   TODO: Rename based on my style getParsedData
 
 % #define TYPE_OBJECT 1
 % #define TYPE_ARRAY  2
@@ -79,7 +81,7 @@ attribute_indices = local_key_indices + 1;
 
 
 for iItem = 1:n_keys(index)
-    cur_key = local_key_names(iItem);
+    cur_key = local_key_names{iItem};
     cur_value_I = attribute_indices(iItem);
     
     switch types(cur_value_I)
