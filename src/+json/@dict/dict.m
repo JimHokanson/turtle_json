@@ -118,15 +118,19 @@ classdef dict < handle
             end
         end
         % Overload property retrieval (referencing)
-        function value = subsref(obj, subStruct)
+        function varargout = subsref(obj, subStruct)
+            %
+            %   http://www.mathworks.com/help/matlab/matlab_oop/code-patterns-for-subsref-and-subsasgn-methods.html
+            %
+            
             s1 = subStruct(1);
             if strcmp(s1.type,'.')
                 try
-                    value = obj.props.(s1.subs);
+                    varargout{1} = obj.props.(s1.subs);
                 catch
                     %TODO: Might want to look for s1.subs being a method
                     %see commented out code above
-                    value = builtin('subsref', obj, subStruct);
+                    varargout{1} = builtin('subsref', obj, subStruct);
                     return
                 end
                 %TODO: Can we avoid the check on prop_lookup_failed by 
@@ -138,11 +142,11 @@ classdef dict < handle
                 %
                 %   () .  <= 2 events, () followed by .
                 %
-                value = builtin('subsref', obj, subStruct(1));
+                varargout = {builtin('subsref', obj, subStruct(1))};
             end
             
             if length(subStruct) > 1
-                value = subsref(value,subStruct(2:end)); 
+                varargout = {subsref(varargout{:},subStruct(2:end))}; 
             end
 
         end

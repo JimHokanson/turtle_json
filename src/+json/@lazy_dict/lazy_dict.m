@@ -49,6 +49,17 @@ classdef lazy_dict < handle
     %   ---------
     %   http://undocumentedmatlab.com/blog/class-object-tab-completion-and-improper-field-names
     
+    
+    %{
+    obj.method(values) %with no return
+    
+    wtf = json.lazy_dict;
+    wtf.('my data') = 1:10;
+    test = wtf.('my data')
+    test2 = wtf.('my data')(5:6)
+    
+    %}
+    
     properties
         props
         lazy_fields
@@ -175,20 +186,35 @@ classdef lazy_dict < handle
                 obj.props = json.setField(obj.props,name,value);
             end
         end
-        function value = subsref(obj, subStruct)
+        function varargout = subsref(obj, subStruct)
+            %
+            %   http://www.mathworks.com/help/matlab/matlab_oop/code-patterns-for-subsref-and-subsasgn-methods.html
+            %
+            
+            %TODO: This needs to run with varargout
             s1 = subStruct(1);
             if strcmp(s1.type,'.')
                 name = s1.subs;
                 lazy_fields_local = obj.lazy_fields;
                 if isfield(lazy_fields_local,name)
-                    value = obj.evaluateLazyField(name);
+                    varargout{1} = obj.evaluateLazyField(name);
                 else
                     try
-                        value = obj.props.(name);
+                        varargout{1} = obj.props.(name);
                     catch
+                        %This was failing for:
+                        %obj.method(inputs)
                         %TODO: Might want to look for s1.subs being a method
                         %see commented out code above
-                        value = builtin('subsref', obj, subStruct);
+                        try
+                            varargout = {builtin('subsref', obj, subStruct)};
+                        catch
+                            %For no outputs
+                            %For some reason this only seems to happen when
+                            %evaluating code manually :/
+                            
+                            builtin('subsref', obj, subStruct)
+                        end
                         return
                     end
                 end
@@ -201,11 +227,11 @@ classdef lazy_dict < handle
                 %
                 %   () .  <= 2 events, () followed by .
                 %
-                value = builtin('subsref', obj, subStruct(1));
+                varargout = {builtin('subsref', obj, subStruct(1))};
             end
             
             if length(subStruct) > 1
-                value = subsref(value,subStruct(2:end));
+                varargout = {subsref(varargout{:},subStruct(2:end))};
             end
             
         end
