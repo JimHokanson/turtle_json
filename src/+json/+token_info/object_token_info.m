@@ -12,19 +12,7 @@ classdef object_token_info
         key_names
         attribute_indices
         attribute_types
-        
-
     end
-    
-%     properties (Dependent)
-%         attribute_sizes
-%     end
-%     
-%     methods
-%         function value = get.attribute_sizes(obj)
-%             value = obj.p.sizes(obj.attribute_indices);
-%         end
-%     end
     
     properties (Hidden)
         map
@@ -61,6 +49,9 @@ classdef object_token_info
             obj.map = containers.Map(obj.key_names,1:n_attributes);
             
         end
+		function getNumericArray(obj,name)
+			error('Code not yet implemented')
+		end
         function output = getToken(obj,name)
 
             I = h__getMapIndex(obj,name);
