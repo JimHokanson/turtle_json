@@ -431,12 +431,19 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 //-------------------------------------------------------------------------
 void seek_string_end(unsigned char *p, unsigned char **char_offset){
 
+    //advance past initial "
+    ++p;
+    
 STRING_SEEK:    
-    //p+1 to advance past initial '"'
-    p = strchr(p+1,'"');
+    //Old code - strchr apparently will check for null, but currently
+    //we are padding to ensure we only need to look for '"'
+    //p = strchr(p+1,'"');
     
-    //Back up to verify 
+    while (*p != '"'){
+      ++p;    
+    }
     
+    //Back up to verify
     if (*(--p) == '\\'){
         mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
     }else{

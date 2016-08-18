@@ -1,0 +1,1 @@
+https://raw.githubusercontent.com/bjouhier/i-json/master/test/big.json   - 8MB

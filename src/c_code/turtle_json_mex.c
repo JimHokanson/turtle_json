@@ -168,10 +168,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     if (!mxIsClass(mxArrayTemp,"char")){
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","raw_string needs to be a string");   
     }
-            
     
     //TODO: Currently we pad regardless of whether or not
-    //it is needed
+    //it is needed. We could allow not padding if the input
+    //has already been padded
 
     raw_string = (unsigned char *) mxArrayToString(mxArrayTemp);
     string_byte_length = mxGetNumberOfElements(mxArrayTemp);
@@ -190,12 +190,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
         json_string[string_byte_length + i] = 0;
     }
 
+        mexPrintf("%s\n",json_string);
     
 S_DONE_PARSING:
     
     //Note, this needs to precede TOC_AND_LOG()
     //since the logging touches plhs[0]
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
+    
         
     TOC_AND_LOG(start_read,elapsed_read_time);
 
@@ -226,5 +229,11 @@ S_DONE_PARSING:
     TOC_AND_LOG(start_pp,elapsed_pp_time);
     
 
+}
+
+//TODO: This code needs to be written
+//This code is currently in two locations - file reading and adding to input string
+void addBuffer(unsigned char *buffer){
+  //TODO: Add on buffer   
 }
 

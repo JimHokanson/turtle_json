@@ -103,15 +103,16 @@ classdef tokens
             local_string_starts = result.string_start_indices;
             local_string_ends = result.string_end_indices;
             n_strings = length(result.string_end_indices);
+            
+            %I'm still trying to decide how to best handle this
+            %Why can't we create strings faster!?!?!?!?
+            %Worst case scenario we should move this to mex
             temp_strings = cell(1,n_strings);
             for iString = 1:n_strings
                 temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString));
             end
             
             obj.strings = temp_strings;
-            
-            
-            
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);
