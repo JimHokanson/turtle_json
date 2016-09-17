@@ -40,9 +40,11 @@ switch s.types(in.index)
         in.index = in.index + 1;
         output = obj.get_parsed_data(in);
     case 4
-        keyboard
+        string_I = s.d1(in.index);
+        output = s.strings(string_I);
     case 5
-        keyboard
+        number_I = s.d1(in.index);
+        output = s.strings(number_I);
     case 6
         output = NaN;
     case 7

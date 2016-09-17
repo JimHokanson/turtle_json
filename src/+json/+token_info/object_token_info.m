@@ -20,6 +20,10 @@ classdef object_token_info
     end
     
     methods
+        function output = getParsedData(obj,varargin)
+            %TODO: rename get_parsed_data to getParsedData
+           output = obj.p.get_parsed_data(varargin{:}); 
+        end
         function obj = object_token_info(name,full_name,index,parse_object)
             obj.name = name;
             obj.full_name = full_name;
