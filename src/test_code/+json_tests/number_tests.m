@@ -1,6 +1,6 @@
 function number_tests()
 %
-%   json.tests.number_tests
+%   json_tests.number_tests
 
 tests(1,:) = {'[+1]',1,'Can''t lead with a positive'};
 tests(2,:) = {'[+1.]',0,'''.'' needs to be followed by a numeric value'}; %
