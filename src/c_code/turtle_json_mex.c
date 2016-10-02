@@ -2,7 +2,110 @@
 
 int N_PADDING = 17;
 
-void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
+bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
+
+    if (input_string_length >= N_PADDING){
+        if (input_bytes[input_string_length-N_PADDING] == 0){
+            mexPrintf("Found padding");
+        }
+    }
+    //     //TODO: I'm not thrilled with this being here and above
+//     json_string2[string_byte_length_value] = 0;
+//     json_string2[string_byte_length_value+1] = '\\';
+//     json_string2[string_byte_length_value+2] = '"';
+//     for (int i = 3; i < N_PADDING; i++){
+//         json_string2[string_byte_length_value + i] = 0;
+//     }
+    
+    return true;
+    
+    
+}
+
+void add_parse_buffer(unsigned char *buffer, size_t array_length){
+    //
+    //  TODO: Describe this and why we are doing this ...
+    
+    buffer[array_length] = 0;
+    //On encountering a quote, we always need to look back.
+    buffer[array_length+1] = '\\';
+    buffer[array_length+2] = '"';
+    for (int i = 3; i < N_PADDING; i++){
+        //length 1, index 0
+        //length file_length, max index - file_length-1
+        //so padding starts at file_length + 0
+        buffer[array_length + i] = 0;
+    }
+}
+
+void process_input_string(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length){
+    //
+    //  The input string is raw JSON, which may or may not
+    //  have the parsing buffer added.
+    //
+    
+    size_t input_string_length;
+    size_t output_string_length;
+    unsigned char *input_string;
+    unsigned char *output_string;
+    
+    input_string = (unsigned char *) mxArrayToString(prhs[0]);
+    input_string_length = mxGetNumberOfElements(prhs[0]);
+    
+    if (padding_is_necessary(input_string,input_string_length)){
+        output_string_length = input_string_length + N_PADDING;
+        output_string = mxMalloc(output_string_length);
+        memcpy(output_string,input_string,input_string_length);
+        mxFree(input_string);
+//         mexPrintf("in len: %d\n",input_string_length);
+//         mexPrintf("First char: %c\n",output_string[0]);
+//         mexPrintf("2: %c\n",output_string[1]);
+//         mexPrintf("3: %c\n",output_string[2]);
+//         mexPrintf("4: %c\n",output_string[3]);
+        add_parse_buffer(output_string, input_string_length);
+    }else{
+        output_string = input_string;
+        output_string_length = input_string_length;
+    }
+    
+    *json_string = output_string;
+    *json_string_length = output_string_length;
+    
+}
+
+void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length){
+    //
+    //  The first input (prhs[0] is a byte (uint8 or int8) array, which
+    //  may or may not have the parsing buffer added.
+    //
+    
+    size_t input_string_length;
+    size_t output_string_length;
+    unsigned char *input_string;
+    unsigned char *output_string;
+    
+    input_string = (unsigned char *)mxGetData(prhs[0]);
+    input_string_length = mxGetNumberOfElements(prhs[0]);
+    
+    if (padding_is_necessary(input_string,input_string_length)){
+        output_string_length = input_string_length + N_PADDING;
+        output_string = mxMalloc(output_string_length);
+        memcpy(output_string,input_string,input_string_length);
+        mxFree(input_string);
+        add_parse_buffer(output_string, input_string_length);
+    }else{
+        output_string = input_string;
+        output_string_length = input_string_length;
+    }
+    
+    *json_string = output_string;
+    *json_string_length = output_string_length;
+
+}
+
+
+
+void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
     
 	FILE *file;
     char *file_path;
@@ -34,16 +137,8 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
     //---------------------------------------------------
 	fread(buffer, file_length, 1, file);
     fclose(file);
-    buffer[file_length] = 0;
-    //On encountering a quote, we always need to look back.
-    buffer[file_length+1] = '\\';
-    buffer[file_length+2] = '"';
-    for (int i = 3; i < N_PADDING; i++){
-        //length 1, index 0
-        //length file_length, max index - file_length-1
-        //so padding starts at file_length + 0
-        buffer[file_length + i] = 0;
-    }
+    
+    add_parse_buffer(buffer, file_length);
     
     *string_byte_length = file_length; 
     
@@ -52,95 +147,73 @@ void readFileToString(const mxArray *prhs[], unsigned char **p_buffer, size_t *s
     mxFree(file_path);
 }
         
-void process_inputs(int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length){
-
-    
-    //TODO: This needs to be 2 functions:
-    //1) Extraction of the string
-    //2) Extraction of options
-    
-    //String Extraction
-    //---------------------------------
-    //1) file_path
-    //2) raw_string_as_char, 'raw_string' = true, 'padding' = ?
-    //3) raw_string_as_uint8, padding=?
-    
+void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options){
+    //
+    //  The input JSON can be:
+    //  1) Path to a file
+    //  2) raw character string  
+    //  3) raw byte string
     
     mxArray *mxArrayTemp;
     unsigned char *raw_string;
     unsigned char *json_string2;
     size_t string_byte_length_value;
     
-    //Options
-    //-----------
-    //1) chars_per_token - NYI
-    //2) n_tokens - NYI
-    //3) raw_string - NYI
-    //4) raw_is_padded - NYI
-    
-    //Format 1:
-    //  token_info = jsmn_mex(file_path,options_struct)
-    //Format 2:
-    //  token_info = jsmn_mex(raw_string,options_struct)
-    
-    //TODO: Let's rewrite this as a function
-    
-    //TODO: Allow this to be uint8 or int8
-    if (!mxIsClass(prhs[0],"char")){
-        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","First input needs to be a string");   
+    //TODO: Get rid of this, and just do the checks below ...
+    if (!(mxIsClass(prhs[0],"char") || options->has_raw_bytes)){
+        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","First input needs to be a string or bytes");   
     }
     
+    if (options->has_raw_string){
+     	if (!mxIsClass(prhs[0],"char")){
+            mexErrMsgIdAndTxt("jsmn_mex:invalid_input","'raw_string' input needs to be a string");   
+        }
+        process_input_string(prhs,json_string,string_byte_length);
+    }else if (options->has_raw_bytes){
+        process_input_bytes(prhs,json_string,string_byte_length);
+    }else{
+        //file_path
+        read_file_to_string(prhs,json_string,string_byte_length);
+    }
+
+}
+
+void init_options(int nrhs, const mxArray*prhs[],Options *options){
     
-    //If only a single input
-    if (nrhs == 1){
-        //Check if string or uint8
-        readFileToString(prhs,json_string,string_byte_length);
+    mxArray *mxArrayTemp;
+    
+    //Initialization of defaults
+    //--------------------------
+    options->has_raw_string = false;
+    options->has_raw_bytes = false;
+    options->n_tokens = 0;
+    options->chars_per_token = 0;
+    
+    if (nrhs < 2){
         return;
     }
     
-    //Two inputs ...
     if (!mxIsClass(prhs[1],"struct")){
         mexErrMsgIdAndTxt("jsmn_mex:invalid_input","Second input needs to be a struct");
     }
-    
+        
     mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
-    if (mxArrayTemp == NULL){
-        readFileToString(prhs,json_string,string_byte_length);
-        return;
+    if (mxArrayTemp != NULL){
+        //TODO: Should get that it is true ...
+        if (mxIsClass(prhs[0],"char")){
+            options->has_raw_string = true;
+        }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+            //Note, we'll allow bytes for a "raw_string"
+            options->has_raw_bytes = true;
+        }else{
+            mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of inputs, 1 or 2 expected");
+        }
+    }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+        options->has_raw_bytes = true;
     }
-    
-    string_byte_length_value = *string_byte_length;
-    
-    //Extraction of the string pointer
-    //---------------------------------------------------------------------
-    //TODO: Need to build in uint8 support
-    if (!mxIsClass(mxArrayTemp,"char")){
-        mexErrMsgIdAndTxt("jsmn_mex:invalid_input","raw_string needs to be a string");   
-    }
-    
-    //TODO: Currently we pad regardless of whether or not
-    //it is needed. We could allow not padding if the input
-    //has already been padded
 
-    raw_string = (unsigned char *) mxArrayToString(mxArrayTemp);
-    string_byte_length_value = mxGetNumberOfElements(mxArrayTemp);
-    *string_byte_length = string_byte_length_value;
-
-    //For now we'll assume we're not padded
-    //-----------------------------------------------
-    json_string2 = mxMalloc(string_byte_length_value+N_PADDING);
-    memcpy(json_string2,raw_string,string_byte_length_value);
-    mxFree(raw_string);
-
-    //TODO: I'm not thrilled with this being here and above
-    json_string2[string_byte_length_value] = 0;
-    json_string2[string_byte_length_value+1] = '\\';
-    json_string2[string_byte_length_value+2] = '"';
-    for (int i = 3; i < N_PADDING; i++){
-        json_string2[string_byte_length_value + i] = 0;
-    }
-    
-    *json_string = json_string2;
+    //TODO
+    //n_tokens
     
 }
 
@@ -175,12 +248,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     unsigned char *json_string = NULL;
     bool is_file_path = true;
 
-    int chars_per_token; //NYI
-    int n_tokens;   //NYI
+    Options options;
+    
+    //int chars_per_token; //NYI
+    //int n_tokens;   //NYI
     
     mxLogical raw_is_padded;
-            
-    
     
     TIC(start_read);
     
@@ -193,10 +266,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
         mexErrMsgIdAndTxt("jsmn_mex:n_inputs","Invalid # of outputs, 1 expected");
     }
     
-    //Processing of inputs ------------------------------------------------
-    //TODO: Split into string parsing and option parsing ...
-    //Options first, then string ...
-    process_inputs(nrhs, prhs, &json_string, &string_byte_length);
+    //Processing of inputs
+    //-------------------------------------
+    init_options(nrhs, prhs, &options);
+    
+//     mexPrintf("Options Parsed\n");
+    
+    get_json_string(nrhs, prhs, &json_string, &string_byte_length, &options);
+    
+//     mexPrintf("Byte Length: %d",string_byte_length);
+//     mexPrintf("Start: %s\n",json_string);
     
     //This needs to precede TOC_AND_LOG() since the logging touches plhs[0]
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);

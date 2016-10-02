@@ -364,6 +364,9 @@ void parse_keys(unsigned char *js,mxArray *plhs[]) {
 
 void parse_strings(unsigned char *js,mxArray *plhs[]) {
 
+    //The only characters you must escape are \, ", and control codes (anything less than U+0020).
+    
+    
     mxArray *temp = mxGetField(plhs[0],0,"string_p");
     
     //Create a string array and replace d1 and d2 with start and end

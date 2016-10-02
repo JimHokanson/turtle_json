@@ -24,6 +24,14 @@
 #define TYPE_TRUE   7
 #define TYPE_FALSE  8
 
+
+typedef struct {
+   bool has_raw_string;
+   bool has_raw_bytes;
+   int n_tokens;
+   int chars_per_token;
+} Options;
+
 /*
  *
  *  Example Usage:
@@ -48,7 +56,10 @@
     *y = (double)(clock() - x)/CLOCKS_PER_SEC; \
     setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
     
-
+//void addParseBuffer(unsigned char **p_buffer, size_t array_length)
+    
+//void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
+    
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
 
 void parse_keys(unsigned char *js,mxArray *plhs[]);    

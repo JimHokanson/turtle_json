@@ -246,12 +246,7 @@
 #define DECREMENT_POINTER --p 
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
-
-// const bool is_whitespace[256] = { false,false,false,false,false,false,false,false,false,true,true,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false };
-// #define ADVANCE_TO_NON_WHITESPACE_CHAR while(is_whitespace[ADVANCE_POINTER_AND_GET_CHAR_VALUE]){}        
     
-//_mm_cmpestri turns out to be slower :/
-
 #define INIT_LOCAL_WS_CHARS \
     const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
 
@@ -343,7 +338,7 @@
 	}
     
 #define NAVIGATE_AFTER_OPENING_ARRAY \
-    ADVANCE_TO_NON_WHITESPACE_CHAR; \   
+    ADVANCE_TO_NON_WHITESPACE_CHAR; \
     if (CURRENT_CHAR == ']'){ \
        goto S_CLOSE_ARRAY; \
     }else{ \
@@ -431,7 +426,7 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 //-------------------------------------------------------------------------
 void seek_string_end(unsigned char *p, unsigned char **char_offset){
 
-    //advance past initial "
+    //advance past initial double-quote character
     ++p;
     
 STRING_SEEK:    
@@ -439,13 +434,55 @@ STRING_SEEK:
     //we are padding to ensure we only need to look for '"'
     //p = strchr(p+1,'"');
     
+    //TODO: We could try more complicated string instructions
+    //Ideally we could have a switch on this for:
+    //1) User options - which to use
+    //2) Keys vs string values
+    
     while (*p != '"'){
       ++p;    
     }
     
     //Back up to verify
     if (*(--p) == '\\'){
-        mexErrMsgIdAndTxt("jsmn_mex:unhandled_case", "Code not yet written");
+        //See documentation on the buffer we've added to the string
+        if (*(--p) == 0){
+            mexErrMsgIdAndTxt("turtle_json:unterminated_string", "JSON string is not terminated with a double-quote character");
+        }
+        //At this point, we either have a true end of the string, or we've
+        //escaped the escape character
+        //
+        //for example:
+        //1) "this is a test\"    => so we need to keep going
+        //2) "testing\\"          => all done
+        //
+        //This of course could keep going ...
+        
+        //Adding on one last check to try and avoid the loop
+        if (*p == '\\'){
+            //Then we need to keep looking, we might have escaped this character
+            //we'll go into a loop at this point
+            bool double_quote_is_terminating = true;
+            unsigned char *next_char = p + 3; 
+            while (*(--p) == '\\'){
+                double_quote_is_terminating = !double_quote_is_terminating;
+            }
+            if (double_quote_is_terminating){
+               *char_offset = next_char-1; 
+            }else{
+                p = next_char;
+                mexPrintf("Char2: %c\n",*(p-2));
+                goto STRING_SEEK;
+            }
+        }else{
+            //   this_char   \     "     next_char
+            //     p         1     2     3
+            p+=3;
+            mexPrintf("Char1: %c\n",*(p-2));
+            goto STRING_SEEK;
+        }
+        
+        //mexErrMsgIdAndTxt("turtle_json:unhandled_case", "Code not yet written");
     }else{
         *char_offset = p+1;
     } 
@@ -569,7 +606,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
             PROCESS_OPENING_ARRAY;
             NAVIGATE_AFTER_OPENING_ARRAY;
         default:
-            mexErrMsgIdAndTxt("jsmn_mex:invalid_start", "Starting token needs to be an opening object or array");
+            mexErrMsgIdAndTxt("turtle_json:invalid_start", "Starting token needs to be an opening object or array");
 	}
 
 //    [ {            ======================================================
@@ -766,7 +803,7 @@ S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
 
 		if (!(CURRENT_CHAR == '\0')) {
-			mexErrMsgIdAndTxt("jsmn_mex:invalid_end", "non-whitespace characters found after end of root token close");
+			mexErrMsgIdAndTxt("turtle_json:invalid_end", "non-whitespace characters found after end of root token close");
 		}
 
 	goto finish_main;
@@ -782,42 +819,42 @@ S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     // {"key": value, 1
     //
 	mexPrintf("Position %d\n",CURRENT_INDEX); \
-	mexErrMsgIdAndTxt("jsmn_mex:no_key", "Key or closing of object expected"); \
+	mexErrMsgIdAndTxt("turtle_json:no_key", "Key or closing of object expected"); \
     
 S_ERROR_DEPTH_EXCEEDED:
-    mexErrMsgIdAndTxt("jsmn_mex:depth_exceeded", "Max depth was exceeded");
+    mexErrMsgIdAndTxt("turtle_json:depth_exceeded", "Max depth was exceeded");
     
 S_ERROR_OPEN_OBJECT:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_OPEN_OBJECT");
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "S_ERROR_OPEN_OBJECT");
 
 S_ERROR_MISSING_COLON_AFTER_KEY:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_MISSING_COLON_AFTER_KEY");
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "S_ERROR_MISSING_COLON_AFTER_KEY");
 
 //TODO: Describe when this error is called    
 S_ERROR_END_OF_VALUE_IN_KEY:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token of key must be followed by a comma or a closing object ""}"" character");
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Token of key must be followed by a comma or a closing object ""}"" character");
 
 //This error comes when we have a comma in an array that is not followed
 // by a valid value => i.e. #, ", [, {, etc.
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
     mexPrintf("Current character: %c\n",CURRENT_CHAR);
     mexPrintf("Current position in string: %d\n",CURRENT_INDEX);
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Invalid token found after a comma in an array");
-	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Invalid token found after a comma in an array");
+	//mexErrMsgIdAndTxt("turtle_json:no_primitive","Primitive value was not found after the comma");
    
 //TODO: Open array points here now too
 S_ERROR_TOKEN_AFTER_KEY:
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "S_ERROR_TOKEN_AFTER_KEY");
-	//mexErrMsgIdAndTxt("jsmn_mex:no_primitive","Primitive value was not found after the comma");    
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "S_ERROR_TOKEN_AFTER_KEY");
+	//mexErrMsgIdAndTxt("turtle_json:no_primitive","Primitive value was not found after the comma");    
     
 
 S_ERROR_END_OF_VALUE_IN_ARRAY:  
     //TODO: Print the character
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
-	mexErrMsgIdAndTxt("jsmn_mex:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
 S_ERROR_DEPTH:
-    mexErrMsgIdAndTxt("jsmn_mex:depth_limit","Max depth exceeded");
+    mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");
     
 S_ERROR_DEBUG:
     mexErrMsgIdAndTxt("turtle_json:debug_error","Debug error");

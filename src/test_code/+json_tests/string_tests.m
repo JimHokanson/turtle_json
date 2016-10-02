@@ -1,6 +1,10 @@
 function string_tests()
 %
 %   json_tests.string_tests
+%
+%   See Also
+%   --------
+%   json_tests.json_checker_tests
 
 %   Format
 %   ------
@@ -8,16 +12,25 @@ function string_tests()
 %   2) empty string to pass,
 %   3) notes on reason for error or thing being tested
 
-tests(1,:) = {'["This is a test]',1,'Missing closing quotes'};
-tests(2,:) = {'["This is a test\"]',1,'Missing closing quote, quote character escaped'};
-tests(3,:) = {'["Hello \" World"]','','Escaped quote character with proper closing of string'};
-
+%Tests focused on string termination
+%-----------------------------------
+tests(1,:) = {'["This is a test]','turtle_json:unterminated_string','Missing closing quotes'};
+tests(end+1,:) = {'["This is a test\"]','turtle_json:unterminated_string','Missing closing quote, quote character escaped'};
+tests(end+1,:) = {'["Hello \" World"]','','Escaped quote character with proper closing of string'};
+tests(end+1,:) = {'["Hello World\\"]','','Escape character is escaped, so string is terminated'};
+tests(end+1,:) = {'["Hello World\\\"]','turtle_json:unterminated_string','unterminated string'};
+tests(end+1,:) = {'["Hello World\\\\"]','','terminated string'};
+%Tests focused on the proper escapes of characters
+%--------------------------------------------------
+%1) Valid escape characters
+%2) Characters that need to be escaped => less than 32
 
 n_tests = size(tests,1);
-for iTest = 1:3
+for iTest = 1:n_tests
     cur_test_string = tests{iTest,1};
     %expected_value = tests{iTest,2};
-    should_pass = isempty(tests{iTest,2});
+    error_id = tests{iTest,2};
+    should_pass = isempty(error_id);
     passed = true;
     try
         t = json.stringToTokens(cur_test_string);
@@ -28,8 +41,15 @@ for iTest = 1:3
             disp(ME)
             error_string = sprintf('Test #%d should have not thrown an error but did',iTest);
             error(error_string);
+        elseif ~strcmp(ME.identifier,error_id)
+            ME
+            error('Test: %d failed, but with the incorrect error',iTest);
+        else
+            fprintf('Test %d failed as expected\n',iTest);
+            %fprintf('Test %d failed as expected with message:\n         %s\n',iTest,ME.message);
         end
-        fprintf('Test %d failed as expected with message:\n         %s\n',iTest,ME.message);
+        %TODO: Check identifier ...
+        
     end
     if passed && ~should_pass
         error_string = sprintf('Test #%d should have thrown an error but didn''t',iTest);
