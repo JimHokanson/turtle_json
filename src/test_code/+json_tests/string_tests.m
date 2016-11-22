@@ -14,12 +14,12 @@ function string_tests()
 
 %Tests focused on string termination
 %-----------------------------------
-tests(1,:) = {'["This is a test]','turtle_json:unterminated_string','Missing closing quotes'};
-tests(end+1,:) = {'["This is a test\"]','turtle_json:unterminated_string','Missing closing quote, quote character escaped'};
-tests(end+1,:) = {'["Hello \" World"]','','Escaped quote character with proper closing of string'};
-tests(end+1,:) = {'["Hello World\\"]','','Escape character is escaped, so string is terminated'};
-tests(end+1,:) = {'["Hello World\\\"]','turtle_json:unterminated_string','unterminated string'};
-tests(end+1,:) = {'["Hello World\\\\"]','','terminated string'};
+tests(1,:) = {'["This is a test]',          'turtle_json:unterminated_string',  'Missing closing quotes'};
+tests(end+1,:) = {'["This is a test\"]',    'turtle_json:unterminated_string',  'Missing closing quote, quote character escaped'};
+tests(end+1,:) = {'["Hello \" World"]',     '',                                 'Escaped quote character with proper closing of string'};
+tests(end+1,:) = {'["Hello World\\"]',      '',                                 'Escape character is escaped, so string is terminated'};
+tests(end+1,:) = {'["Hello World\\\"]',     'turtle_json:unterminated_string',  'unterminated string'};
+tests(end+1,:) = {'["Hello World\\\\"]',    '',                                 'terminated string'};
 %Tests focused on the proper escapes of characters
 %--------------------------------------------------
 %1) Valid escape characters

@@ -43,6 +43,7 @@ classdef tokens
         
         d_extra_info = '-------------------------------'
         data_to_string_ratio
+        toc_string_creation_time
         toc_total_time
         toc_non_read_time
         toc_file_read
@@ -107,10 +108,12 @@ classdef tokens
             %I'm still trying to decide how to best handle this
             %Why can't we create strings faster!?!?!?!?
             %Worst case scenario we should move this to mex
+            t1 = tic;
             temp_strings = cell(1,n_strings);
             for iString = 1:n_strings
                 temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString));
             end
+            obj.toc_string_creation_time = toc(t1);
             
             obj.strings = temp_strings;
             

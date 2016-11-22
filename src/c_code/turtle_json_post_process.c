@@ -59,7 +59,7 @@ const double p1e_20[58] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 //*p   ==========       js[parser_position]
 //++p  ==========       ++parser_position
 
-double string_to_double(char *p) {
+void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_value) {
     
     /*
      *  I found atof to be the main bottleneck in this code. It was
@@ -68,6 +68,10 @@ double string_to_double(char *p) {
      *  basic ones online that used loops and multiplation. This was my
      *  attempt to make something as fast possible. I welcome a faster
      *  approach!
+     *
+     *  I think that it would be worthwhile to investigate trying
+     *  to populate integer and fraction arrays and then add them together
+     *  using intrinsics
      */
     
     double value = 0;
@@ -136,10 +140,17 @@ double string_to_double(char *p) {
             value += p1e0[*p++]; //1e0 == 1, an unfortunate mismatch of exponent and scalar
             break;
         case 1:
+            
+            *error_p = i+1;
+            *error_value = 0;
+            return;
             //TODO: This will likely cause a problem since we have multiple threads
-            mexErrMsgIdAndTxt("jsmn_mex:no_number","No numbers were found, at position: %d");
+            //mexErrMsgIdAndTxt("turtle_json:no_number","No numbers were found, at position: %d");
         default:
-            mexErrMsgIdAndTxt("jsmn_mex:too_many_integers","The integer component of the number had too many digits");
+            *error_p = i+1;
+            *error_value = 1;
+            return;
+            //mexErrMsgIdAndTxt("turtle_json:too_many_integers","The integer component of the number had too many digits");
     }
     
     //This would be written neater as a while loop that updates a pointer
@@ -156,7 +167,7 @@ double string_to_double(char *p) {
     
     if (*p == '.') {
         ++p;
-        //TODO: Is no digit ok?
+        //TODO: Is no digit ok? => no, this needs to be handled
         if(isdigit(*p)){
             value += p1e_1[*p++];
             if(isdigit(*p)){
@@ -198,7 +209,10 @@ double string_to_double(char *p) {
                                                                                     if(isdigit(*p)){
                                                                                         value += p1e_20[*p++];
                                                                                         if(isdigit(*p)){
-                                                                                            mexErrMsgIdAndTxt("jsmn_mex:too_many_decimals","The fractional component of the number had too many digits");
+                                                                                            *error_p = i+1;
+                                                                                            *error_value = 3;
+                                                                                            return;
+                                                                                            //mexErrMsgIdAndTxt("turtle_json:too_many_decimals","The fractional component of the number had too many digits");
                                                                                             
                                                                                         }
                                                                                     }
@@ -220,6 +234,11 @@ double string_to_double(char *p) {
                     }
                 }
             }
+        }else{
+            //No number following the period
+            *error_p = i+1;
+            *error_value = 2;
+            return;
         }
     }
     //End of if '.'
@@ -256,10 +275,10 @@ double string_to_double(char *p) {
                 exponent_value += p1e0[*p++];
                 break;
             case 1:
-                mexErrMsgIdAndTxt("jsmn_mex:empty_exponent","An exponent was given with no numeric value");
+                mexErrMsgIdAndTxt("turtle_json:empty_exponent","An exponent was given with no numeric value");
             default:
                 //TODO: Give error location in string
-                mexErrMsgIdAndTxt("jsmn_mex:large_exponent","There were more than 15 digits in a numeric exponent");
+                mexErrMsgIdAndTxt("turtle_json:large_exponent","There were more than 3 digits in a numeric exponent");
         }
         if (negate){
             exponent_value = -exponent_value;
@@ -271,30 +290,124 @@ double string_to_double(char *p) {
     //With our string skipping we skip all parts of the number so
     //something like this would get by:
     //  1.2345E123E
+    //  as would
+    //  1.2345.123432
+    //
+    //  valid characters at the end would be:
+    //  space } ] , 
+    //  comma is probably the most likely
     
-    return value;
+    *value_p = value;
 }
 
 void parse_numbers(unsigned char *js,mxArray *plhs[]) {
+    //
+    //  numeric_p - this array starts as a set of pointers
+    //  to locations in the json_string that contain numbers.
+    //  For example, we might have numeric_p[0] point to the following
+    //  location:
+    //
+    //      {"my_value": 1.2345}
+    //                   ^   
+    //
+    //  Some of these pointers may be null, indicating that a "null"
+    //  JSON value occurred at that index in the array.
+    //
+    //  I am currently assuming that a pointer is 64 bits, which means
+    //  that I recycle the memory to store the array of doubles
     
     mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
     
     //Casting for input handling
     unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
-    //Casting for output handling
+    //Casting for output handling (recycling of memory)
     double *numeric_p_double = (double *)mxGetData(temp);
+    
+    //Note, we are making an assumption here about the max size
+    //of doubles
     int n_numbers = mxGetN(temp);
-     
+    
+    int *error_locations;
+    int *error_values;
+    
+    int n_threads = omp_get_max_threads();
+    
+    // Use omp_get_num_threads instead?????
+    error_locations = mxMalloc(n_threads*sizeof(int));
+    error_values    = mxMalloc(n_threads*sizeof(int));
+    
     const double MX_NAN = mxGetNaN();
     
-    #pragma omp parallel for
-    for (int i = 0; i < n_numbers; i++){
-        if (numeric_p[i]){
-            numeric_p_double[i] = string_to_double(numeric_p[i]);
-        }else{
-            numeric_p_double[i] = MX_NAN;
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        
+        int error_location = 0;
+        int error_value;
+
+        #pragma omp for
+        for (int i = 0; i < n_numbers; i++){
+            if (numeric_p[i]){
+                string_to_double(&numeric_p_double[i],numeric_p[i],i,&error_location,&error_value);
+            }else{
+                numeric_p_double[i] = MX_NAN;
+            }
+        }  
+        
+        *(error_locations + tid) = error_location;
+        *(error_values + tid) = error_value;
+        
+    }
+    
+    for (int i = 0; i < n_threads; i++){
+        if (*error_locations){
+            int error_index = *error_locations - 1;
+            //Note that we hold onto the pointer in cases of an error
+            //It is not overidden with a double
+            unsigned char *first_char_of_bad_number = numeric_p[error_index];
+            // p - js
+            //
+            // numeric_p[**=
+            
+            //TODO: This is a bit confusing since this pointer doesn't
+            //move but the other one does ...
+            //TODO: Ideally we would pass these error messages into
+            //a handler that would handle the last bit of formatting
+            //and also provide context in the string
+            //We would need the string length ...
+            switch (*(error_values + i))
+            {
+                case 0:
+                    //I don't think this can run based on how our parser works ...
+                    //TODO: Change this to a code error?
+                    mexErrMsgIdAndTxt("turtle_json:no_integer_component","No integer component was found for a number (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
+                    break;
+                case 1:
+                    mexErrMsgIdAndTxt("turtle_json:integer_component_too_large","The integer component of the number had too many digits (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
+                    break;
+                case 2:
+                    mexErrMsgIdAndTxt("turtle_json:no_fractional_numbers","A number had a period, followed by no numbers (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
+                case 3:
+                    mexErrMsgIdAndTxt("turtle_json:fractional_component_too_large","The fractional component of a number had too many digits");
+                case 4:
+                    mexErrMsgIdAndTxt("turtle_json:no_exponent_numbers","A number had an exponent symbol (e or E) followed by no digits");
+                case 5:
+                    mexErrMsgIdAndTxt("turtle_json:exponent_component_too_large","The fractional component of the number had too many digits");
+                default:
+                    mexErrMsgIdAndTxt("turtle_json:internal_code_error","Internal code error");   
+            }
         }
-    }  
+        ++error_locations;
+    }
+    
+//     #pragma omp parallel for
+//     for (int i = 0; i < n_numbers; i++){
+//         if (numeric_p[i]){
+//             numeric_p_double[i] = string_to_double(numeric_p[i]);
+//         }else{
+//             numeric_p_double[i] = MX_NAN;
+//         }
+//     }  
 }
 
 //http://www.mathworks.com/matlabcentral/answers/3198-convert-matlab-string-to-wchar-in-c-mex-under-windows-and-linux
@@ -308,6 +421,13 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
 //We might eventually parse keys and strings differently ...
 void parse_keys(unsigned char *js,mxArray *plhs[]) {
 
+    
+    //JAH STATUS:
+    //write generic method for processing strings ...
+    
+    //This might be useful ...
+    //https://woboq.com/blog/utf-8-processing-using-simd.html
+    
     mxArray *temp = mxGetField(plhs[0],0,"key_p");
     
     //Create a string array and replace d1 and d2 with start and end

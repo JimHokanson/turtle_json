@@ -415,8 +415,10 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         p += digit_search_result;
         //At this point we've traversed 32 characters
         //This code is easily rewriteable if in reality we need more
+        //TODO: I should explicitly describe the max here
+        //####.#####E###
         if (digit_search_result == 16){
-        	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too much info in digit parsing");
+        	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too many digits when parsing a number");
         }
     }
     

@@ -17,7 +17,8 @@ May require 2015b or newer, although older versions could work, if the TDM-GCC s
  3) Might need to run:  
  setenv('MW_MINGW64_LOC','C:\TDM-GCC-64')
  4) Make the mex call
- mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v
+
+    mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v
  
 Mac OS
 ------
