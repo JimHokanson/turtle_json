@@ -28,6 +28,7 @@
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;
+   bool parse_strings;
    int n_tokens;
    int chars_per_token;
 } Options;
