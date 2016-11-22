@@ -1,5 +1,21 @@
 #include "turtle_json.h"
 
+//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+struct mxArray_Tag_Partial {
+    void *name_or_CrossLinkReverse;
+    mxClassID ClassID;
+    int VariableType;
+    mxArray *CrossLink;
+    size_t ndim;
+    unsigned int RefCount; /* Number of sub-elements identical to this one */
+};
+
+mxArray *mxCreateReference(const mxArray *mx)
+{
+    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
+    ++my->RefCount;
+    return (mxArray *) mx;
+}
 
 //Values for Integer portion of number
 //------------------------------------
@@ -479,6 +495,202 @@ void parse_keys(unsigned char *js,mxArray *plhs[]) {
     TOC_AND_LOG(key_parse,key_parsing_time);    
     
     setStructField(plhs[0],key_data,"key_data",mxCHAR_CLASS,*n_key_chars);
+    
+}
+
+void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
+    
+    mxArray *temp;
+    unsigned char **char_p;
+    int n_entries;
+    int *n_chars;
+    int *start_indices;
+    int *end_indices;
+    
+    //These need to be outside the if statement, as they include declarations
+    TIC(key_parse);
+    TIC(string_parse);
+    
+    if (is_key){
+        temp = mxGetField(plhs[0],0,"key_p");
+        
+        char_p = (unsigned char **)mxGetData(temp);
+        n_entries = mxGetN(temp);
+    
+        temp = mxGetField(plhs[0],0,"n_key_chars");
+        n_chars = (int *)mxGetData(temp);
+        
+        temp = mxGetField(plhs[0],0,"key_start_indices");
+        start_indices = (int *)mxGetData(temp);
+    
+        temp = mxGetField(plhs[0],0,"key_end_indices");
+        end_indices = (int *)mxGetData(temp);
+        
+    }else{
+        temp = mxGetField(plhs[0],0,"string_p");
+        
+        char_p = (unsigned char **)mxGetData(temp);
+        n_entries = mxGetN(temp);
+    
+        temp = mxGetField(plhs[0],0,"n_string_chars");
+        n_chars = (int *)mxGetData(temp);
+
+        temp = mxGetField(plhs[0],0,"string_start_indices");
+        start_indices = (int *)mxGetData(temp);
+    
+        temp = mxGetField(plhs[0],0,"string_end_indices");
+        end_indices = (int *)mxGetData(temp);
+    }
+    
+    unsigned char *p;
+    int cur_index;
+    int end_index;
+        
+    mxArray *cell_array = mxCreateCellMatrix(1,n_entries);
+    mxArray *temp_mx_array;
+    
+    uint16_t *cell_data;
+    
+    //Times
+    //---------------------------------------
+    // 0: 0.433811, 0.263949,  5.53868  //Just the loop
+    //
+    //  Working on the header
+    // 1: 0.485122, 0.332324,  6.85322  //Setting a null cell
+    // 2: 1.21397,  0.844079,  17.4978  //Creation and setting cell, ouch
+    // 3: 1.04999,  0.872159,  17.9427  //Yes, the real pain is from creation
+    // 4: 0.929129, 0.770652,  15.6719  //Slightly faster, but still painful - numeric matrix instead of char array
+    // 5: 0.984621, 0.814956,  16.677   //duplication is slower :/
+    //
+    //  Working on the data 
+    // 6: 0.861152, 0.696013,  14.2122  //Just to get some memory :/
+    // 7: 0.41617,  0.262358,  5.32195  //tight loop with malloc and free - doesn't hold if we hold onto data
+    // 8: 0.761662, 0.605897,  12.264   //holding onto all malloc, then freeing
+    //
+    //  Header and data together
+    // 9: 1.9168,   1.38419,   28.6841
+    //10: 0.563573, 0.411608,  8.35081
+    
+    //5
+    //-------------------------------------
+    //mxArray *wtf = mxCreateNumericMatrix(0,0,mxCHAR_CLASS,mxREAL);
+    
+    //7
+    //-------------------------------------
+    //char * buffer;
+    
+    //8
+    //--------------------------------------
+    //char * buffer;
+    //char **double_buffer = malloc(n_entries*sizeof(buffer));
+    //char **p_start_double_buffer = double_buffer;
+    
+    //10
+    //-------------------------------------
+    temp_mx_array = mxCreateNumericMatrix(1,2,mxCHAR_CLASS,mxREAL);
+    
+    for (int i = 0; i < n_entries; i++){
+        
+        //1
+        //---------------------------
+        //mxSetCell(cell_array,i,0);
+        
+        //2  Ouch 512 ms to create these elements
+        //----------------------------------------
+        //temp_mx_array = mxCreateCharArray(0,0);
+        //mxSetCell(cell_array,i,temp_mx_array);
+        
+        //3
+        //----------------------------------------
+        //temp_mx_array = mxCreateCharArray(0,0);
+        //mxDestroyArray(temp_mx_array);
+        
+        //4
+        //----------------------------------------
+        //temp_mx_array = mxCreateNumericMatrix(0,0,mxCHAR_CLASS,mxREAL);
+        //mxDestroyArray(temp_mx_array);
+        
+        //5
+        //----------------------------------------
+        //temp_mx_array = mxDuplicateArray(wtf);
+        //mxDestroyArray(temp_mx_array);
+        
+        //6
+        //----------------------------------------
+        //cell_data = mxMalloc(4);
+        //mxFree(cell_data);
+        
+        //7
+        //----------------------------------------
+        //buffer = (char*) malloc (4);
+        //free(buffer);
+        
+        //8
+        //---------------------------------------------
+        //double_buffer[i] = (char*) malloc(4);
+        
+        //9
+        //---------------------------------------------
+        //temp_mx_array = mxCreateNumericMatrix(1,2,mxCHAR_CLASS,mxREAL);
+        //mxSetCell(cell_array,i,temp_mx_array);
+        
+        //10 - mxCreateReference is undocumented
+        //----------------------------------------------
+        mxSetCell(cell_array,i,mxCreateReference(temp_mx_array));
+        
+    } 
+    
+    
+    //8
+    //------------------------------------------------------
+    // double_buffer = &double_buffer[n_entries-1];
+    // for (int i = 0; i < n_entries; i++){
+    //     free(*double_buffer);
+    //     --double_buffer;
+    // }
+    // 
+    // free(p_start_double_buffer);
+    
+    if (is_key){
+            TOC_AND_LOG(key_parse,key_parsing_time);
+            mxAddField(plhs[0],"keys");
+            mxSetField(plhs[0],0,"keys",cell_array);     
+    }else{
+        TOC_AND_LOG(string_parse,string_parsing_time);
+            mxAddField(plhs[0],"strings");
+            mxSetField(plhs[0],0,"strings",cell_array);        
+    }
+   
+    //tic; d2 = repmat({''},1,1e6); toc;
+    //0.01
+    
+    //tic; d = num2cell(1:1e6); toc;
+    //0.33
+    
+//     d = char(104*ones(1e6,1));
+//     tic; d2 = cellstr(d); toc;
+//     0.53
+    
+    
+//             unsigned char *p = char_p[i];
+//         cur_index = start_indices[i];
+//         
+// 
+//         //Shifting to Matlab numbering - might do earlier
+//         string_start_indices[i] += 1;
+//         
+//         while (*p != '"') {
+//             //TODO:
+//             //1) check for \
+//             //2) check for non-ASCII
+//             string_data[cur_index] = *p;
+//             ++p;
+//             ++cur_index;
+//         }
+//         string_end_indices[i] = cur_index;
+    
+
+    
     
 }
 

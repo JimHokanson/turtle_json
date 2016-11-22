@@ -18,6 +18,8 @@ classdef tokens
         d1
         d2
         
+        token_after_close %Only valid for objects, arrays, and keys
+        
         %************ Current Definitions ************
         %                       d1                  d2
         %     object: 1) type  2) n_values        3) tac
@@ -34,6 +36,7 @@ classdef tokens
         key_data
         key_starts
         key_ends
+        keys
         string_data
         string_starts
         string_ends
@@ -43,12 +46,13 @@ classdef tokens
         
         d_extra_info = '-------------------------------'
         data_to_string_ratio
-        toc_string_creation_time
-        toc_total_time
-        toc_non_read_time
+        toc_total_time      %Includes reading
+        toc_non_read_time   %Everything but reading
         toc_file_read
         toc_parse
         toc_post_process
+        toc_pp_string
+        toc_pp_key
         ns_per_char
         
         %This is approximate because we double the tokens for keys
@@ -89,33 +93,44 @@ classdef tokens
             obj.types = result.types;
             obj.d1 = result.d1;
             obj.d2 = result.d2;
+            
+            obj.token_after_close = obj.d2;
+            
             obj.numeric_data = result.numeric_p;
             %obj.numeric_data = result.numeric_data;
             
-            obj.key_data = result.key_data;
-            obj.key_starts = result.key_start_indices;
-            obj.key_ends = result.key_end_indices;
             
-            obj.string_data = result.string_data;
-            obj.string_starts = result.string_start_indices;
-            obj.string_ends = result.string_end_indices;
+            obj.strings = result.strings;
+            obj.keys = result.keys;
+            obj.toc_pp_string = result.string_parsing_time;
+            obj.toc_pp_key = result.key_parsing_time;
             
-            local_string_data = result.string_data;
-            local_string_starts = result.string_start_indices;
-            local_string_ends = result.string_end_indices;
-            n_strings = length(result.string_end_indices);
+% % %             obj.key_data = result.key_data;
+% % %             obj.key_starts = result.key_start_indices;
+% % %             obj.key_ends = result.key_end_indices;
             
-            %I'm still trying to decide how to best handle this
-            %Why can't we create strings faster!?!?!?!?
-            %Worst case scenario we should move this to mex
-            t1 = tic;
-            temp_strings = cell(1,n_strings);
-            for iString = 1:n_strings
-                temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString));
-            end
-            obj.toc_string_creation_time = toc(t1);
+% % %             obj.string_data = result.string_data;
+% % %             obj.string_starts = result.string_start_indices;
+% % %             obj.string_ends = result.string_end_indices;
             
-            obj.strings = temp_strings;
+%             keyboard
+            
+% % %             local_string_data = result.string_data;
+% % %             local_string_starts = result.string_start_indices;
+% % %             local_string_ends = result.string_end_indices;
+% % %             n_strings = length(result.string_end_indices);
+% % %             
+% % %             %I'm still trying to decide how to best handle this
+% % %             %Why can't we create strings faster!?!?!?!?
+% % %             %Worst case scenario we should move this to mex
+% % %             t1 = tic;
+% % %             temp_strings = cell(1,n_strings);
+% % %             for iString = 1:n_strings
+% % %                 temp_strings{iString} = local_string_data(local_string_starts(iString):local_string_ends(iString));
+% % %             end
+% % %             obj.toc_string_creation_time = toc(t1);
+% % %             
+% % %             obj.strings = temp_strings;
             
             obj.data_to_string_ratio = length(result.d1)/length(result.json_string);
             obj.toc_total_time = toc(t0);

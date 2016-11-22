@@ -28,7 +28,7 @@
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;
-   bool parse_strings;
+   bool parse_strings; //Not yet implemented
    int n_tokens;
    int chars_per_token;
 } Options;
@@ -62,6 +62,8 @@ typedef struct {
 //void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
+
+void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key);
 
 void parse_keys(unsigned char *js,mxArray *plhs[]);    
     

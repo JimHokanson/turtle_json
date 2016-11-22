@@ -115,7 +115,9 @@ end
 function output = parse_array(index,s,in)
 
 n_items = s.d1(index);
-tac = s.d2;
+
+%TODO: make s.d2 an alias of this ...
+token_after_close = s.token_after_close;
 
 if n_items == 0
     output = [];
@@ -151,24 +153,27 @@ switch types(index+1)
         error('Unexpected type: key')
     case 4 %string
         keyboard
-        if tac(index)-index == n_items + 1 && ...
-                all(types(index+1:index+n_items) == 3)
+        if token_after_close(index)-index == n_items + 1 && all(types(index+1:index+n_items) == 3)
 
                 string_pointer = s.d1;
-                tac = lp.d2;
+                token_after_close = lp.d2;
                 start_index = string_pointer(index+1);
-                end_index = string_pointer(tac(index)-1);
+                end_index = string_pointer(token_after_close(index)-1);
 
                 output      = s.strings(start_index:end_index);
             
             return
         end
-    case {5,6}
-        if tac(index)-index == n_items + 1 && types(index+n_items) == 5
+    case {5,6} %number or null
+        
+        %Rather than testing all, we verify that the last element is valid
+        %Then we see if the difference in indices is equal to the # of
+        %items
+        if token_after_close(index)-index == n_items + 1 && types(index+n_items) == 5
             
             numeric_pointer = s.d1;
             start_numeric_I = numeric_pointer(index+1);
-            end_numeric_I = numeric_pointer(tac(index)-1);
+            end_numeric_I = numeric_pointer(token_after_close(index)-1);
             
             if end_numeric_I - start_numeric_I == n_items - 1
                 output = s.numeric_data(start_numeric_I:end_numeric_I);
@@ -178,7 +183,7 @@ switch types(index+1)
         end
         
     case {7,8} %logical
-        if tac(index)-index == n_items + 1
+        if token_after_close(index)-index == n_items + 1
             if all(types(index+1:index+n_items) == 7 | types(index+1:index+n_items) == 8);
                 output = types(index+1:index+n_items) == 7;
                 return
@@ -190,7 +195,7 @@ end
 
 output = cell(1,n_items);
 cur_I  = index+1;
-tokens_after_close = tac;
+tokens_after_close = token_after_close;
 for iItem = 1:n_items
     switch s.types(cur_I)
         case 1

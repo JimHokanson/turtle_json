@@ -1,6 +1,6 @@
 #include "turtle_json.h"
 
-int N_PADDING = 17;
+#define N_PADDING 17
 
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
 
@@ -9,6 +9,7 @@ bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length
             mexPrintf("Found padding");
         }
     }
+    
     //     //TODO: I'm not thrilled with this being here and above
 //     json_string2[string_byte_length_value] = 0;
 //     json_string2[string_byte_length_value+1] = '\\';
@@ -18,7 +19,6 @@ bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length
 //     }
     
     return true;
-    
     
 }
 
@@ -302,18 +302,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     
     parse_numbers(json_string,plhs);
     
-    parse_keys(json_string,plhs);
+    //parse_keys(json_string,plhs);
     
-    parse_strings(json_string,plhs);
+    parse_char_data(json_string,plhs, true);
+    parse_char_data(json_string,plhs, false);
+    
+    //void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key)
+    
+    //parse_strings(json_string,plhs);
     
     TOC_AND_LOG(start_pp,elapsed_pp_time);
     
 
 }
 
-//TODO: This code needs to be written
-//This code is currently in two locations - file reading and adding to input string
-void addBuffer(unsigned char *buffer){
-  //TODO: Add on buffer   
-}
+// // // //TODO: This code needs to be written
+// // // //This code is currently in two locations - file reading and adding to input string
+// // // void addBuffer(unsigned char *buffer){
+// // //   //TODO: Add on buffer   
+// // // }
 

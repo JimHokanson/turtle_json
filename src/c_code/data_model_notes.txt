@@ -1,0 +1,62 @@
+Data Model
+
+Tokens include:
+Object  {
+Array   [
+Key     :
+String  "
+Number  1
+Null    null  - I represent null as NaN
+True    true
+False   false
+
+Things that exist for every token.
+----------------------------------
+Values in these are arrays are ordered as they are encountered in the JSON string.
+
+types : array of UINT8
+    Indicates the type of token. See values in turtle_json.h
+
+d1 : array of INT32
+    object: # of keys in object
+     array: # of values in the array
+       key: 1) initially an index into the json string of the start of the key
+            2) 
+    string: 
+
+d2 : array of INT32
+    object: index of token after the object closes (1 based)
+     array: "    " array closes
+       key: "    " key value closes, e.g. {"key": [1,2,3,4], "next_key" ... <= index of "key" points to "next_key" 
+    string: 
+
+
+General Meta Data
+----------------------
+    n_key_allocations: 
+          n_key_chars: total # of bytes in the JSON string that are part of keys (?? does this include double quotes??)
+       n_string_chars:
+ n_string_allocations:
+n_numeric_allocations:
+
+Data Type Specific
+------------------
+            key_p: array of unsigned char *
+key_start_indices: array of int
+            Count of the # of key characters at the start of processing
+            this key. This is used for placing all keys into a singular
+            array.
+  key_end_indices: array of int
+            Count of the # of key characters (really bytes) after initial
+            processing of the key. This gets updated in post-processing
+            based on UTF8 processing (conversion to UTF16).
+    
+
+         key_data:
+
+string_p
+string_end_indices:
+string_start_indices:
+string_data:
+
+numeric_p:
