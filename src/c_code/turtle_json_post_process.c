@@ -653,6 +653,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         //2 - invalid escape char
         //3 - invalid hex 
         
+        //TODO: This code would benefit from being broken up into functions ...
+        
         while (!parse_status) {
             
             if (*p == '"'){
@@ -660,11 +662,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
             }else if(*p == '\\'){
                 ++p; //Move onto the next character that is escaped
                 
-                //escape_values
+                //Process a unicode escape value e.g. \u00C8 => È
                 if (*p == 'u'){
-                 
-                    //  \u####  <= unicode escape
-                    //  123456  <= byte count
                     shrink_string = true;
                     
                     unicode_char_value = 0;
@@ -682,7 +681,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
                             parse_status == 3;
                             break;
                         }else{
-                            unicode_char_value += hex_multipliers[iHex]*hex_numerical_value;
+                            unicode_char_value = (unicode_char_value << 4) + hex_numerical_value
+                            //unicode_char_value += hex_multipliers[iHex]*hex_numerical_value;
                         }
                     }
                     

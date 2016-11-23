@@ -148,10 +148,6 @@
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     n_string_chars += CURRENT_POINTER - string_p[current_string_index]; \
     string_end_indices[current_string_index] = n_string_chars;
-            
-    //d2[current_data_index] = CURRENT_POINTER - temp_p;        
-            
-    //d2[current_data_index] = CURRENT_POINTER - string_p[current_string_index];
 
 #define PROCESS_KEY \
     INCREMENT_KEY_INDEX; \
@@ -164,25 +160,11 @@
     key_start_indices[current_key_index]   = n_key_chars; \
     d1[current_data_index]   = current_key_index + 1; \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
-    /* We won't count the closing quote, but we would normally add 1 to be inclusive on a count, so they cancel out */ \
+    /* We won't count the closing quote, but we would normally add 1 to */ \
+    /* be inclusive on a count, so they cancel out */ \
     n_key_chars += CURRENT_POINTER - key_p[current_key_index]; \
     key_end_indices[current_key_index] = n_key_chars;
-    
-// Option 1            
-//     if ((CURRENT_POINTER - key_p[current_key_index]) > max_key_size){ \
-//         max_key_size = CURRENT_POINTER - key_p[current_key_index]; \
-//     }
-           
-// Option 2    
-//     n_chars_key = CURRENT_POINTER - key_p[current_key_index]; \
-//     max_key_size = (n_chars_key > max_key_size) ? n_chars_key : max_key_size;
-    
-// Option 3    
-//      n_chars_key = CURRENT_POINTER - key_p[current_key_index]; \    
-//     if (n_chars_key > max_key_size){ \
-//         max_key_size = n_chars_key; \
-//     }
-            
+                
 #define PROCESS_NUMBER \
     EXPAND_NUMERIC_CHECK; \
     INCREMENT_DATA_INDEX; \
@@ -204,11 +186,13 @@
 #define PROCESS_TRUE \
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_TRUE); \
+    /*TODO: Add true check ... */ \
 	ADVANCE_POINTER_BY_X(3);
             
 #define PROCESS_FALSE \
     INCREMENT_DATA_INDEX; \
     SET_TYPE(TYPE_FALSE); \
+    /*TODO: Add false check ... */ \
 	ADVANCE_POINTER_BY_X(4);
                 
 //Things for closing  =====================================================
@@ -551,7 +535,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     //---------------------------------------------------------------------
     const int MAX_DEPTH = 200;
     int parent_types[201];
-    //Note, this needs to be indices instead of pointers because
+    //This needs to be indices instead of pointers because
     //we might resize (resize types, d1, d2) and the pointers would become 
     //invalid
     int parent_indices[201];
@@ -564,33 +548,27 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[]) {
     int current_data_index = -1;
     
     uint8_t *types = mxMalloc(data_size_allocated);
-    uint8_t *types_move = types;
+    //uint8_t *types_move = types;
             
-    //do we need to make these uint64?
-    //technically not, the start pointer is an index
-    //and not an address
-    //
-    //d1 - n_values and start pointer index
-    //d2 - tac
     int *d1 = mxMalloc(data_size_allocated * sizeof(int));
     int *d2 = mxMalloc(data_size_allocated * sizeof(int));
     //---------------------------------------------------------------------
     
     int n_key_chars = 0;
-    int n_key_allocations  = 1;
+    //int n_key_allocations  = 1;
     int key_size_allocated = ceil((double)string_byte_length/20);
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = -1;
     ALLOCATE_KEY_DATA 
     
     int n_string_chars = 0;
-    int n_string_allocations = 1;
+    //int n_string_allocations = 1;
     int string_size_allocated = ceil((double)string_byte_length/20);
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = -1;
     ALLOCATE_STRING_DATA
    
-    int n_numeric_allocations = 1;
+    //int n_numeric_allocations = 1;
     int numeric_size_allocated = ceil((double)string_byte_length/4);
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = -1;
@@ -873,11 +851,16 @@ finish_main:
     d2 = mxRealloc(d2,((current_data_index + 1)*sizeof(int)));
     setStructField(plhs[0],d2,"d2",mxINT32_CLASS,current_data_index + 1);
      
-    setIntScalar(plhs[0],"n_key_allocations",n_key_allocations);
+    //Meta data storage
+    //--------------------
     setIntScalar(plhs[0],"n_key_chars",n_key_chars);
     setIntScalar(plhs[0],"n_string_chars",n_string_chars);
-    setIntScalar(plhs[0],"n_string_allocations",n_string_allocations);
-    setIntScalar(plhs[0],"n_numeric_allocations",n_numeric_allocations);
+    //This information can be used to tell how efficient we were
+    //relative to the allocation
+    setIntScalar(plhs[0],"n_tokens_allocated",data_size_allocated);
+    setIntScalar(plhs[0],"n_key_allocations",key_size_allocated);
+    setIntScalar(plhs[0],"n_string_allocations",string_size_allocated);
+    setIntScalar(plhs[0],"n_numeric_allocations",numeric_size_allocated);
     
     
     //TODO: This is only correct on 64 bit systems ...

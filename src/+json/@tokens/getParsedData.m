@@ -64,7 +64,8 @@ obj = sl.obj.dict;
 %3 - string
 %2 - array
 
-n_keys = s.d1;
+n_keys = s.child_count;
+value_indices = s.value_index;
 
 types = s.types;
 
@@ -96,9 +97,9 @@ for iItem = 1:n_keys(index)
             %it
             error('A key should not contain a key')
         case 4
-            value = s.strings(cur_value_I);
+            value = s.strings{value_indices(cur_value_I)};
         case 5
-            value = s.numeric_data(cur_value_I);
+            value = s.numeric_data(value_indices(cur_value_I));
         case 6
             value = NaN;
         case 7
@@ -114,9 +115,8 @@ end
 
 function output = parse_array(index,s,in)
 
-n_items = s.d1(index);
+n_items = s.child_count(index);
 
-%TODO: make s.d2 an alias of this ...
 token_after_close = s.token_after_close;
 
 if n_items == 0
@@ -124,10 +124,8 @@ if n_items == 0
     return
 end
 
-% output = [];
-% return;
-
 types = s.types;
+value_indices = s.value_index;
 
 %1) object- go to full loop
 %2) array - go to full loop - for now
@@ -153,38 +151,41 @@ switch types(index+1)
         error('Unexpected type: key')
     case 4 %string
         %cell array of strings?
-        keyboard
-        if token_after_close(index)-index == n_items + 1 && all(types(index+1:index+n_items) == 3)
-
-                string_pointer = s.d1;
-                token_after_close = lp.d2;
-                start_index = string_pointer(index+1);
-                end_index = string_pointer(token_after_close(index)-1);
-
-                output      = s.strings(start_index:end_index);
+        %Requires:
+        %1) first and last entries of the array are a string
+        %2) that there indices are such that all inbetween values must be
+        %strings ..
+        if types(index + n_items) == 4
             
-            return
+            I1 = value_indices(index + 1);
+            I2 = value_indices(index + n_items);
+            
+            if (I2 - I1 + 1) == n_items
+                output = s.strings(I1:I2);
+                return
+            end
         end
     case {5,6} %number or null
-        
-        %Rather than testing all, we verify that the last element is valid
-        %Then we see if the difference in indices is equal to the # of
-        %items
-        if token_after_close(index)-index == n_items + 1 && types(index+n_items) == 5
-            
-            numeric_pointer = s.d1;
-            start_numeric_I = numeric_pointer(index+1);
-            end_numeric_I = numeric_pointer(token_after_close(index)-1);
-            
-            if end_numeric_I - start_numeric_I == n_items - 1
-                output = s.numeric_data(start_numeric_I:end_numeric_I);
+        if types(index+n_items) == 5
+            I1 = value_indices(index + 1);
+            I2 = value_indices(index + n_items);
+            if (I2 - I1 + 1) == n_items
+                output = s.numeric_data(I1:I2);
+                return
             end
-            
-            return
         end
-        
     case {7,8} %logical
+        %note that tac(index) points 1 past the array
+        %index also points before the array
+        %start value1 value2 value3 next
+        %index                      tac(index)
+        %1       2     3      4      5
+        %
+        %5 - 1 = n_items (3) + 1
         if token_after_close(index)-index == n_items + 1
+            %Unlike the other types, we don't keep track of an index
+            %for these values to know if all values inbetween the first 
+            %and the last element are all logicals
             if all(types(index+1:index+n_items) == 7 | types(index+1:index+n_items) == 8);
                 output = types(index+1:index+n_items) == 7;
                 return
@@ -201,18 +202,27 @@ for iItem = 1:n_items
     switch s.types(cur_I)
         case 1
             output{iItem} = parse_object(cur_I,s,in);
+            cur_I = tokens_after_close(cur_I);
         case 2
             output{iItem} = parse_array(cur_I,s,in);
+            cur_I = tokens_after_close(cur_I);
         case 3
-            output{iItem} = s.strings{cur_I};
+            error('Key type should not be an element of an array')
         case 4
-            output{iItem} = s.numeric_data(cur_I);
-        case 5
-            output{iItem} = logical(s.numeric_data(cur_I));
+            output{iItem} = s.strings{value_indices(cur_I)};
+            cur_I = cur_I + 1;
+        case {5,6}
+            output{iItem} = s.numeric_data(value_indices(cur_I));
+            cur_I = cur_I + 1;
+        case 7
+            output{iItem} = true;
+            cur_I = cur_I + 1;
+        case 8
+            output{iItem} = false;
+            cur_I = cur_I + 1;
         otherwise
             error('Unexpected value')
     end
-    cur_I = tokens_after_close(cur_I);
 end
 
 end

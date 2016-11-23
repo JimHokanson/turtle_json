@@ -18,43 +18,47 @@ Things that exist for every token.
 Values in these arrays are ordered as they are encountered in the JSON string.
 In other words, the first value in the array corresponds to the first token.
 
+Note that from these definitions that every token takes up at least 9 bytes.
+
 types : array of uint8
     Indicates the type of token. See values in turtle_json.h
 
 d1 : array of int32
+        d1 is either:
+        1) The # of entries something contains
+        2) An index of the element in a vector of elements of that type
+
     object: # of keys in object
-     array: # of values in the array
+     array: # of values in the array (i.e. length of the array)
     string: 1 based index of the string element that this token occupies
             in other words, this is equivalent to the # of strings 
             observed so far, including this one. Use this to index into
             'strings'
        key: same as string definition, but for 'keys' property
     number: same as string definition, but for 'numeric_p' property
-      null:
-      true:
-     false:    
+      null: same as string definition, but for 'numeric_p' property
+      true: not used, value is undefined
+     false: not used, value is undefined
+
 
 d2 : array of int32
+        d2 is either:
+
     object: index of token after the object closes (1 based)
      array: "    " array closes
-    string:
        key: "    " key value closes, e.g. {"key": [1,2,3,4], 
                      "next_key" ... <= index of "key" points to "next_key"
                      token
-    number:
-      null:
-      true:
-     false:
-
-Note that from these definitions that every token takes up at least 9 bytes.
-
-
-
+    string:  not used, value is undefined (TODO: might make this a length)
+    number:  "    "
+      null:  "    "
+      true:  "    "
+     false:  "    "
 
 Data Type Specific
 ------------------
 
-  --------  Key Related -------
+    --------  Key Related -------
             keys : cellstr
                 Parsed key strings
             key_p: array of unsigned char *
@@ -75,15 +79,21 @@ key_start_indices: array of int
             processing of the key. This gets updated in post-processing
             based on UTF8 processing (conversion to UTF16).
     
+    -------- String Related -------
+        strings: cellstr
+            Parsed string values    
+       string_p: array of unsigned char *
+            Pointer to the first character in the key string (not the 
+            opening double quotes)
 
-    
-string_p
+TODO: See note in key section regarding these values. Since d2 is unused
+it could possibly store the length.
 string_end_indices:
 string_start_indices:
-strings:
 
-numeric_p:
-
+    -------  Number Related  ------
+      numeric_p: 1) Initially a pointer to the start of a number to process
+                 2) Later this takes on the 
 
 General Meta Data
 ----------------------
