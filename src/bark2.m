@@ -1,6 +1,6 @@
 function jt = bark2()
 file_path = 'C:\D\example_JSON\1.json';
-N = 20;
+N = 10;
 d1_all = zeros(1,N);
 t3 = tic;
 for i = 1:N

@@ -1,6 +1,9 @@
 #include "turtle_json.h"
 
+#define IS_CONTINUATION_BYTE *p >> 6 == 0b10
+
 //http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+//--------------------------------------------------------------------------
 struct mxArray_Tag_Partial {
     void *name_or_CrossLinkReverse;
     mxClassID ClassID;
@@ -16,6 +19,8 @@ mxArray *mxCreateReference(const mxArray *mx)
     ++my->RefCount;
     return (mxArray *) mx;
 }
+//-------------------------------------------------------------------------
+
 
 //Values for Integer portion of number
 //------------------------------------
@@ -500,6 +505,41 @@ void parse_keys(unsigned char *js,mxArray *plhs[]) {
 
 void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     
+    //Are the nulls even needed???????, I don't think so .... TODO: fix
+    //this and also add on consecutive value support 
+    //
+    //GCC speficic initialization
+    const uint16_t escape_values[256] = {
+        [0 ... 7] = '\0',
+        [8] = '\b',
+        [9] = '\t',
+        [10] = '\n',
+        [11] = '\0',
+        [12] = '\f',
+        [13] = '\r',
+        [14 ... 33] = '\0',
+        [34] = '"',
+        [35 ... 46] = '\0',
+        [47] = '/',
+        [48 ... 91] = '\0',
+        [92] = '\\',
+        [93 ... 255] ='\0'};
+
+    //Input character
+    //Output, numerical value to add, unless invalid then -1
+    //e.g. a => 10
+    //     C => 12
+    const int hex_numerical_values[256] = {
+        [0 ... 47] = -1,
+        [48] = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, // '0 ... 9'
+        [58 ... 64] = -1,
+        [65] = 10, 11, 12, 13, 14, 15,      // 'A - F'
+        [71 ... 96] = -1,
+        [97] = 10, 11, 12, 13, 14, 15, 
+        [103 ... 255] = -1};
+
+        
+    
     mxArray *temp;
     unsigned char **char_p;
     int n_entries;
@@ -542,114 +582,221 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         end_indices = (int *)mxGetData(temp);
     }
     
-    unsigned char *p;
-    int cur_index;
-    int end_index;
+    //Initial allocation of memory
+    //------------------------------------------------------
+    int n_chars_max_in_string;
         
     mxArray *cell_array = mxCreateCellMatrix(1,n_entries);
     mxArray *temp_mx_array;
     
     uint16_t *cell_data;
+    uint16_t **all_cells_data = mxMalloc(n_entries*sizeof(cell_data));
     
-    //Times
-    //---------------------------------------
-    // 0: 0.433811, 0.263949,  5.53868  //Just the loop
-    //
-    //  Working on the header
-    // 1: 0.485122, 0.332324,  6.85322  //Setting a null cell
-    // 2: 1.21397,  0.844079,  17.4978  //Creation and setting cell, ouch
-    // 3: 1.04999,  0.872159,  17.9427  //Yes, the real pain is from creation
-    // 4: 0.929129, 0.770652,  15.6719  //Slightly faster, but still painful - numeric matrix instead of char array
-    // 5: 0.984621, 0.814956,  16.677   //duplication is slower :/
-    //
-    //  Working on the data 
-    // 6: 0.861152, 0.696013,  14.2122  //Just to get some memory :/
-    // 7: 0.41617,  0.262358,  5.32195  //tight loop with malloc and free - doesn't hold if we hold onto data
-    // 8: 0.761662, 0.605897,  12.264   //holding onto all malloc, then freeing
-    //
-    //  Header and data together
-    // 9: 1.9168,   1.38419,   28.6841
-    //10: 0.563573, 0.411608,  8.35081
-    
-    //5
-    //-------------------------------------
-    //mxArray *wtf = mxCreateNumericMatrix(0,0,mxCHAR_CLASS,mxREAL);
-    
-    //7
-    //-------------------------------------
-    //char * buffer;
-    
-    //8
-    //--------------------------------------
-    //char * buffer;
-    //char **double_buffer = malloc(n_entries*sizeof(buffer));
-    //char **p_start_double_buffer = double_buffer;
-    
-    //10
-    //-------------------------------------
-    temp_mx_array = mxCreateNumericMatrix(1,2,mxCHAR_CLASS,mxREAL);
-    
+    //Note, any string reductions would need to be done here ...
     for (int i = 0; i < n_entries; i++){
         
-        //1
-        //---------------------------
-        //mxSetCell(cell_array,i,0);
+        //TODO: Test 1,0 vs 0,0
+        temp_mx_array = mxCreateNumericMatrix(1,0,mxCHAR_CLASS,mxREAL);
         
-        //2  Ouch 512 ms to create these elements
-        //----------------------------------------
-        //temp_mx_array = mxCreateCharArray(0,0);
-        //mxSetCell(cell_array,i,temp_mx_array);
+        n_chars_max_in_string = end_indices[i] - start_indices[i];
         
-        //3
-        //----------------------------------------
-        //temp_mx_array = mxCreateCharArray(0,0);
-        //mxDestroyArray(temp_mx_array);
+//         if (n_chars_max_in_string < 1 || n_chars_max_in_string > 100){
+//             mexErrMsgIdAndTxt("wtf:batman","Come on man");
+//         }
         
-        //4
-        //----------------------------------------
-        //temp_mx_array = mxCreateNumericMatrix(0,0,mxCHAR_CLASS,mxREAL);
-        //mxDestroyArray(temp_mx_array);
+        cell_data = mxMalloc(n_chars_max_in_string*2);
+        all_cells_data[i] = cell_data;
         
-        //5
-        //----------------------------------------
-        //temp_mx_array = mxDuplicateArray(wtf);
-        //mxDestroyArray(temp_mx_array);
+        mxSetData(temp_mx_array,cell_data);
         
-        //6
-        //----------------------------------------
-        //cell_data = mxMalloc(4);
-        //mxFree(cell_data);
+        //TODO: This can be updated later when we know the real # of characters
+        //Let's set now, and then grab later if incorrect ...
+        mxSetN(temp_mx_array,n_chars_max_in_string);
         
-        //7
-        //----------------------------------------
-        //buffer = (char*) malloc (4);
-        //free(buffer);
-        
-        //8
-        //---------------------------------------------
-        //double_buffer[i] = (char*) malloc(4);
-        
-        //9
-        //---------------------------------------------
-        //temp_mx_array = mxCreateNumericMatrix(1,2,mxCHAR_CLASS,mxREAL);
-        //mxSetCell(cell_array,i,temp_mx_array);
-        
-        //10 - mxCreateReference is undocumented
-        //----------------------------------------------
-        mxSetCell(cell_array,i,mxCreateReference(temp_mx_array));
+        mxSetCell(cell_array,i,temp_mx_array);
         
     } 
     
+    //Parsing of the string into proper UTF-8
+    unsigned char *p;
+    int cur_index;
+    bool shrink_string; //Set true when we reduce the # of characters in 
+    //the string due to escapes or UTF-8 conversion
+    uint16_t *output_data;
+    int parse_status;
+    int hex_numerical_value; //TODO: This could be uint8_t
+    uint16_t unicode_char_value;
+    uint32_t utf8_value;
+    int escape_value;
+    int hex_multipliers[4] = {4096, 256, 16, 1};
+    uint16_t escape_char;
     
-    //8
-    //------------------------------------------------------
-    // double_buffer = &double_buffer[n_entries-1];
-    // for (int i = 0; i < n_entries; i++){
-    //     free(*double_buffer);
-    //     --double_buffer;
-    // }
-    // 
-    // free(p_start_double_buffer);
+    for (int i = 0; i < n_entries; i++){
+        
+        p = char_p[i];
+        output_data = all_cells_data[i];
+        
+        cur_index = -1;
+        shrink_string = false;
+        parse_status = 0;
+        
+        
+        //This is where we put in the state machine
+        //for now let's keep it simple ...
+        //
+        //Depending on length, we may want to try SIMD
+        
+        //parse_status
+        //---------------------------
+        //0 - not done
+        //1 - done
+        //2 - invalid escape char
+        //3 - invalid hex 
+        
+        while (!parse_status) {
+            
+            if (*p == '"'){
+                parse_status = 1;
+            }else if(*p == '\\'){
+                ++p; //Move onto the next character that is escaped
+                
+                //escape_values
+                if (*p == 'u'){
+                 
+                    //  \u####  <= unicode escape
+                    //  123456  <= byte count
+                    shrink_string = true;
+                    
+                    unicode_char_value = 0;
+                    for (int iHex = 0; iHex < 4; iHex++){
+                        
+                        //TODO: This would probably be better in terms of
+                        //4 bit shifts ...
+                        
+                        //Go from hex char to numerical value, e.g. f to 15
+                        hex_numerical_value = hex_numerical_values[*(++p)];
+                        //-1 is internal value for not valid 
+                        //  (i.e. not 0-9,a-f, or A-F)
+                        // Couldn't use 0, as 0 is a valid value
+                        if (hex_numerical_value == -1){
+                            parse_status == 3;
+                            break;
+                        }else{
+                            unicode_char_value += hex_multipliers[iHex]*hex_numerical_value;
+                        }
+                    }
+                    
+                    output_data[++cur_index] = unicode_char_value;
+                }else{
+                    escape_char = escape_values[*p];
+                    //Here 0 represents an in invalid
+                    if(escape_char == 0){
+                        parse_status == 2;
+                    }else{
+                        shrink_string = true;
+                        output_data[++cur_index] = escape_char;
+                    }
+                    
+                }
+            }else if(*p > 127){
+                shrink_string = true;
+                //Inspect first byte to get # of bytes
+                //2 bytes 110...   >> 5 == 6 - switch to 0b110
+                //3 bytes 1110.... >> 4 == 14
+                //4 bytes 11110... >> 3 == 30
+                //are 5 & 6 valid?
+                //
+                //errors (parse status # listed)
+                //- 10 - invalid first byte (currently no distinction
+                //       between 5 & 6 bytes, or other alternatives:
+                //       10... or 11111110 or 11111111
+                //        
+                //- 11 - invalid # of continuation bytes (given first byte)
+                //       continuation byte is 10...
+                //- 12 - not 2 byte compatible - TODO: Allow warning or 
+                //       error, on warning, write value as whatever the
+                //       unicode value is for not-representable or whatever
+                //       the proper terminology is ..
+                
+                //TODO: technically we should check for null values
+                //in each of the bytes, as this is not valid utf-8 
+                //(overlong encoding)
+                
+                //2 bytes
+                if ((*p >> 5) == 0b110){ 
+                    
+                    utf8_value = *p & 0b11111;
+                    ++p;
+                    
+                    if (IS_CONTINUATION_BYTE){
+                        utf8_value = (utf8_value << 6) + (*p & 0b111111);
+                        //mexPrintf("2 byte result: %d\n",utf8_value);
+                        output_data[++cur_index] = (uint16_t) utf8_value;
+                    }else{
+                        parse_status = 11;
+                    }
+                 
+                //3 bytes    
+                }else if((*p >> 4) == 0b1110){
+                
+                //bits
+                //1 -> 4
+                //2 -> 6
+                //3 -> 6   => 16 total, fits into 2 bytes
+                //This also means that anything that is 4 bytes will
+                //never be valid when stored as 2 bytes
+                //TODO: We could do all the math with uint16t
+                    
+                    utf8_value = *p & 0b1111;
+                    ++p;
+                    
+                    if (IS_CONTINUATION_BYTE){
+                        utf8_value = (utf8_value << 6) + (*p & 0b111111);
+                        ++p;
+                        if (IS_CONTINUATION_BYTE){
+                            utf8_value = (utf8_value << 6) + (*p & 0b111111);
+                            //mexPrintf("2 byte result: %d\n",utf8_value);
+                            output_data[++cur_index] = (uint16_t) utf8_value;
+                        }else{
+                            parse_status = 11;
+                        }
+                    }else{
+                        parse_status = 11;
+                    }
+                    
+                //4 bytes     
+                }else if((*p >> 3) == 0b11110){
+                    //not 2 byte compatible
+                    parse_status = 12;
+                }else{
+                    //invalid first byte
+                    parse_status = 10;
+                }
+                
+            //Just a regular old character to store    
+            }else{
+                output_data[++cur_index] = *p;    
+            }
+            
+            ++p;
+            
+        } // End of while statement ...
+        
+        if (parse_status == 1){
+            if (shrink_string){
+                mxSetN(mxGetCell(cell_array,i),cur_index+1);
+            }
+        }else{
+            //TODO: This needs to be flushed out with parse_status values
+            mexPrintf("error parse status: %d\n",parse_status);
+            mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
+            //We have an error 
+        }
+        
+        
+    }
+
+    mxFree(all_cells_data);
     
     if (is_key){
             TOC_AND_LOG(key_parse,key_parsing_time);
@@ -660,38 +807,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
             mxAddField(plhs[0],"strings");
             mxSetField(plhs[0],0,"strings",cell_array);        
     }
-   
-    //tic; d2 = repmat({''},1,1e6); toc;
-    //0.01
-    
-    //tic; d = num2cell(1:1e6); toc;
-    //0.33
-    
-//     d = char(104*ones(1e6,1));
-//     tic; d2 = cellstr(d); toc;
-//     0.53
-    
-    
-//             unsigned char *p = char_p[i];
-//         cur_index = start_indices[i];
-//         
-// 
-//         //Shifting to Matlab numbering - might do earlier
-//         string_start_indices[i] += 1;
-//         
-//         while (*p != '"') {
-//             //TODO:
-//             //1) check for \
-//             //2) check for non-ASCII
-//             string_data[cur_index] = *p;
-//             ++p;
-//             ++cur_index;
-//         }
-//         string_end_indices[i] = cur_index;
-    
 
-    
-    
 }
 
 void parse_strings(unsigned char *js,mxArray *plhs[]) {

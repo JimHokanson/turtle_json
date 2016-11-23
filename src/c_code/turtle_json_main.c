@@ -464,6 +464,9 @@ STRING_SEEK:
         if (*p == '\\'){
             //Then we need to keep looking, we might have escaped this character
             //we'll go into a loop at this point
+            //
+            // This is true if the escape character is really an escape
+            //character, rather than escaping the double quote
             bool double_quote_is_terminating = true;
             unsigned char *next_char = p + 3; 
             while (*(--p) == '\\'){
@@ -473,18 +476,16 @@ STRING_SEEK:
                *char_offset = next_char-1; 
             }else{
                 p = next_char;
-                mexPrintf("Char2: %c\n",*(p-2));
+                //mexPrintf("Char2: %c\n",*(p-2));
                 goto STRING_SEEK;
             }
         }else{
             //   this_char   \     "     next_char
             //     p         1     2     3
             p+=3;
-            mexPrintf("Char1: %c\n",*(p-2));
+            //mexPrintf("Char1: %c\n",*(p-2));
             goto STRING_SEEK;
-        }
-        
-        //mexErrMsgIdAndTxt("turtle_json:unhandled_case", "Code not yet written");
+        }        
     }else{
         *char_offset = p+1;
     } 

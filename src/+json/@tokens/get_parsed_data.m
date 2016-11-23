@@ -152,6 +152,7 @@ switch types(index+1)
     case 3 %key
         error('Unexpected type: key')
     case 4 %string
+        %cell array of strings?
         keyboard
         if token_after_close(index)-index == n_items + 1 && all(types(index+1:index+n_items) == 3)
 

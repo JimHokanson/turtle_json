@@ -24,6 +24,15 @@ tests(end+1,:) = {'["Hello World\\\\"]',    '',                                 
 %--------------------------------------------------
 %1) Valid escape characters
 %2) Characters that need to be escaped => less than 32
+tests(end+1,:) = {'["This \" is a test"]','', 'Escape of " character'};
+tests(end+1,:) = {'["This \n is a test"]','', 'Escape of \n character'};
+
+
+
+%{
+s = '["15\u00f8C 3\u0111"]'
+s2 = json.stringToTokens(s);
+%}
 
 n_tests = size(tests,1);
 for iTest = 1:n_tests
