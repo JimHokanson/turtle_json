@@ -25,7 +25,7 @@ t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',1}; %??????
 
 
 t(14,:) = {'{"Numbers cannot be hex": 0x14}',0};
-t(:,15) = {'["Illegal backslash escape: \x15"',0};
+t(15,:) = {'["Illegal backslash escape: \x15"',0};
 t(16,:) = {'[\naked]',0};
 t(17,:) = {'["Illegal backslash escape: \017"]',0};
 t(18,:) = {'[[[[[[[[[[[[[[[[[[[["Too deep"]]]]]]]]]]]]]]]]]]]]',0};

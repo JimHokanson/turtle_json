@@ -21,8 +21,8 @@ classdef object_token_info
     
     methods
         function output = getParsedData(obj,varargin)
-            %TODO: rename get_parsed_data to getParsedData
-           output = obj.p.get_parsed_data(varargin{:}); 
+            %TODO: rename getParsedData to getParsedData
+           output = obj.p.getParsedData(varargin{:}); 
         end
         function obj = object_token_info(name,full_name,index,parse_object)
             obj.name = name;
@@ -86,6 +86,7 @@ classdef object_token_info
                 case 4
                     output = lp.strings{lp.d1(local_index)};
                 case 5
+                    %TODO: Support scalars
                     output = lp.numeric_data(lp.d1(local_index));
                 case 6
                     output = NaN;
@@ -103,7 +104,7 @@ classdef object_token_info
             I = h__getMapIndex(obj,name);
             local_index = obj.attribute_indices(I);
             
-            output = obj.p.get_parsed_data('index',local_index);
+            output = obj.p.getParsedData('index',local_index);
         end
         function output = getArrayToken(obj,name)
             I = h__getMapIndex(obj,name);

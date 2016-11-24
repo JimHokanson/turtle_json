@@ -15,9 +15,7 @@ classdef tokens < handle
         TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
         
         types
-        d1
-        d2
-        
+
         %TODO: next_sibling_token_index is a better name
         token_after_close %Only valid for objects, arrays, and keys
         
@@ -65,6 +63,8 @@ classdef tokens < handle
     properties (Hidden)
         toc_total_time
         h_parsed_info
+        d1
+        d2
     end
     
     methods
@@ -117,7 +117,8 @@ classdef tokens < handle
                     %name,full_name,index,parse_object
                     root = json.token_info.object_token_info('root','root',1,obj);
                 case 2
-                    error('Not yet implemented')
+                    root = json.token_info.array_token_info('root','root',1,obj);
+                    %error('Not yet implemented')
                     %output = parse_array(str,j,1,numeric_data,in);
                 otherwise
                     error('Unexpected parent object')

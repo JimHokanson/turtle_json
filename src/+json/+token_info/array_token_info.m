@@ -3,6 +3,13 @@ classdef array_token_info
     %   Class:
     %   json.token_info.array_token_info
     
+    %{
+        s = '[[1,2,3],[4,5,6]]'
+        s2 = json.stringToTokens(s)
+        r = s2.getRootInfo
+        d = r.get2dNumericArray
+    %}
+    
     properties
         type = 'array'
         name
@@ -100,12 +107,64 @@ classdef array_token_info
             %            d1_size = lp.d1(local_index+1);
             %            d2_size = (end_numeric_index-start_numeric_index+1)/d1_size)
             
-            keyboard
-            error('Not yet implemented')
+            lp = obj.p;
+            local_index = obj.index;
+            
+            next_sibling_element = lp.token_after_close;
+            child_count = lp.child_count;
+            
+            value_indices = lp.value_index;
+            
+            
+            %Retrieval of indices
+            %--------------------------------------------------------------
+            % [    [     #
+            % 0    +1   +2
+            first_data_value_index = value_indices(local_index + 2);
+            
+            %note, array closings don't take up space, so the final #
+            %is positioned at 1 less than next sibling element 
+            %
+            %This could fail if the 2d array assumption is invalid
+            %since we haven't checked the type of n_s_e(local_index)-1
+            %so value_indices of this value might be 0
+            last_data_value_index  = value_indices(next_sibling_element(local_index)-1);
+            
+            %Basic verification for now ...
+            %--------------------------------------------------------------
+            %This could still be wrong if the arrays are unevenly shaped
+            %but somehow counterbalance each other
+            %e.g. 3 1d arrays of sizes 2,1,3
+            %   {[1,2],[3],[4,5,6]} => interpreted as [1,2;3,4;5,6]
+            %
+            %A more proper error check would go through the subarrays
+            %and verify that they are all of arrays and that their sizes
+            %are consistent
+            
+            n_1d_arrays = child_count(local_index);
+            
+            %This could be different for each child, we'll just
+            %check that 2d is possible given the first entry
+            n_elements_per_1d_array = child_count(local_index+1);
+            
+            if (last_data_value_index - first_data_value_index + 1) ... 
+                    == n_1d_arrays*n_elements_per_1d_array
+               output = reshape(lp.numeric_data(first_data_value_index:last_data_value_index),[n_elements_per_1d_array n_1d_arrays]);
+            else
+                %TODO: Show numbers that failed ...
+               error('Current array object is not a proper 2d array') 
+            end
+
         end
         function output = getArrayOf1dNumericArrays(obj)
+            %
+            %   
+            %
             
             output = cell(1,obj.n_elements);
+            
+            
+            %TODO: Change names, don't use d1 or d2
             
             lp = obj.p;
             tac = lp.d2;
