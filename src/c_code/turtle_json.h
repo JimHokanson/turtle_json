@@ -51,8 +51,6 @@ typedef struct {
 
 //These two MACROS are meant to be used like TIC and TOC in Matlab
 
-//struct timeval tv;
-
 // #define TIC(x) \
 //     clock_t x; \
 //     x = clock();
@@ -65,9 +63,8 @@ typedef struct {
 //     *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
 //     setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
     
-    
-//long long elapsed = (t1.tv_sec-t0.tv_sec)*1000000LL + t1.tv_usec-t0.tv_usec;    
-
+//These were added when I got an error declaring TIC(x) immediately
+//after a label
 #define DEFINE_TIC(x) \
     struct timeval x ## _0; \
     struct timeval x ## _1;
@@ -75,6 +72,7 @@ typedef struct {
 #define START_TIC(x) \
     gettimeofday(&x##_0,NULL);
     
+//TODO: Make this call start and define    
 #define TIC(x) \
     struct timeval x ## _0; \
     struct timeval x ## _1; \

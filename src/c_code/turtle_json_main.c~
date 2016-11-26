@@ -52,25 +52,15 @@
 //-----------------  Object and Array Memory Management  ------------------
 #define INITIALIZE_OA_DATA \
     n_values = mxMalloc(oa_size_allocated * sizeof(int)); \
-    child_count = mxMalloc(oa_size_allocated * sizeof(int)); \
-    next_sibling_index = mxMalloc(oa_size_allocated * sizeof(int));
-     
+    next_sibling_index = mxMalloc(oa_size_allocated * sizeof(int)); \
+    child_count = mxMalloc(oa_size_allocated * sizeof(int));  
+    
 #define INCREMENT_OA_INDEX \
-    ++current_oa_index; \
-    if (current_oa_index > oa_size_index_max){ \
-        ++n_oa_allocations; \
-        oa_size_allocated = ceil(1.5*oa_size_allocated); \
-        oa_size_index_max = oa_size_index_max - 1; \
-        child_count = mxRealloc(child_count,oa_size_allocated * sizeof(int)); \
-        next_sibling_index = mxRealloc(next_sibling_index,oa_size_allocated * sizeof(int)); \
-    }
     
-#define TRUNCATE_OA_DATA \
-    child_count = mxRealloc(child_count,(current_oa_index + 1) * sizeof(int)); \
-    next_sibling_index = mxRealloc(next_sibling_index,(current_oa_index + 1) * sizeof(int));
     
-//-----------------   Key Memory Management ------------------------------- 
-#define INITIALIZE_KEY_DATA \
+//-----------------   Key Memory Management -------------------------------     
+    
+#define ALLOCATE_KEY_DATA \
     unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *)); \
     int *key_sizes =  mxMalloc(key_size_allocated * sizeof(int));
             
@@ -89,7 +79,7 @@
     key_sizes = mxRealloc(key_sizes,(current_key_index + 1) * sizeof(int));
     
 //-----------------   String Memory Management ----------------------------    
-#define INITIALIZE_STRING_DATA \
+#define ALLOCATE_STRING_DATA \
     unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *)); \
     int *string_sizes = mxMalloc(string_size_allocated * sizeof(int));
     
@@ -109,7 +99,7 @@
  	string_start_indices = mxRealloc(string_start_indices,(current_string_index + 1) * sizeof(int));
     
 //-----------------   Numeric Memory Management ---------------------------
-#define INITIALIZE_NUMERIC_DATA unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));  
+#define ALLOCATE_NUMERIC_DATA unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));  
 
 //TODO: This is named inconsistently vs strings and keys and data, choose a consistent name
 #define EXPAND_NUMERIC_CHECK \
@@ -121,11 +111,26 @@
         numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
     }
     
-#define TRUNCATE_NUMERIC_DATA \
-    numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
+#define TRUNCATE_NUMERIC_DATA numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
 
-    
+
+//Things for opening    =====    [ { :    =================================
+#define INCREMENT_PARENT_SIZE parent_sizes[current_depth] += 1
+
+#define SET_TYPE(x) types[current_data_index] = x;            
+            
+//TODO: The size isn't needed for keys - we could call two different macros ...
+#define INITIALIZE_PARENT_INFO(x) \
+        ++current_depth; \
+        if (current_depth > 200){\
+            goto S_ERROR_DEPTH_EXCEEDED; \
+        }\
+        parent_types[current_depth] = x; \
+        parent_indices[current_depth] = current_data_index; \
+        parent_sizes[current_depth] = 0;
+            
 //=========================================================================
+//=================          Processing      ==============================
 //=========================================================================
 // The main code is essentially a state machine. States within the machine
 // have the following rough layout:
@@ -134,38 +139,11 @@
 //      2) common processing
 //      3) navigation to the next state
 //        
-    
-
-//Things for opening    =====    [ { :    =================================
-#define INCREMENT_PARENT_SIZE \
-    parent_sizes[current_depth] += 1
-
-#define SET_TYPE(x) \
-    types[current_data_index] = x;            
-            
-#define INITIALIZE_PARENT_INFO_OA(x) \
-        ++current_depth; \
-        if (current_depth > 200){\
-            goto S_ERROR_DEPTH_EXCEEDED; \
-        }\
-        parent_types[current_depth] = x; \
-        parent_indices[current_depth] = current_data_index; \
-        parent_sizes[current_depth] = 0;
+//  Code below is for #2, the processing that is commen to the type
+//  regardless of whether or not it is in a key or array
         
-#define INITIALIZE_PARENT_INFO_KEY(x) \
-        ++current_depth; \
-        if (current_depth > 200){\
-            goto S_ERROR_DEPTH_EXCEEDED; \
-        }\
-        parent_types[current_depth] = x; \
-        parent_indices[current_depth] = current_data_index;
-            
-//=========================================================================
-//=================          Processing      ==============================
-//=========================================================================
 #define PROCESS_OPENING_OBJECT \
     INCREMENT_DATA_INDEX; \
-    INCREMENT_OA_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
     INITIALIZE_PARENT_INFO(TYPE_OBJECT);
     
@@ -603,13 +581,15 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     int current_data_index = -1;
     int n_data_allocations = 1;
     INITIALIZE_MAIN_DATA;
+
     //---------------------------------------------------------------------
+    
     int n_oa_allocations = 1;
-    int oa_size_allocated = ceil((double)string_byte_length/100);
-    int oa_size_index_max = oa_size_allocated - 1;
     int current_oa_index = -1;
+    int oa_size_allocated = ceil((double)string_byte_length/100);
+    int 
     INITIALIZE_OA_DATA;
-    //---------------------------------------------------------------------
+    
     int n_key_chars = 0;
     int n_key_allocations  = 1; //Not yet implemented
     int key_size_allocated;
@@ -620,8 +600,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = -1;
-    INITIALIZE_KEY_DATA;
-    //---------------------------------------------------------------------
+    ALLOCATE_KEY_DATA 
+    
     int n_string_chars = 0;
     int n_string_allocations = 1;
     int string_size_allocated;
@@ -632,8 +612,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = -1;
-    INITIALIZE_STRING_DATA;
-    //---------------------------------------------------------------------
+    ALLOCATE_STRING_DATA
+   
     int n_numeric_allocations = 1;
     int numeric_size_allocated;
     if (options->n_numbers){
@@ -643,8 +623,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = -1;
-    INITIALIZE_NUMERIC_DATA
-    //---------------------------------------------------------------------
+    ALLOCATE_NUMERIC_DATA
+    
     
 //Start of the parsing ====================================================
     DECREMENT_POINTER;

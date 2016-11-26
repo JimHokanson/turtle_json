@@ -53,12 +53,24 @@ classdef tokens < handle
         %                       d1                  d2
         %     object: 1) type  2) n_values        3) tac
         %     array:  1) type  2) n_values        3) tac
-        %     key:    1) type  2) start_pointer   3) tac
+        %     key:    1) type  2) start_pointer   3) tac      key_p    key_sizes
         %
         %     string: 1) type  2) start_pointer   3) end of string
         %     number: 1) type  2) start_pointer
         %     null:   1) type  2) start_pointer
         %     tf      1) type
+        
+        %-------------- New Definitions --------------                   POST PROCESS
+        %  
+        %   object : type  index   n_values    tac
+        %   array  : type  index   n_values    tac                       content_info
+        %   key    : type  index   length      tac      key_pointer      value
+        %   string : type  index   length      string_pointer            value
+        %   number : type  index   pointer/value         
+        %   null   : type  index   value
+        %   tf     : type  
+        %
+        %
         
         %TODO: rename to numbers
         numeric_data
