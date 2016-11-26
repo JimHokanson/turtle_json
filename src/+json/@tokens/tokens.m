@@ -8,15 +8,37 @@ classdef tokens < handle
     %   json.fileToTokens
     %   json.stringToTokens
     
+    %cell array for each object
+    %Each key would need to know its parent :/
+    %but, at the end of parsing each object knows its children, so we
+    %could post process
+    %
+    %   1) keep track of n_objects
+    %   2) Initialize a cell array for each object
+    %   3) for each object, create a struct that has indices which point
+    %   to the children of each key
+    %   
+    %
+    %   Alternative:
+    %   ---------------
+    %   structure array - would need the # of unique keys to be low
+    %   
+    %   for each key:
+    %       check if in the structure
+    %
+    
+    %TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
+    
     properties
-        file_string %string of the file
-        %We might not hold onto this ...
+        file_string %string of the file as bytes (with end padding)
+        %TODO: truncate the end padding by shortening the length of the 
+        %mxArray
         
-        TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
-        
-        types
+        %Data entries per token
+        %----------------------------------------------------------
+        types 
 
-        %TODO: next_sibling_token_index is a better name
+        %TODO: next_sibling_index is a better name
         token_after_close %Only valid for objects, arrays, and keys
         
         value_index %index of the value into array of that data type
@@ -38,7 +60,7 @@ classdef tokens < handle
         %     null:   1) type  2) start_pointer
         %     tf      1) type
         
-        
+        %TODO: rename to numbers
         numeric_data
         keys 
         strings
@@ -83,6 +105,9 @@ classdef tokens < handle
             %-----------------
             in.chars_per_token = json.sl.in.NULL;
             in.n_tokens = json.sl.in.NULL;
+            in.n_strings = json.sl.in.NULL;
+            in.n_keys = json.sl.in.NULL;
+            in.n_numbers = json.sl.in.NULL;
             in.raw_string = json.sl.in.NULL;
             in.raw_is_padded = false;
             in = json.sl.in.processVarargin(in,varargin,'remove_null',true);
@@ -108,7 +133,7 @@ classdef tokens < handle
             
             obj.numeric_data = result.numeric_p;            
             obj.strings = result.strings;
-            obj.keys = result.keys;
+            %obj.keys = result.keys;
             
         end
         function root = getRootInfo(obj)

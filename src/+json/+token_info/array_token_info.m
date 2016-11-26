@@ -4,10 +4,12 @@ classdef array_token_info
     %   json.token_info.array_token_info
     
     %{
-        s = '[[1,2,3],[4,5,6]]'
-        s2 = json.stringToTokens(s)
-        r = s2.getRootInfo
-        d = r.get2dNumericArray
+        expected_data = [1,4; 2,5; 3,6];
+        s = '[[1,2,3],[4,5,6]]';
+        s2 = json.stringToTokens(s);
+        r = s2.getRootInfo;
+        d = r.get2dNumericArray;
+        isequal(d,expected_data)
     %}
     
     properties
@@ -16,8 +18,6 @@ classdef array_token_info
         full_name
         index
         n_elements
-        %         attribute_names
-        %         attribute_indices
     end
     
     properties
@@ -50,67 +50,64 @@ classdef array_token_info
             obj.name = name;
             obj.full_name = full_name;
             obj.index = index;
-            obj.p = p;
-            
-            %     object: 1) type  2) n_values        3) tac
-            %     array:  1) type  2) n_values        3) tac
-            %     key:    1) type  2) start_pointer   3) tac
-            %
-            %     string: 1) type  2) start_pointer   3) end of string
-            %     number: 1) type  2) start_pointer
-            %     null:   1) type  2) start_pointer
-            %     tf      1) type
-            
-            obj.n_elements = p.d1(index);
+            obj.p = p;            
+            obj.n_elements = p.child_count(index);
         end
         function output = getCellstr(obj)
+            %
+            %   output = getCellstr(obj)
+            %   
+            %   cell array of strings => {'as' 'df'}
             
             %TODO: Add on optional error check ...
             lp = obj.p;
-            n_values = lp.d1;
+            n_values = lp.child_count;
             local_index = obj.index;
             if n_values(local_index)
-                string_pointer = lp.d1;
-                tac = lp.d2;
-                start_index = string_pointer(local_index+1);
-                end_index = string_pointer(tac(local_index)-1);
+                value_indices = lp.value_index;
+                next_sibling_index = lp.token_after_close;
+                
+                start_index = value_indices(local_index+1);
+                end_index = value_indices(next_sibling_index(local_index)-1);
 
-                output      = obj.p.strings(start_index:end_index);
+                output = lp.strings(start_index:end_index);
             else
                 output = {};
             end
         end
         function output = get1dNumericArray(obj)
+            %
+            %   output = get1dNumericArray(obj)
+            %   
+            %   1d numeric array => [1,2,3,4,5]
             
             lp = obj.p;
-            n_values = lp.d1;
+            n_values = lp.child_count;
             local_index = obj.index;
             if (n_values(local_index))
-                tac = lp.d2;
-                numeric_pointer = lp.d1;
-                start_numeric_I = numeric_pointer(local_index+1);
-                end_numeric_I = numeric_pointer(tac(local_index)-1);
-                output = lp.numeric_data(start_numeric_I:end_numeric_I);
+                value_indices = lp.value_index;
+                next_sibling_index = lp.token_after_close;
+                
+                start_index = value_indices(local_index+1);
+                end_index = value_indices(next_sibling_index(local_index)-1);
+                
+                output = lp.numeric_data(start_index:end_index);
             else
                 output = [];
             end
             
         end
         function output = get2dNumericArray(obj)
-            
-            %            lp = obj.p;
-            %            local_index = obj.index;
-            %            start_index = local_index + 2;
-            %            end_index   = lp.d2(local_index)-1;
-            %            start_numeric_index = lp.d1(start_index);
-            %            end_numeric_index = lp.d1(end_index);
-            %            d1_size = lp.d1(local_index+1);
-            %            d2_size = (end_numeric_index-start_numeric_index+1)/d1_size)
+            %
+            %   output = get2dNumericArray(obj)
+            %
+            %   2d numeric array => [1,2,3;
+            %                        4,5,6];
             
             lp = obj.p;
             local_index = obj.index;
             
-            next_sibling_element = lp.token_after_close;
+            next_sibling_index = lp.token_after_close;
             child_count = lp.child_count;
             
             value_indices = lp.value_index;
@@ -128,7 +125,7 @@ classdef array_token_info
             %This could fail if the 2d array assumption is invalid
             %since we haven't checked the type of n_s_e(local_index)-1
             %so value_indices of this value might be 0
-            last_data_value_index  = value_indices(next_sibling_element(local_index)-1);
+            last_data_value_index  = value_indices(next_sibling_index(local_index)-1);
             
             %Basic verification for now ...
             %--------------------------------------------------------------
@@ -158,53 +155,38 @@ classdef array_token_info
         end
         function output = getArrayOf1dNumericArrays(obj)
             %
+            %   output = getArrayOf1dNumericArrays(obj)       
             %   
-            %
-            
-            output = cell(1,obj.n_elements);
-            
-            
-            %TODO: Change names, don't use d1 or d2
+            %   array of 1d numeric arrays => {[1,2,3],[4,5],[6]}
             
             lp = obj.p;
-            tac = lp.d2;
-            n_values = lp.d1;
-            numeric_pointer = lp.d1;
-            
+            next_sibling_index = lp.token_after_close;
+            child_count = lp.child_count;
+            value_indices = lp.value_index;
             numeric_data = lp.numeric_data;
+            local_n = obj.n_elements;
+
+            output = cell(1,obj.n_elements);
             
             cur_array_index = obj.index + 1;
-            
-            local_n = obj.n_elements;
-            
             for iCell = 1:local_n
-                if n_values(cur_array_index)
-                    start_numeric_I = numeric_pointer(cur_array_index+1);
-                    cur_array_index = tac(cur_array_index);
-                    end_numeric_I = numeric_pointer(cur_array_index-1); %Get last value before the start of the next array
-                    output{iCell} = numeric_data(start_numeric_I:end_numeric_I);
+                if child_count(cur_array_index)
+                    data_start_I = value_indices(cur_array_index+1);
+                    cur_array_index = next_sibling_index(cur_array_index);
+                    %Get last value before the start of the next array
+                    data_end_I = value_indices(cur_array_index-1); 
+                    output{iCell} = numeric_data(data_start_I:data_end_I);
                 else
                     cur_array_index = cur_array_index + 1;
                 end
-            end
-            
+            end         
         end
         function output = getObjectArray(obj)
             %
             %   Use this when the array holds all objects
             
-            %     object: 1) type  2) n_values        3) tac
-            %     array:  1) type  2) n_values        3) tac
-            %     key:    1) type  2) start_pointer   3) tac
-            %
-            %     string: 1) type  2) start_pointer   3) end of string
-            %     number: 1) type  2) start_pointer
-            %     null:   1) type  2) start_pointer
-            %     tf      1) type
-            
-            
-            local_p = obj.p;
-            tokens_after_close = local_p.d2;
+            lp = obj.p;
+            next_sibling_index = lp.d2;
             I = obj.index+1;
             n_objects = obj.n_elements;
             temp_output = cell(1,n_objects);
@@ -212,8 +194,8 @@ classdef array_token_info
                 %TODO: Add check on type
                 local_name = sprintf('(%d)',iObject);
                 local_full_name = [obj.full_name local_name];
-                temp_output{iObject} = json.token_info.object_token_info(local_name,local_full_name,I,local_p);
-                I = tokens_after_close(I);
+                temp_output{iObject} = json.token_info.object_token_info(local_name,local_full_name,I,lp);
+                I = next_sibling_index(I);
             end
             
             output = [temp_output{:}];

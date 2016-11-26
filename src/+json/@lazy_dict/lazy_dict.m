@@ -104,7 +104,7 @@ classdef lazy_dict < handle
             try
                 obj.props.(name) = value;
             catch
-                obj.props = json.setField(obj.props,name,value);
+                obj.props = json.utils.setField(obj.props,name,value);
             end
         end
         function addLazyField(obj,name,value)
@@ -122,7 +122,7 @@ classdef lazy_dict < handle
             try
                 obj.lazy_fields.(name) = value;
             catch
-                obj.lazy_fields = json.setField(obj.lazy_fields,name,value);
+                obj.lazy_fields = json.utils.setField(obj.lazy_fields,name,value);
             end
             
             obj.addProp(name,'Not yet evaluated (Lazy Property)')
@@ -158,7 +158,7 @@ classdef lazy_dict < handle
                     obj.props.(name) = value;
                 catch
                     try
-                        obj.props = json.setField(obj.props,name,value);
+                        obj.props = json.utils.setField(obj.props,name,value);
                     catch ME
                         error('Could not assign "%s" property value', subStruct.subs);
                     end
@@ -183,7 +183,7 @@ classdef lazy_dict < handle
             try
                 obj.props.(name) = value;
             catch
-                obj.props = json.setField(obj.props,name,value);
+                obj.props = json.utils.setField(obj.props,name,value);
             end
         end
         function varargout = subsref(obj, subStruct)

@@ -1,24 +1,23 @@
-This code can "tokenize" or parse JSON files/strings.
+This code parses JSON files/strings. Writing is not yet supported.
 
-# Status
+#Why This Code?
 
-Parsing files/strings is now fully supported.
-
-Writing to JSON is not yet supported.
-
-Documentation is in progress ...
-
+This parser was written to have high performance relative to other Matlab JSON parsers. 
 
 
 # Usage
 
-Parsing can be done in one of two ways. Parsing can either be done to a set of tokens or alternatively, to a complete representation of the structure in Matlab. Parsing to tokens provides finer control over 
+Parsing can be done in one of two ways. Parsing can either be done to a set of tokens or alternatively, to a complete representation of the structure in Matlab. Parsing to tokens provides finer control over the parsing process.
 
 ## Parsing to Tokens
+
+TODO: Not thrilled with the token name, abstract syntax tree?
 
 ```matlab
 %This returns a tokenized representation of all of the data
 tokens = json.fileToTokens(file_path);
+%OR
+tokens = json.stringToTokens(json_string);
 
 %Returns information on the root array or object
 root = tokens.getRootInfo(); 
@@ -34,10 +33,22 @@ x_data_token = root.getToken('x_data');
 x_data = x_data_token.getArrayOf1dNumericArrays();
 
 %If 'x_data' is a 2d array (matrix)
-x_data = get2dNumericArray;
+x_data = x_data_token.get2dNumericArray();
 
+%If 'x_data' is a 1d array
+x_data = x_data_token.get1dNumericArray();
+
+%If 'x_data' contains a cell array of strings
+x_data = x_data_token.getCellstr();
 ```
 
+## Parsing to a Complete Matlab Data Structure
+
+```matlab
+data = json.load(file_path);
+%OR
+data = json.parse(json_string);
+```
 
 
 # What's a token?
@@ -52,7 +63,3 @@ Consider the following JSON:
 
 The '{' character specifies that an object starts. The '"' character specifies the start (or end) of a key/string unless it is escaped in a string. Once you know the location of these special characters, it becomes much easier to parse a JSON file.
 
-
-
-TODO: Jim at this point
-- next, discuss parsing vs step by step object requesting

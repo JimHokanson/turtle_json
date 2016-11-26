@@ -64,7 +64,7 @@ classdef dict < handle
             try
                 obj.props.(name) = value;
             catch
-                obj.props = json.setField(obj.props,name,value);
+                obj.props = json.utils.setField(obj.props,name,value);
             end
         end
     end
