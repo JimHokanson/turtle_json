@@ -544,7 +544,9 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     unsigned char *p = js;    
     unsigned char *temp_p;
     
-    clock_t parsed_data_logging;
+    DEFINE_TIC(parsed_data_logging);
+    
+    //clock_t parsed_data_logging;
     
     //---------------------------------------------------------------------
     const int MAX_DEPTH = 200;
@@ -871,7 +873,9 @@ S_ERROR_DEBUG:
 finish_main:
     
     //The end ...
-    parsed_data_logging = clock();
+    //parsed_data_logging = clock();
+    
+    START_TIC(parsed_data_logging);
     
     //This wasn't working for some reason ...     
     //TIC(parsed_data_logging);

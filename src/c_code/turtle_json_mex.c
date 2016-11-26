@@ -4,7 +4,10 @@
 
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
 
+    //TODO: This function is not complete
     if (input_string_length >= N_PADDING){
+        //We need to look for the padding sequence.
+        
         if (input_bytes[input_string_length-N_PADDING] == 0){
             mexPrintf("Found padding");
         }
@@ -179,6 +182,12 @@ void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_strin
 }
 
 void init_options(int nrhs, const mxArray*prhs[],Options *options){
+    //
+    //  Option parsing
+    //  
+    //  See Also
+    //  --------
+    //  json.tokens 
     
     mxArray *mxArrayTemp;
     
@@ -281,6 +290,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //in the compiler - compiler not recognizing terminal errors in code
     //so it thinks you can pass in an uninitialized value to the main function
     
+    TIC(start_mex);
+    
     size_t string_byte_length;
     unsigned char *json_string = NULL;
     bool is_file_path = true;
@@ -345,7 +356,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //parse_strings(json_string,plhs);
     
     TOC_AND_LOG(start_pp,elapsed_pp_time);
-    
+    TOC_AND_LOG(start_mex,total_elapsed_time_mex);
 
 }
 

@@ -16,16 +16,30 @@
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
+      //
+      //    output_string
+      //
     
+      //Improvements
+      //------------
+      //1) Take in an optional string format
+      //    # of decimal places of precision
+      //    - fixed width of min width
+      //2) Take in a pointer to a string
+      //
+      //- newline support after so many characters
     
       char *str = mxGetData(prhs[1]);
+      
       double *data = mxGetData(prhs[0]);
+      
       int n_data = mxGetNumberOfElements(prhs[0]);
+      
       str = mxMalloc(n_data*20);
       char *str_p = str;
 
-      double value;
       for (int i = 0; i <= n_data; i++){
+          //%f seems a lot slower than %g
         str_p += sprintf(str_p, ",%0.10g",data[i]);
       }
       

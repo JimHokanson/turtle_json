@@ -6,7 +6,6 @@
 #include "stdint.h"     //uint_8
 #include <string.h>     //strchr()
 #include <time.h>       //clock()
-#include <sys/time.h>   //for gettimeofday
 #include <omp.h>        //openmp
 
 //AVX
@@ -53,38 +52,33 @@ typedef struct {
 
 //struct timeval tv;
 
-// #define TIC(x) \
-//     clock_t x; \
-//     x = clock();
-//             
+#define TIC(x) \
+    clock_t x; \
+    x = clock();
+            
 //The toc_and_log() macro saves the timing to a field with the name 
 //specified by y
 //#y => y as a string, not as a value "stringification"
-// #define TOC_AND_LOG(x,y) \
-//     double *y = mxMalloc(sizeof(double)); \
-//     *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
-//     setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
+#define TOC_AND_LOG(x,y) \
+    double *y = mxMalloc(sizeof(double)); \
+    *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
+    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
     
     
 //long long elapsed = (t1.tv_sec-t0.tv_sec)*1000000LL + t1.tv_usec-t0.tv_usec;    
-
-#define DEFINE_TIC(x) \
-    struct timeval x ## _0; \
-    struct timeval x ## _1;
     
-#define START_TIC(x) \
-    gettimeofday(&x##_0,NULL);
+#define DECLARE_TIME_STRUCT(x,y)
+    struct timeval x##y
     
 #define TIC(x) \
-    struct timeval x ## _0; \
-    struct timeval x ## _1; \
-    gettimeofday(&x##_0,NULL);
+    struct timeval #x "_1";
+    struct timeval #x "_2";
+    gettimeofday(&x,NULL);
     
 #define TOC_AND_LOG(x,y) \
-    gettimeofday(&x##_1,NULL); \
     double *y = mxMalloc(sizeof(double)); \
-    *y = (double)(x##_1.tv_sec - x##_0.tv_sec) + (double)(x##_1.tv_usec - x##_0.tv_usec)/1e6; \
-    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);      
+    *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
+    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);    
     
     
     

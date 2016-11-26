@@ -361,7 +361,6 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     
     int n_threads = omp_get_max_threads();
     
-    // Use omp_get_num_threads instead?????
     error_locations = mxMalloc(n_threads*sizeof(int));
     error_values    = mxMalloc(n_threads*sizeof(int));
     
@@ -439,7 +438,19 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     
 }
 
-void all_key_check(unsigned char *js,mxArray *plhs[]){
+void populate_array_flags(unsigned char *js,mxArray *plhs[]){
+    
+    //Transverse the structure
+    //i.e. if we have an object => check its keys
+    //if we have an array, summarize as described below
+    //
+    //Things to know
+    //- object array - 1d
+    //   - homogenous fields?
+    //- nd logical array
+    //- nd cellstr array
+    //- nd numerical array
+    
     
 //Same object has:
 //1) Same # of children
@@ -476,6 +487,9 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     //
     //
     
+    //Goal is to replace escape characters with their values
+    //i.e. go from:
+    //  "\n" => lookup 'n' and get the newline characters as the output
     const uint16_t escape_values[256] = {
         [34] = '"',
         [47] = '/',

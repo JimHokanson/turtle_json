@@ -113,6 +113,7 @@ classdef tokens < handle
             in = json.sl.in.processVarargin(in,varargin,'remove_null',true);
             
             t0 = tic;
+            t1 = cputime;
             %The main call
             result = turtle_json_mex(file_path,in);
             obj.toc_total_time = toc(t0);
