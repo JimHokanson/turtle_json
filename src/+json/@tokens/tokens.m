@@ -37,17 +37,24 @@ classdef tokens < handle
         %Data entries per token
         %----------------------------------------------------------
         types 
-
-        %TODO: next_sibling_index is a better name
-        token_after_close %Only valid for objects, arrays, and keys
+        data_indices
         
-        value_index %index of the value into array of that data type
-        %numeric or null => 'numeric_data' property
-        %string => 'strings' property
-        %key => 'keys' property
-        %
-        %Value is not valid for other types
-        child_count
+        oa_next_sibling_indices
+        oa_child_counts
+
+        key_next_sibling_indices
+        
+        
+%         %TODO: next_sibling_index is a better name
+%         token_after_close %Only valid for objects, arrays, and keys
+%         
+%         value_index %index of the value into array of that data type
+%         %numeric or null => 'numeric_data' property
+%         %string => 'strings' property
+%         %key => 'keys' property
+%         %
+%         %Value is not valid for other types
+%         child_count
         
         %************ Current Definitions ************
         %                       d1                  d2
@@ -60,12 +67,12 @@ classdef tokens < handle
         %     null:   1) type  2) start_pointer
         %     tf      1) type
         
-        %-------------- New Definitions --------------                   POST PROCESS
+        %-------------- New Definitions --------------                      POST PROCESS
         %  
         %   object : type  index   n_values    tac
-        %   array  : type  index   n_values    tac                       content_info
-        %   key    : type  index   length      tac      key_pointer      value
-        %   string : type  index   length      string_pointer            value
+        %   array  : type  index   n_values    tac                          content_info
+        %   key    : type  index   length      tac      key_p               value
+        %   string : type  index   length               string_p            value
         %   number : type  index   pointer/value         
         %   null   : type  index   value
         %   tf     : type  
@@ -97,8 +104,6 @@ classdef tokens < handle
     properties (Hidden)
         toc_total_time
         h_parsed_info
-        d1
-        d2
     end
     
     methods
@@ -135,13 +140,22 @@ classdef tokens < handle
             obj.file_string = result.json_string;
             
             obj.types = result.types;
-            obj.d1 = result.d1;
-            obj.d2 = result.d2;
+            obj.data_indices = result.d1;
+            
+            %Objects and Arrays -------------
+            obj.oa_next_sibling_indices = result.next_sibling_index_oa;
+            obj.oa_child_counts = result.child_count;
+            
+            %Keys ---------------------------
+            %We might not need this, depending on how we do things ...
+            obj.key_next_sibling_indices = 1; %next_sibling_index_key
+            
+            
             
             %Aliasing ------------------------
-            obj.token_after_close = obj.d2;
-            obj.value_index = obj.d1;
-            obj.child_count = obj.d1;
+%             obj.token_after_close = obj.d2;
+%             obj.value_index = obj.d1;
+%             obj.child_count = obj.d1;
             
             
             obj.numeric_data = result.numeric_p;            

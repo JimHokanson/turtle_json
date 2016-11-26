@@ -338,6 +338,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
   
     TOC_AND_LOG(start_parse, elapsed_parse_time);
       
+    //mexPrintf("finished initial parse\n");
     
     //Post token parsing
     //------------------

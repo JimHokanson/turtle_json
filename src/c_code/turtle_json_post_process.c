@@ -521,6 +521,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     int n_entries;
     int *start_indices;
     int *end_indices;
+    int *sizes;
     
     //These need to be outside the if statement, as they include declarations
     
@@ -531,23 +532,16 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         char_p = (unsigned char **)mxGetData(temp);
         n_entries = mxGetN(temp);
     
-        temp = mxGetField(plhs[0],0,"key_start_indices");
-        start_indices = (int *)mxGetData(temp);
-    
-        temp = mxGetField(plhs[0],0,"key_end_indices");
-        end_indices = (int *)mxGetData(temp);
-        
+        temp = mxGetField(plhs[0],0,"key_sizes");
+        sizes = (int *)mxGetData(temp);
     }else{
         temp = mxGetField(plhs[0],0,"string_p");
         
         char_p = (unsigned char **)mxGetData(temp);
         n_entries = mxGetN(temp);
     
-        temp = mxGetField(plhs[0],0,"string_start_indices");
-        start_indices = (int *)mxGetData(temp);
-    
-        temp = mxGetField(plhs[0],0,"string_end_indices");
-        end_indices = (int *)mxGetData(temp);
+        temp = mxGetField(plhs[0],0,"string_sizes");
+        sizes = (int *)mxGetData(temp);
     }
     
     TIC(string_memory_allocation);
@@ -564,7 +558,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     //http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
     for (int i = 0; i < n_entries; i++){
         
-        n_chars_max_in_string = end_indices[i] - start_indices[i];
+        n_chars_max_in_string = sizes[i];
         
         //String initialization
         //--------------------------------------

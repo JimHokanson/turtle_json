@@ -77,15 +77,17 @@ classdef parsing_info
             obj.n_tokens = length(result.d1);
             obj.token_allocation_efficiency = obj.n_tokens/double(obj.n_tokens_allocated);
             
-            obj.n_keys_allocated = double(result.n_key_allocations);
+            %TODO: Include OA
+            
+            obj.n_keys_allocated = double(result.n_keys_allocated);
             obj.n_keys = length(result.key_p);
             obj.key_allocation_efficiency = obj.n_keys/obj.n_keys_allocated;
             
-            obj.n_strings_allocated = double(result.n_string_allocations);
+            obj.n_strings_allocated = double(result.n_strings_allocated);
             obj.n_strings = length(result.string_p);
             obj.string_allocation_efficiency = obj.n_strings/obj.n_strings_allocated;
             
-        	obj.n_numbers_allocated = double(result.n_numeric_allocations);
+        	obj.n_numbers_allocated = double(result.n_numbers_allocated);
             obj.n_numbers = length(result.numeric_p);
             obj.number_allocation_efficiency = obj.n_numbers/obj.n_numbers_allocated;
             
