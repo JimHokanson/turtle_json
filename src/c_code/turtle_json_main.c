@@ -46,25 +46,45 @@
     types = mxRealloc(types,(current_data_index + 1)); \
     d1 = mxRealloc(d1,(current_data_index + 1)*sizeof(int));         
 
-//-----------------  Object and Array Memory Management  ------------------
-#define INITIALIZE_OA_DATA \
-    int *n_values = mxMalloc(oa_size_allocated * sizeof(int)); \
-    int *child_count = mxMalloc(oa_size_allocated * sizeof(int)); \
-    int *next_sibling_index_oa = mxMalloc(oa_size_allocated * sizeof(int));
+    
+//-----------------   Object Memory Management ----------------------------
+#define INITIALIZE_OBJECT_DATA \
+    int *child_count_object = mxMalloc(object_size_allocated * sizeof(int)); \
+    int *next_sibling_index_object = mxMalloc(object_size_allocated * sizeof(int));
      
-#define INCREMENT_OA_INDEX \
-    ++current_oa_index; \
-    if (current_oa_index > oa_size_index_max){ \
-        ++n_oa_allocations; \
-        oa_size_allocated = ceil(1.5*oa_size_allocated); \
-        oa_size_index_max = oa_size_allocated - 1; \
-        child_count = mxRealloc(child_count,oa_size_allocated * sizeof(int)); \
-        next_sibling_index_oa = mxRealloc(next_sibling_index_oa,oa_size_allocated * sizeof(int)); \
+#define INCREMENT_OBJECT_INDEX \
+    ++current_object_index; \
+    if (current_object_index > object_size_index_max){ \
+        ++n_object_allocations; \
+        object_size_allocated = ceil(1.5*object_size_allocated); \
+        object_size_index_max = object_size_allocated - 1; \
+        child_count_object = mxRealloc(child_count_object,object_size_allocated * sizeof(int)); \
+        next_sibling_index_object = mxRealloc(next_sibling_index_object,object_size_allocated * sizeof(int)); \
     }
     
-#define TRUNCATE_OA_DATA \
-    child_count = mxRealloc(child_count,(current_oa_index + 1) * sizeof(int)); \
-    next_sibling_index_oa = mxRealloc(next_sibling_index_oa,(current_oa_index + 1) * sizeof(int));
+#define TRUNCATE_OBJECT_DATA \
+    child_count_object = mxRealloc(child_count_object,(current_object_index + 1) * sizeof(int)); \
+    next_sibling_index_object = mxRealloc(next_sibling_index_object,(current_object_index + 1) * sizeof(int));    
+    
+    
+//-----------------  Array Memory Management  ------------------
+#define INITIALIZE_ARRAY_DATA \
+    int *child_count_array = mxMalloc(array_size_allocated * sizeof(int)); \
+    int *next_sibling_index_array = mxMalloc(array_size_allocated * sizeof(int));
+     
+#define INCREMENT_ARRAY_INDEX \
+    ++current_array_index; \
+    if (current_array_index > array_size_index_max){ \
+        ++n_array_allocations; \
+        array_size_allocated = ceil(1.5*array_size_allocated); \
+        array_size_index_max = array_size_allocated - 1; \
+        child_count_array = mxRealloc(child_count_array,array_size_allocated * sizeof(int)); \
+        next_sibling_index_array = mxRealloc(next_sibling_index_array,array_size_allocated * sizeof(int)); \
+    }
+    
+#define TRUNCATE_ARRAY_DATA \
+    child_count_array = mxRealloc(child_count_array,(current_array_index + 1) * sizeof(int)); \
+    next_sibling_index_array = mxRealloc(next_sibling_index_array,(current_array_index + 1) * sizeof(int));
     
 //-----------------   Key Memory Management ------------------------------- 
 #define INITIALIZE_KEY_DATA \
@@ -86,7 +106,7 @@
 #define TRUNCATE_KEY_DATA \
     key_p = mxRealloc(key_p,(current_key_index + 1)*sizeof(unsigned char *)); \
     key_sizes = mxRealloc(key_sizes,(current_key_index + 1) * sizeof(int)); \
-    next_sibling_index_key = mxRealloc(next_sibling_index_key,(current_oa_index + 1) * sizeof(int));
+    next_sibling_index_key = mxRealloc(next_sibling_index_key,(current_key_index + 1) * sizeof(int));
     
 //-----------------   String Memory Management ----------------------------    
 #define INITIALIZE_STRING_DATA \
@@ -164,16 +184,16 @@
 //=========================================================================
 #define PROCESS_OPENING_OBJECT \
     INCREMENT_DATA_INDEX; \
-    INCREMENT_OA_INDEX; \
+    INCREMENT_OBJECT_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
-    d1[current_data_index] = current_oa_index + 1; \
+    d1[current_data_index] = current_object_index + 1; \
     INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT);
     
 #define PROCESS_OPENING_ARRAY \
     INCREMENT_DATA_INDEX; \
-    INCREMENT_OA_INDEX; \
+    INCREMENT_ARRAY_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
-    d1[current_data_index] = current_oa_index + 1; \
+    d1[current_data_index] = current_array_index + 1; \
     INITIALIZE_PARENT_INFO_OA(TYPE_ARRAY); \
 
 #define PROCESS_STRING \
@@ -250,11 +270,12 @@
 //------------------
 //+1 to next element
 //+1 for Matlab 1 based indexing
-#define STORE_NEXT_SIBLING_OF_OBJECT_OR_ARRAY \
-    next_sibling_index_oa[d1[current_parent_index]-1] = current_data_index + 2;
-    
-//  #define STORE_TAC_OF_OBJECT_OR_ARRAY d2[current_parent_index] = current_data_index + 2;
-    
+#define STORE_NEXT_SIBLING_OF_OBJECT \
+    next_sibling_index_object[d1[current_parent_index]-1] = current_data_index + 2;
+
+#define STORE_NEXT_SIBLING_OF_ARRAY \
+    next_sibling_index_array[d1[current_parent_index]-1] = current_data_index + 2;
+        
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
 //Note that we're working with the current_data_index since we haven't
@@ -264,16 +285,13 @@
 #define STORE_NEXT_SIBLING_KEY_SIMPLE \
     next_sibling_index_key[current_key_index] = current_data_index + 3;
 
-//#define STORE_TAC_KEY_SIMPLE d2[current_data_index] = current_data_index + 3;  
-
 #define STORE_NEXT_SIBLING_KEY_COMPLEX \
     next_sibling_index_key[d1[current_parent_index]-1] = current_data_index + 2;
-      
-//#define STORE_TAC_KEY_COMPLEX d2[current_parent_index] = current_data_index + 2;    
-            
-#define STORE_SIZE child_count[d1[current_parent_index]-1] = parent_sizes[current_depth];
+                  
+#define STORE_SIZE_OBJECT child_count_object[d1[current_parent_index]-1] = parent_sizes[current_depth];
     
-//#define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
+#define STORE_SIZE_ARRAY child_count_array[d1[current_parent_index]-1] = parent_sizes[current_depth];    
+
             
 #define MOVE_UP_PARENT_INDEX --current_depth;
 
@@ -508,9 +526,9 @@ STRING_SEEK:
     //p = strchr(p+1,'"');
     
     //TODO: We could try more complicated string instructions
-    //Ideally we could have a switch on this for:
-    //1) User options - which to use
-    //2) Keys vs string values
+    //1) SIMD
+    //2) Keys vs string values - assume keys are shorter
+    
     
     while (*p != '"'){
       ++p;    
@@ -596,6 +614,13 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [123]         = &&S_OPEN_OBJECT_IN_ARRAY,           // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
+    
+    //Types of arrays to process
+    //--------------------------
+    //numeric arrays
+    //logical arrays
+    //object arrays
+    //string arrays
         
     const void *key_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
@@ -647,11 +672,17 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     int current_data_index = -1;
     INITIALIZE_MAIN_DATA;
     //---------------------------------------------------------------------
-    int n_oa_allocations = 1;
-    int oa_size_allocated = ceil((double)string_byte_length/100);
-    int oa_size_index_max = oa_size_allocated - 1;
-    int current_oa_index = -1;
-    INITIALIZE_OA_DATA;
+    int n_object_allocations = 1;
+    int object_size_allocated = ceil((double)string_byte_length/100);
+    int object_size_index_max = object_size_allocated - 1;
+    int current_object_index = -1;
+    INITIALIZE_OBJECT_DATA;
+    //---------------------------------------------------------------------
+    int n_array_allocations = 1;
+    int array_size_allocated = ceil((double)string_byte_length/100);
+    int array_size_index_max = array_size_allocated - 1;
+    int current_array_index = -1;
+    INITIALIZE_ARRAY_DATA;
     //---------------------------------------------------------------------
     int n_key_chars = 0;
     int n_key_allocations  = 1; //Not yet implemented
@@ -743,8 +774,8 @@ S_CLOSE_KEY_COMPLEX_AND_OBJECT:
 S_CLOSE_OBJECT:
     
     RETRIEVE_CURRENT_PARENT_INDEX;
-    STORE_NEXT_SIBLING_OF_OBJECT_OR_ARRAY;
-    STORE_SIZE;
+    STORE_NEXT_SIBLING_OF_OBJECT;
+    STORE_SIZE_OBJECT;
     MOVE_UP_PARENT_INDEX;
     
     NAVIGATE_AFTER_CLOSING_COMPLEX;
@@ -767,8 +798,8 @@ S_OPEN_ARRAY_IN_KEY:
 S_CLOSE_ARRAY:
     
     RETRIEVE_CURRENT_PARENT_INDEX;
-    STORE_NEXT_SIBLING_OF_OBJECT_OR_ARRAY;
-    STORE_SIZE;
+    STORE_NEXT_SIBLING_OF_ARRAY;
+    STORE_SIZE_ARRAY;
     MOVE_UP_PARENT_INDEX;
     
     NAVIGATE_AFTER_CLOSING_COMPLEX;
@@ -998,13 +1029,15 @@ S_FINISH_GOOD:
     //This information can be used to tell how efficient we were
     //relative to the allocation
     setIntScalar(plhs[0],"n_tokens_allocated",data_size_allocated);
-    setIntScalar(plhs[0],"n_oa_allocated",oa_size_allocated);
+    setIntScalar(plhs[0],"n_objects_allocated",object_size_allocated);
+    setIntScalar(plhs[0],"n_arrays_allocated",array_size_allocated);
     setIntScalar(plhs[0],"n_keys_allocated",key_size_allocated);
     setIntScalar(plhs[0],"n_strings_allocated",string_size_allocated);
     setIntScalar(plhs[0],"n_numbers_allocated",numeric_size_allocated);
     
     setIntScalar(plhs[0],"n_data_allocations",n_data_allocations);
-    setIntScalar(plhs[0],"n_oa_allocations",n_oa_allocations);
+    setIntScalar(plhs[0],"n_object_allocations",n_object_allocations);
+    setIntScalar(plhs[0],"n_array_allocations",n_array_allocations);
     setIntScalar(plhs[0],"n_key_allocations",n_key_allocations);
     setIntScalar(plhs[0],"n_string_allocations",n_string_allocations);
     setIntScalar(plhs[0],"n_numeric_allocations",n_numeric_allocations);
@@ -1014,9 +1047,13 @@ S_FINISH_GOOD:
     setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
     setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
     
-    TRUNCATE_OA_DATA
-    setStructField(plhs[0],child_count,"child_count",mxINT32_CLASS,current_oa_index + 1); 
-    setStructField(plhs[0],next_sibling_index_oa,"next_sibling_index_oa",mxINT32_CLASS,current_oa_index + 1);
+    TRUNCATE_OBJECT_DATA
+    setStructField(plhs[0],child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
+    setStructField(plhs[0],next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
+    
+    TRUNCATE_ARRAY_DATA
+    setStructField(plhs[0],child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
+    setStructField(plhs[0],next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
     
     TRUNCATE_KEY_DATA
     setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);

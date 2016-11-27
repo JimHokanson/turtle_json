@@ -39,8 +39,11 @@ classdef tokens < handle
         types 
         data_indices
         
-        oa_next_sibling_indices
-        oa_child_counts
+        object_next_sibling_indices
+        object_child_counts
+        
+        array_next_sibling_indices
+        array_child_counts
 
         key_next_sibling_indices
         
@@ -70,7 +73,9 @@ classdef tokens < handle
         %-------------- New Definitions --------------                      POST PROCESS
         %  
         %   object : type  index   n_values    tac
+        %
         %   array  : type  index   n_values    tac                          content_info
+        %
         %   key    : type  index   length      tac      key_p               value
         %   string : type  index   length               string_p            value
         %   number : type  index   pointer/value         
@@ -143,8 +148,11 @@ classdef tokens < handle
             obj.data_indices = result.d1;
             
             %Objects and Arrays -------------
-            obj.oa_next_sibling_indices = result.next_sibling_index_oa;
-            obj.oa_child_counts = result.child_count;
+            obj.object_next_sibling_indices = result.next_sibling_index_object;
+            obj.object_child_counts = result.child_count_object;
+            
+            obj.array_next_sibling_indices = result.next_sibling_index_array;
+            obj.array_child_counts = result.child_count_array;
             
             %Keys ---------------------------
             %We may not need this once we've write process_arrays in mex
