@@ -166,12 +166,14 @@
     INCREMENT_DATA_INDEX; \
     INCREMENT_OA_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
+    d1[current_data_index] = current_oa_index + 1; \
     INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT);
     
 #define PROCESS_OPENING_ARRAY \
     INCREMENT_DATA_INDEX; \
     INCREMENT_OA_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
+    d1[current_data_index] = current_oa_index + 1; \
     INITIALIZE_PARENT_INFO_OA(TYPE_ARRAY); \
 
 #define PROCESS_STRING \
@@ -195,8 +197,8 @@
     SET_TYPE(TYPE_KEY); \
     /* We want to skip the opening quotes so + 1 */ \
     key_p[current_key_index] = CURRENT_POINTER + 1; \
-    /* Index into key arrays */ \
-    d1[current_data_index]   = current_key_index + 1; \
+    /* Index into key arrays, +1 for Matlab base */ \
+    d1[current_data_index] = current_key_index + 1; \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     /* We won't count the closing quote, but we would normally add 1 to */ \
     /* be inclusive on a count, so they cancel out */ \
@@ -238,10 +240,18 @@
 #define RETRIEVE_CURRENT_PARENT_INDEX \
     current_parent_index = parent_indices[current_depth];
     
+//Origin of -1
+//------------------
+// d1 is 1 based, but we are in C, so we need to index based on being 0 based
+// so we subtract 1
+//  This can be seen in the other calls below with d1 and -1
+//
+//Origin of +2
+//------------------
 //+1 to next element
 //+1 for Matlab 1 based indexing
 #define STORE_NEXT_SIBLING_OF_OBJECT_OR_ARRAY \
-    next_sibling_index_oa[d1[current_parent_index]] = current_data_index + 2;
+    next_sibling_index_oa[d1[current_parent_index]-1] = current_data_index + 2;
     
 //  #define STORE_TAC_OF_OBJECT_OR_ARRAY d2[current_parent_index] = current_data_index + 2;
     
@@ -257,11 +267,11 @@
 //#define STORE_TAC_KEY_SIMPLE d2[current_data_index] = current_data_index + 3;  
 
 #define STORE_NEXT_SIBLING_KEY_COMPLEX \
-    next_sibling_index_key[d1[current_parent_index]] = current_data_index + 2;
+    next_sibling_index_key[d1[current_parent_index]-1] = current_data_index + 2;
       
 //#define STORE_TAC_KEY_COMPLEX d2[current_parent_index] = current_data_index + 2;    
             
-#define STORE_SIZE child_count[d1[current_parent_index]] = parent_sizes[current_depth];
+#define STORE_SIZE child_count[d1[current_parent_index]-1] = parent_sizes[current_depth];
     
 //#define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
             
@@ -1001,17 +1011,17 @@ S_FINISH_GOOD:
     
     //------------------------    Main Data   -----------------------------
     TRUNCATE_MAIN_DATA
-    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_oa_index + 1);
+    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
     setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
     
     TRUNCATE_OA_DATA
-    setStructField(plhs[0],child_count,"child_count",mxINT32_CLASS,current_data_index + 1); 
+    setStructField(plhs[0],child_count,"child_count",mxINT32_CLASS,current_oa_index + 1); 
     setStructField(plhs[0],next_sibling_index_oa,"next_sibling_index_oa",mxINT32_CLASS,current_oa_index + 1);
     
     TRUNCATE_KEY_DATA
     setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
     setStructField(plhs[0],key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
-    setStructField(plhs[0],next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_oa_index + 1);
+    setStructField(plhs[0],next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_key_index + 1);
     
     TRUNCATE_STRING_DATA
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);

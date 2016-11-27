@@ -328,6 +328,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //
     //We subtract the length of the buffer so that the buffer is not 
     //displayed to the user
+    //
+    //TODO: I think this is only valid for string inputs, not for file inputs ...
     setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length-N_PADDING);
     
     //Token parsing

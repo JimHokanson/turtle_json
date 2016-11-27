@@ -29,6 +29,10 @@ classdef parsing_info
        n_tokens
        token_allocation_efficiency
        
+       n_oa_allocated
+       n_oa
+       oa_allocation_efficiency
+       
        n_keys_allocated
        n_keys
        key_allocation_efficiency
@@ -77,7 +81,9 @@ classdef parsing_info
             obj.n_tokens = length(result.d1);
             obj.token_allocation_efficiency = obj.n_tokens/double(obj.n_tokens_allocated);
             
-            %TODO: Include OA
+            obj.n_oa_allocated = double(result.n_oa_allocated);
+            obj.n_oa = length(result.child_count);
+            obj.oa_allocation_efficiency = obj.n_oa/obj.n_oa_allocated;
             
             obj.n_keys_allocated = double(result.n_keys_allocated);
             obj.n_keys = length(result.key_p);

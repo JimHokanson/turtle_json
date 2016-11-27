@@ -147,8 +147,8 @@ classdef tokens < handle
             obj.oa_child_counts = result.child_count;
             
             %Keys ---------------------------
-            %We might not need this, depending on how we do things ...
-            obj.key_next_sibling_indices = 1; %next_sibling_index_key
+            %We may not need this once we've write process_arrays in mex
+            obj.key_next_sibling_indices = result.next_sibling_index_key;
             
             
             
