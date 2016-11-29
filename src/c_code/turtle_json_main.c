@@ -8,7 +8,8 @@
  *
  */
 
-
+//same = index at open equals index at close - n_items - requires logging 
+//logical indices
 
 // parent type - use pointers???
 
@@ -70,7 +71,8 @@
 //-----------------  Array Memory Management  ------------------
 #define INITIALIZE_ARRAY_DATA \
     int *child_count_array = mxMalloc(array_size_allocated * sizeof(int)); \
-    int *next_sibling_index_array = mxMalloc(array_size_allocated * sizeof(int));
+    int *next_sibling_index_array = mxMalloc(array_size_allocated * sizeof(int)); \
+    uint8_t *array_types = mxMalloc(array_size_allocated);        
      
 #define INCREMENT_ARRAY_INDEX \
     ++current_array_index; \
@@ -80,11 +82,13 @@
         array_size_index_max = array_size_allocated - 1; \
         child_count_array = mxRealloc(child_count_array,array_size_allocated * sizeof(int)); \
         next_sibling_index_array = mxRealloc(next_sibling_index_array,array_size_allocated * sizeof(int)); \
+        array_types = mxRealloc(array_types,array_size_allocated*sizeof(uint8_t)); \
     }
     
 #define TRUNCATE_ARRAY_DATA \
     child_count_array = mxRealloc(child_count_array,(current_array_index + 1) * sizeof(int)); \
-    next_sibling_index_array = mxRealloc(next_sibling_index_array,(current_array_index + 1) * sizeof(int));
+    next_sibling_index_array = mxRealloc(next_sibling_index_array,(current_array_index + 1) * sizeof(int)); \
+    array_types = mxRealloc(array_types,(current_array_index + 1)*sizeof(uint8_t));
     
 //-----------------   Key Memory Management ------------------------------- 
 #define INITIALIZE_KEY_DATA \
@@ -155,7 +159,7 @@
 //        
     
 
-//Things for opening    =====    [ { :    =================================
+//===================    Opening    [ { :    ==============================
 #define INCREMENT_PARENT_SIZE \
     parent_sizes[current_depth] += 1
 
@@ -170,7 +174,9 @@
         parent_types[current_depth] = x; \
         parent_indices[current_depth] = current_data_index; \
         parent_sizes[current_depth] = 0;
-        
+ 
+//TODO: Including a separate definition for key may give worse performance ...
+//key does not care about size, size = 1
 #define INITIALIZE_PARENT_INFO_KEY(x) \
         ++current_depth; \
         if (current_depth > 200){\
@@ -178,7 +184,51 @@
         }\
         parent_types[current_depth] = x; \
         parent_indices[current_depth] = current_data_index;
+
+        
+//========================      Closing     ===============================
+    
+#define RETRIEVE_CURRENT_PARENT_INDEX \
+    current_parent_data_index = parent_indices[current_depth];
+    
+//Origin of -1
+//------------------
+// d1 is 1 based, but we are in C, so we need to index based on being 0 based
+// so we subtract 1
+//  This can be seen in the other calls below with d1 and -1
+//
+//Origin of +2
+//------------------
+//+1 to next element
+//+1 for Matlab 1 based indexing
+#define STORE_NEXT_SIBLING_OF_OBJECT \
+    next_sibling_index_object[d1[current_parent_data_index]-1] = current_data_index + 2;
+
+#define STORE_NEXT_SIBLING_OF_ARRAY \
+    next_sibling_index_array[d1[current_parent_data_index]-1] = current_data_index + 2;
+        
+//This is called before the simple value, so we need to advance to the simple
+//value and then do the next value (i.e the token after close)
+//Note that we're working with the current_data_index since we haven't
+//advanced it yet and don't need to rely on a parent index (which hasn't even
+//been set since the value is simple)
+    
+#define STORE_NEXT_SIBLING_KEY_SIMPLE \
+    next_sibling_index_key[current_key_index] = current_data_index + 3;
+
+#define STORE_NEXT_SIBLING_KEY_COMPLEX \
+    next_sibling_index_key[d1[current_parent_data_index]-1] = current_data_index + 2;
+                  
+#define STORE_SIZE_OBJECT child_count_object[d1[current_parent_data_index]-1] = parent_sizes[current_depth];
+    
+#define STORE_SIZE_ARRAY child_count_array[d1[current_parent_data_index]-1] = parent_sizes[current_depth];    
+        
+#define MOVE_UP_PARENT_INDEX --current_depth;
+
+#define IS_NULL_PARENT_INDEX current_depth == 0     
             
+#define PARENT_TYPE parent_types[current_depth]         
+        
 //=========================================================================
 //=================          Processing      ==============================
 //=========================================================================
@@ -255,49 +305,7 @@
     /*TODO: Add false check ... */ \
 	ADVANCE_POINTER_BY_X(4);
                 
-//===================      Things for closing      ========================
-    
-#define RETRIEVE_CURRENT_PARENT_INDEX \
-    current_parent_index = parent_indices[current_depth];
-    
-//Origin of -1
-//------------------
-// d1 is 1 based, but we are in C, so we need to index based on being 0 based
-// so we subtract 1
-//  This can be seen in the other calls below with d1 and -1
-//
-//Origin of +2
-//------------------
-//+1 to next element
-//+1 for Matlab 1 based indexing
-#define STORE_NEXT_SIBLING_OF_OBJECT \
-    next_sibling_index_object[d1[current_parent_index]-1] = current_data_index + 2;
-
-#define STORE_NEXT_SIBLING_OF_ARRAY \
-    next_sibling_index_array[d1[current_parent_index]-1] = current_data_index + 2;
-        
-//This is called before the simple value, so we need to advance to the simple
-//value and then do the next value (i.e the token after close)
-//Note that we're working with the current_data_index since we haven't
-//advanced it yet and don't need to rely on a parent index (which hasn't even
-//been set since the value is simple)
-    
-#define STORE_NEXT_SIBLING_KEY_SIMPLE \
-    next_sibling_index_key[current_key_index] = current_data_index + 3;
-
-#define STORE_NEXT_SIBLING_KEY_COMPLEX \
-    next_sibling_index_key[d1[current_parent_index]-1] = current_data_index + 2;
-                  
-#define STORE_SIZE_OBJECT child_count_object[d1[current_parent_index]-1] = parent_sizes[current_depth];
-    
-#define STORE_SIZE_ARRAY child_count_array[d1[current_parent_index]-1] = parent_sizes[current_depth];    
-
-            
-#define MOVE_UP_PARENT_INDEX --current_depth;
-
-#define IS_NULL_PARENT_INDEX current_depth == 0     
-            
-#define PARENT_TYPE parent_types[current_depth]            
+           
 
   
 //================       Navigation       =================================  
@@ -437,10 +445,11 @@
     }    
     
 //=========================================================================
+//=========================================================================    
 const int SIMD_SEARCH_MODE = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
 __m128i chars_to_search_for_ws;
 int ws_search_result;            
-
+//-------------------------------------------------------------------------
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
     //This is a helper function for setting the field in the output struct
@@ -460,7 +469,7 @@ void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID class
     mxAddField(s,fieldname);
     mxSetField(s,0,fieldname,pm);
 }
-
+//-------------------------------------------------------------------------
 void setIntScalar(mxArray *s, const char *fieldname, int value){
 
     //This function allows us to hold onto integer scalars
@@ -481,7 +490,8 @@ void setIntScalar(mxArray *s, const char *fieldname, int value){
     
 }
 
-//-------------------------------------------------------------------------
+//=========================================================================
+//=========================================================================
 void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
     //In this approach we look for math like characters. We parse for
@@ -579,9 +589,12 @@ STRING_SEEK:
         *char_offset = p+1;
     } 
 }
-
+//=========================================================================
+//=========================================================================
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
+//=========================================================================
+//=========================================================================
 //=========================================================================
 void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Options *options) {
     
@@ -596,6 +609,9 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     //it wouldn't be correct following a comma:
     //[] ok
     //["value",]
+    
+    
+    //TODO: Is this better as a 2d array?????
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [34]        = &&S_PARSE_STRING_IN_ARRAY,            // "
@@ -614,14 +630,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [123]         = &&S_OPEN_OBJECT_IN_ARRAY,           // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
-    
-    //Types of arrays to process
-    //--------------------------
-    //numeric arrays
-    //logical arrays
-    //object arrays
-    //string arrays
-        
+
     const void *key_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
         [34]        = &&S_PARSE_STRING_IN_KEY,      // "
@@ -656,7 +665,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     //invalid
     int parent_indices[201];
     int parent_sizes[201];
-    int current_parent_index;
+    int current_parent_data_index;
     int current_depth = 0;
     
     //---------------------------------------------------------------------
@@ -800,6 +809,25 @@ S_CLOSE_ARRAY:
     RETRIEVE_CURRENT_PARENT_INDEX;
     STORE_NEXT_SIBLING_OF_ARRAY;
     STORE_SIZE_ARRAY;
+
+    
+    //Ideally we could avoid the check on the parent_sizes
+    //We run into a problem if we ever have an empty array
+    //d1[current_parent_data_index+1] could access out of bounds memory
+    //
+    //TODO: This should be moved out into a post-parser
+    //TODO: We need to have a merged type
+    
+    if (parent_sizes[current_depth]){
+        //TODO: get rid of this -1 mess
+        array_types[d1[current_parent_data_index]-1] = types[current_data_index] * (parent_sizes[current_depth]  == (d1[current_data_index] - d1[current_parent_data_index+1] + 1));
+    }
+    
+
+            
+            
+    
+    
     MOVE_UP_PARENT_INDEX;
     
     NAVIGATE_AFTER_CLOSING_COMPLEX;
@@ -808,7 +836,6 @@ S_CLOSE_ARRAY:
 S_PARSE_KEY:
         
 	INCREMENT_PARENT_SIZE;
-    
     PROCESS_KEY_NAME;
     
     //Most JSON I've seen holds the ':' character
@@ -847,7 +874,6 @@ S_PARSE_STRING_IN_ARRAY:
 S_PARSE_STRING_IN_KEY:
 
     STORE_NEXT_SIBLING_KEY_SIMPLE;
-    
     PROCESS_STRING;
 	PROCESS_END_OF_KEY_VALUE_SIMPLE
 
@@ -856,7 +882,6 @@ S_PARSE_STRING_IN_KEY:
 S_PARSE_NUMBER_IN_KEY:
     
     STORE_NEXT_SIBLING_KEY_SIMPLE;
-
     PROCESS_NUMBER;
     
     //The number parser stops 1 past the last number
@@ -904,53 +929,40 @@ S_PARSE_NUMBER_IN_ARRAY:
 S_PARSE_NULL_IN_KEY:
     
     STORE_NEXT_SIBLING_KEY_SIMPLE;
-
     PROCESS_NULL;
-    
 	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
 
 	INCREMENT_PARENT_SIZE;
-    
     PROCESS_NULL;
-    
 	PROCESS_END_OF_ARRAY_VALUE;
 
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
     
     STORE_NEXT_SIBLING_KEY_SIMPLE;
-    
     PROCESS_TRUE;
-    
 	PROCESS_END_OF_KEY_VALUE_SIMPLE;
-
 
 S_PARSE_TRUE_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
-    
     PROCESS_TRUE;
-    
     PROCESS_END_OF_ARRAY_VALUE;
 
     
 S_PARSE_FALSE_IN_KEY:
     
     STORE_NEXT_SIBLING_KEY_SIMPLE;
-    
     PROCESS_FALSE;
-    
     PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 S_PARSE_FALSE_IN_ARRAY:
     
 	INCREMENT_PARENT_SIZE;
-    
     PROCESS_FALSE;
-    
 	PROCESS_END_OF_ARRAY_VALUE;
 
 	//=============================================================
@@ -1054,6 +1066,7 @@ S_FINISH_GOOD:
     TRUNCATE_ARRAY_DATA
     setStructField(plhs[0],child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
     setStructField(plhs[0],next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
+    setStructField(plhs[0],array_types,"array_types",mxUINT8_CLASS,current_array_index + 1);
     
     TRUNCATE_KEY_DATA
     setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);

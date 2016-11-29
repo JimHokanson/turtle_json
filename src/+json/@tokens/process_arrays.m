@@ -1,6 +1,23 @@
 function process_arrays(obj)
 
+OBJECT_TYPE = 1;
+ARRAY_TYPE = 2;
+KEY_TYPE = 3;
+STRING_TYPE = 4;
+NUMBER_TYPE = 5;
+NULL_TYPE = 6;
+TRUE_TYPE = 7;
+FALSE_TYPE = 8;
 
+%look at all arrays, are they regular
+%- ideally we could start with 
+%1st object in an array
+%
+%
+%array parsing
+%- parse numeric array
+%- parse logical array
+%- parse string array
 
 m = obj.mex;
 types = m.types;
@@ -40,6 +57,19 @@ while ~done
           cur_data_index = key_ns_index(cur_key_index);
        end
     else
+        %1) Get depth
+        temp_index = cur_data_index+1;
+        cur_array_index = data_indices(cur_data_index);
+        n_array_elments = child_counts(cur_array_index);
+        switch (types(cur_data_index+1))
+            case OBJECT_TYPE
+                %TODO: are the objects all the same
+                
+                
+            case ARRAY_TYPE
+                %TODO: Get depth, then look for regularity
+                keyboard
+        
         keyboard
     end
     
