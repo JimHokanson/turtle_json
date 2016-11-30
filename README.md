@@ -1,5 +1,8 @@
 This code parses JSON files/strings. Writing is not yet supported.
 
+#Status
+I am currently working on rewriting the parser so that array properties are such as homogeneity and dimension are extracted. As well, the goal is to extract homogeneity of object structures, as this speeds up memory allocation in Matlab (e.g. faster to have a structure array vs a cell array of structures)
+
 #Why This Code?
 
 This parser was written to have high performance relative to other Matlab JSON parsers. 
