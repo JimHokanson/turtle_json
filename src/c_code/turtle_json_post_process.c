@@ -438,44 +438,252 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     
 }
 
+//=========================================================================
+//=========================================================================
 void populate_array_flags(unsigned char *js,mxArray *plhs[]){
+//
+//
+//  Populate:
+//  ---------
+//  array_depths
+//  array_types
     
-    //Transverse the structure
-    //i.e. if we have an object => check its keys
-    //if we have an array, summarize as described below
+
+    //Extraction of relevant local variables
+    //---------------------------------------------------------------------
+    uint8_t *types = (uint8_t *)get_field(plhs,"types");
+    int *d1 = (int *)get_field(plhs,"d1");
+    mwSize n_entries = get_field_length(plhs,"d1");
+    
+    int *n_arrays_at_depth = (int *)get_field(plhs,"n_arrays_at_depth");
+    mwSize n_depths = get_field_length(plhs,"n_arrays_at_depth");
+    
+    uint8_t *array_depths = (uint8_t *)get_field(plhs,"array_depths");
+    int *child_count_array = (int *)get_field(plhs,"child_count_array");
+    int *next_sibling_index_array = (int *)get_field(plhs,"next_sibling_index_array");
+    mwSize n_arrays = get_field_length(plhs,"next_sibling_index_array");
+    
+    //Determining the order to process arrays
+    //---------------------------------------------------------------------
+    //We need to process from the bottom up
+    int *process_order = mxMalloc(n_arrays*sizeof(int));
+    int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
+    
+    int cur_running_index = 0;
+    for (int iDepth = n_depths - 1; iDepth > 0; iDepth--){
+        cur_depth_index[iDepth] = cur_running_index;
+        cur_running_index += n_arrays_at_depth[iDepth];
+    }
+    
+    int cur_array_index = 0;
+    int cur_process_index;
+    for (int iData = 0; iData < n_entries; iData ++){
+        if (types[iData] == TYPE_ARRAY){
+            //This is where will write iData
+            cur_process_index = cur_depth_index[array_depths[cur_array_index]]++;
+            process_order[cur_process_index] = iData;
+            cur_array_index++;
+        }
+    }
+    
+    uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
+
+//Map the input types of an array to more generic mixed types
+//e.g. true and false to logical
+    uint8_t array_type_map1[9] = { 
+        ARRAY_OTHER_TYPE,    //Nothing
+        ARRAY_OTHER_TYPE,    //Object
+        ARRAY_OTHER_TYPE,    //Array
+        ARRAY_OTHER_TYPE,    //Key
+        ARRAY_STRING_TYPE,   //String
+        ARRAY_NUMERIC_TYPE,  //Number
+        ARRAY_NUMERIC_TYPE,  //Null
+        ARRAY_LOGICAL_TYPE,  //True
+        ARRAY_LOGICAL_TYPE}; //False
+     
+    //Map     
+    uint8_t array_type_map2[9] = { 
+        ARRAY_OTHER_TYPE,   //Nothing
+        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays, then we become a 2d numeric array
+        ARRAY_ND_STRING,    //string
+        ARRAY_ND_LOGICAL,   //logical
+        ARRAY_OTHER_TYPE,   //object same type
+        ARRAY_OTHER_TYPE,   //object diff type
+        ARRAY_ND_NUMERIC,   //nd_numeric
+        ARRAY_ND_STRING,    //nd_string
+        ARRAY_ND_LOGICAL};  //nd_logical     
+        
+        
+    
+    //Array processing
+    //------------------------------------------------------------
+    //Things to know:
     //
-    //Things to know
-    //- object array - 1d
-    //   - homogenous fields?
-    //- nd logical array
-    //- nd cellstr array
-    //- nd numerical array
+    //Is this array of the same type:
+    //  1 - numeric
+    //  2 - string
+    //  3 - logical
+    //  4 - object
+    //  5 - n-d numeric array
+    //  6 - n-d string array
+    //  7 - n-d logical array
+    //  8 - n-d object array  NYI
+    //
+    //Is this array the parent of same arrays?
+    //Is this array regular - all children are the same (recursively)
+    //Do the objects all have the same keys?    
+        
     
+        
+    bool is_nd_array;
+    int n_children;
+    int child_size;
+    int child_depth;
+    int cur_child_array_index;
+    int cur_child_data_index;
     
-//Same object has:
-//1) Same # of children
-//2) Could keep track of # of characters - this could be post processed
-//3) Each string has the same length
-//4) final comparison of the actual strings - this could be done in parallel
-//with a potential cleanup of those that turned out not to be the same
-//Note, this could get messy as we run into comparing many to many
-//
-//Do we do this based on the same parent or the same depth?
-//
-//Same parent may not be optimum, but it probably is sufficient
-//- on not being the same, we could fall back to some alternative strategy
-//Parents would need to be post processed
-//
-//[ {'a':1,'b':2},{'a':1,'b':2}]
-//  o1            o2              <= both objects are the same, create a struct array
-//
-//[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
-//  o1            o2            o3      <= objects are not the same cell array of structs
+    int cur_child_array_index2;
+    int cur_child_data_index2;
     
+    //TODO: Check that this won't ever be exceeded
+    //TODO: Dynamically allocate this ...
+    int child_size_stack[20];
     
+    uint8_t cur_child_array_type;
+    for (int iArray = 0; iArray < n_arrays; iArray++){
+        cur_process_index = process_order[iArray];
+        cur_array_index = RETRIEVE_DATA_INDEX(cur_process_index);
+        array_depths[cur_array_index] = 0;
+        n_children = child_count_array[cur_array_index];
+        if (n_children){
+            //We are switching on the contents of the array, and we want
+            //to use this to determine the type of the array
+            switch (types[cur_process_index+1]){
+                case TYPE_OBJECT:
+                    //
+                    //[ {'a':1,'b':2},{'a':1,'b':2}]
+                    //  o1            o2              <= both objects are the same, create a struct array
+                    //
+                    //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
+                    //  o1            o2            o3      <= objects are not the same cell array of structs
+                    
+                    
+                    //Are the objects the same ?????
+                    break;
+                case TYPE_ARRAY:
+                    //This indicates that our array holds an array.
+                    //  
+                    cur_child_array_index = cur_array_index + 1;
+                    cur_child_data_index  = cur_process_index + 1;
+                    child_size  = child_count_array[cur_child_array_index];
+                    child_depth = array_depths[cur_child_array_index];
+                    cur_child_array_type = array_types[cur_child_array_index];
+                    
+                    if (cur_child_array_type == 0){
+                        break;
+                    }
+                    
+                    //Log the sizes of the first array
+                    if (child_depth > 1){
+                       cur_child_array_index2 = cur_child_array_index + 1; 
+                       for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+                           child_size_stack[iDepth] = child_count_array[cur_child_array_index2];
+                           cur_child_array_index2++;
+                       } 
+                    }
+                    
+                    //Split, based on whether we need to verify deeper or not
+                    is_nd_array = true;
+                    if (child_depth > 1){
+                        for (int iChild = 1; iChild < n_children; iChild++){
+                            //TODO: Remove this two step process ...
+                            //TODO: Make all of these indices 0 based
+                            //-1 is for matlab to c conversion :/
+                            cur_child_data_index = next_sibling_index_array[cur_child_array_index]-1;
+                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+                            
+                            //TODO: The order of these should be switched
+                            if (child_size != child_count_array[cur_child_array_index] ||
+                                    child_depth != array_depths[cur_child_array_index] ||
+                                    cur_child_array_type != array_types[cur_child_array_index]){
+                                is_nd_array = false;
+                                break;
+                            }else{
+                                
+                                //Depth verification
+                                cur_child_array_index2 = cur_child_array_index + 1;
+                                for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+                                    if (child_size_stack[iDepth] != child_count_array[cur_child_array_index2]){
+                                        is_nd_array = false;
+                                        break;
+                                    } 
+                                    cur_child_array_index2++;
+                                }
+                            }
+                        }
+                    }else{
+                        //Step 1:
+                        //Verify # of children, depth, and type
+
+                        for (int iChild = 1; iChild < n_children; iChild++){
+                            //TODO: Remove this two step process ... 
+                            //TODO: Make all of these indices 0 based
+                            //-1 is for matlab to c conversion :/
+                            cur_child_data_index = next_sibling_index_array[cur_child_array_index]-1;
+                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+
+                            if (child_size != child_count_array[cur_child_array_index] || 
+                                    child_depth != array_depths[cur_child_array_index] ||
+                                    cur_child_array_type != array_types[cur_child_array_index]){
+                                is_nd_array = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                                        //Let's punt on this problem for now ...
+                    //-------------------------------------------------
+                    if (child_depth > 1){
+                        //Now we need to get the children
+                        
+                    }
+                    
+                    if (is_nd_array){
+                        array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
+                        array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
+                    }
+                    break;
+                case TYPE_KEY:
+                    mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, key was found as child of array in post-processing");
+                    break;
+                case TYPE_STRING:
+                case TYPE_NUMBER:
+                case TYPE_NULL:
+                case TYPE_TRUE:
+                case TYPE_FALSE:
+                    if (n_children == d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1){
+                        array_types[cur_array_index] = array_type_map1[types[cur_process_index+1]];
+                    }
+                    array_depths[cur_array_index] = 1;
+                    break;
+                default:
+                    mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, unrecognized type in post-processing");
+                    break;
+            }
+                    
+        }
+    }
+    
+    setStructField(plhs[0],cur_depth_index,"cur_depth_index",mxINT32_CLASS,n_depths); 
+    setStructField(plhs[0],process_order,"process_order",mxINT32_CLASS,n_arrays); 
+    setStructField(plhs[0],array_types,"array_types",mxUINT8_CLASS,n_arrays);
+    
+//     mxFree(process_order);
+//     mxFree(cur_depth_index);
 }
 
-
+//=========================================================================
+//=========================================================================
 void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     //
     //  Parses string or key characters into Matlab strings

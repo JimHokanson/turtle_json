@@ -8,6 +8,7 @@
 #include <time.h>       //clock()
 #include <sys/time.h>   //for gettimeofday
 #include <omp.h>        //openmp
+#include "turtle_json_memory.h"
 
 //AVX
 //#include "immintrin.h"
@@ -25,6 +26,16 @@
 #define TYPE_TRUE   7
 #define TYPE_FALSE  8
 
+#define ARRAY_OTHER_TYPE   0
+#define ARRAY_NUMERIC_TYPE 1
+#define ARRAY_STRING_TYPE  2
+#define ARRAY_LOGICAL_TYPE 3
+#define ARRAY_OBJECT_SAME_TYPE  4
+#define ARRAY_OBJECT_DIFF_TYPE 5
+#define ARRAY_ND_NUMERIC 6
+#define ARRAY_ND_STRING 7
+#define ARRAY_ND_LOGICAL 8
+
 
 typedef struct {
    bool has_raw_string;
@@ -36,6 +47,16 @@ typedef struct {
    int n_numbers;
    int chars_per_token;
 } Options;
+
+
+
+#define STORE_INDEX(x) \
+    /* + 1 for Matlab indexing */ \
+    d1[current_data_index] = x + 1;
+
+#define RETRIEVE_DATA_INDEX(x) \
+    /* -1 since we are undoing the Matlab indexing */ \
+    d1[x]-1
 
 /*
  *
@@ -91,6 +112,10 @@ typedef struct {
 //void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
+
+void *get_field(mxArray *plhs[],const char *fieldname);
+
+mwSize get_field_length(mxArray *plhs[],const char *fieldname);
 
 void populate_array_flags(unsigned char *js,mxArray *plhs[]);
 

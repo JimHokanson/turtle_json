@@ -29,6 +29,9 @@ oa_ns_index  = m.next_sibling_index_oa;
 n_oa = length(m.child_count);
 
 
+keyboard
+
+
 cur_stack_processing_index = 1;
 stack_max_index = 1;
 %TODO: Maybe include a min here ...
