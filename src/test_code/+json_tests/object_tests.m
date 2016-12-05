@@ -2,6 +2,17 @@ function object_tests()
 %
 %   json.tests.object_tests
 
+%{
+TODO: Move this somewhere else ...
+
+s1 = struct('ab',1,'ac',2);
+s2 = struct('ab',2,'ad',3);
+js = mexEncodeJSON(temp);
+s = json.stringToTokens(js);
+    %check how many unique objects
+%}
+
+
 tests(1,:) = {'{"key":1,3}',1,'3 should be a key, not a numeric'};
 tests(2,:) = {'{:3}',1,'Missing key'};
 tests(3,:) = {'{}',1,''}; %empty object should be ok

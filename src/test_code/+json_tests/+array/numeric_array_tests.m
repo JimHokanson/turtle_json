@@ -4,6 +4,11 @@ function numeric_array_tests()
 %http://stackoverflow.com/questions/40833647/proper-translation-of-multi-dimensional-array-to-json-and-back/
 
 data = reshape(1:24,[4,3,2]);
+js = mexEncodeJSON(data)
+
+data2 = zeros(4,1,2);
+data3 = {data data2};
+js = mexEncodeJSON(data3)
 
 %JSON writers
 %------------
@@ -16,7 +21,7 @@ data = reshape(1:24,[4,3,2]);
 
 %2) 
 %Matlab's JSON implementation
-%- s = mexEncodeJSON(data)
+%- js = mexEncodeJSON(data)
 %- writes so that innermost is highest dimension
 
 end

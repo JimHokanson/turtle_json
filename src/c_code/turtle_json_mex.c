@@ -2,6 +2,18 @@
 
 #define N_PADDING 17
 
+
+
+void *get_field(mxArray *plhs[],const char *fieldname){
+    mxArray *temp = mxGetField(plhs[0],0,fieldname);
+    return mxGetData(temp);
+}
+
+mwSize get_field_length(mxArray *plhs[],const char *fieldname){
+    mxArray *temp = mxGetField(plhs[0],0,fieldname);
+    return mxGetN(temp);
+}
+
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
 
     //TODO: This function is not complete
@@ -219,6 +231,8 @@ void init_options(int nrhs, const mxArray*prhs[],Options *options){
             //Note, we'll allow bytes for a "raw_string"
             options->has_raw_bytes = true;
         }else{
+            //TODO: I also got this when the first input was not a string => e.g. (data,'raw_string',true)
+            //TODO: This error message looks wrong 
             mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
         }
     }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
@@ -340,11 +354,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
   
     TOC_AND_LOG(start_parse, elapsed_parse_time);
       
+    
+    
+    
     //mexPrintf("finished initial parse\n");
     
     //Post token parsing
     //------------------
     TIC(start_pp);
+    
+    populate_object_flags(json_string,plhs);
+    
+    populate_array_flags(json_string,plhs);
     
     parse_numbers(json_string,plhs);
     
