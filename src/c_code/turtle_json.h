@@ -111,11 +111,15 @@ typedef struct {
     
 //void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
     
+void setIntScalar(mxArray *s, const char *fieldname, int value);    
+    
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
 
 void *get_field(mxArray *plhs[],const char *fieldname);
 
 mwSize get_field_length(mxArray *plhs[],const char *fieldname);
+
+void populate_object_flags(unsigned char *js,mxArray *plhs[]);
 
 void populate_array_flags(unsigned char *js,mxArray *plhs[]);
 

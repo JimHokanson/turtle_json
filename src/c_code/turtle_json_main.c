@@ -70,7 +70,11 @@
         
 #define LOG_ARRAY_DEPTH \
         array_depths[current_array_index] = current_depth; \
-        n_arrays_at_depth[current_depth] += 1;        
+        n_arrays_at_depth[current_depth] += 1;
+        
+#define LOG_OBJECT_DEPTH \
+        object_depths[current_object_index] = current_depth; \
+        n_objects_at_depth[current_depth] += 1;          
  
 //TODO: Including a separate definition for key may give worse performance ...
 //key does not care about size, size = 1
@@ -134,7 +138,8 @@
     INCREMENT_OBJECT_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
     STORE_INDEX(current_object_index); \
-    INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT);
+    INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT); \
+    LOG_OBJECT_DEPTH;
     
 #define PROCESS_OPENING_ARRAY \
     INCREMENT_DATA_INDEX; \
@@ -573,6 +578,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     int parent_indices[21];
     int parent_sizes[21];
     int *n_arrays_at_depth = mxCalloc(21,sizeof(int));
+    int *n_objects_at_depth = mxCalloc(21,sizeof(int));
     int current_parent_data_index;
     int current_depth = 0;
     
@@ -945,6 +951,7 @@ S_FINISH_GOOD:
     
     //------------------------    Main Data   -----------------------------
     setStructField(plhs[0],n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    setStructField(plhs[0],n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
     
     TRUNCATE_MAIN_DATA
     setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
@@ -953,6 +960,7 @@ S_FINISH_GOOD:
     TRUNCATE_OBJECT_DATA
     setStructField(plhs[0],child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
     setStructField(plhs[0],next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
+    setStructField(plhs[0],object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
     
     TRUNCATE_ARRAY_DATA
     setStructField(plhs[0],child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 

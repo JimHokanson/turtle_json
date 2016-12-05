@@ -1,5 +1,6 @@
 #include "turtle_json.h"
 
+//TODO: Document what this is ...
 #define IS_CONTINUATION_BYTE *p >> 6 == 0b10
 
 //Issues
@@ -369,7 +370,6 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        
         int error_location = 0;
         int error_value;
 
@@ -384,7 +384,6 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
         
         *(error_locations + tid) = error_location;
         *(error_values + tid) = error_value;
-        
     }
     
     //Error processing
@@ -438,6 +437,207 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     
 }
 
+void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, uint8_t type_to_match, int *n_values_at_depth, int n_depths, uint8_t *value_depths){
+    //TODO: Document function
+    //TODO: We could do both arrays and objects at the same time ...
+    
+    int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
+    
+    int cur_running_index = 0;
+    //- This sets the start index in 'proess_order' for each depth
+    //- The order is based on how many arrays came at lower depths
+    //- Note that we start from lowest depth first
+    //- Depth currently starts at 1 ... TODO: We should code this in with
+    //  defined levels in some header
+    for (int iDepth = n_depths - 1; iDepth > 0; iDepth--){
+        cur_depth_index[iDepth] = cur_running_index;
+        cur_running_index += n_values_at_depth[iDepth];
+    }
+    
+    int cur_value_index = 0;
+    int cur_process_index;
+    //- Now we actually log the order in which to process the arrays
+    //- For every array, log when to process it, placing it as the 'next'
+    //  arrray to process based on its depth
+    for (int iData = 0; iData < n_entries; iData ++){
+        if (types[iData] == type_to_match){
+            cur_process_index = cur_depth_index[value_depths[cur_value_index]]++;
+            process_order[cur_process_index] = iData;
+            cur_value_index++;
+        }
+    }    
+    
+    mxFree(cur_depth_index);
+    
+}
+bool same_keys(unsigned char *key1, unsigned char *key2, int key_length){
+    for (int iKey = 0; iKey < key_length; iKey++){
+        if (*key1++ != *key2++){
+            return false;
+        }
+    }
+    return true;
+}
+
+void populate_object_flags(unsigned char *js,mxArray *plhs[]){
+    
+    TIC(object_parse);
+    
+    uint8_t *object_depths = (uint8_t *)get_field(plhs,"object_depths");
+    int *child_count_object = (int *)get_field(plhs,"child_count_object");
+    int *next_sibling_index_object = (int *)get_field(plhs,"next_sibling_index_object");
+    int n_objects = get_field_length(plhs,"next_sibling_index_object");
+    
+    if (n_objects == 0){
+        TOC_AND_LOG(object_parse,object_parsing_time);
+        return;
+    }
+    
+    uint8_t *types = (uint8_t *)get_field(plhs,"types");
+    int *d1 = (int *)get_field(plhs,"d1");
+    mwSize n_entries = get_field_length(plhs,"d1");
+    
+  	int *n_objects_at_depth = (int *)get_field(plhs,"n_objects_at_depth");
+    mwSize n_depths = get_field_length(plhs,"n_objects_at_depth");
+    
+    unsigned char **key_p = (unsigned char **)get_field(plhs,"key_p");
+    int *key_sizes = (int *)get_field(plhs,"key_sizes");
+    int *next_sibling_index_key = (int *)get_field(plhs,"next_sibling_index_key");
+    
+    int *process_order = mxMalloc(n_objects*sizeof(int));
+    populateProcessingOrder(process_order, types, n_entries, TYPE_OBJECT, n_objects_at_depth, n_depths, object_depths);
+    
+    
+    //Outputs
+    //===========================
+    //  For each object:
+    //      - Object ID  
+    //      - Current object count
+    //
+    //  For each key:
+    //  - nothing!
+    //
+    //Now, loop through each object
+    //
+    
+    //What is the max # of keys per object?
+    int max_children = 0;
+    for (int iObject = 0; iObject < n_objects; iObject++){
+        if (child_count_object[iObject] > max_children){
+            max_children = child_count_object[iObject];
+        }
+    }
+    
+    
+    int object_id = 0;
+    int id_index = 0;
+    int *object_ids = mxMalloc(n_objects*sizeof(int));
+    int *object_indices = mxMalloc(n_objects*sizeof(int));
+    
+    
+    int cur_process_index;
+    int cur_object_index;
+    int cur_key_index;
+    int temp_key_index;
+    int n_keys_current_object;
+    
+    int *object_key_sizes = mxMalloc(max_children*sizeof(int));
+    unsigned char **object_key_pointers = mxMalloc(max_children*sizeof(unsigned char *));
+    
+    
+    int cur_object_iter = 0; 
+        
+    bool done = false;
+    bool diff_object;
+    
+    while (!done){
+        cur_process_index = process_order[cur_object_iter];
+        cur_object_index  = RETRIEVE_DATA_INDEX(cur_process_index);
+        n_keys_current_object = child_count_object[cur_object_index];
+        
+        object_ids[cur_object_index] = ++object_id;
+        id_index = 0;
+        object_indices[cur_object_index] = id_index;
+        
+        //Store key information for comparison to other objects ...
+        //-----------------------------------------------------------------
+        cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+        for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
+            object_key_sizes[iKey] = key_sizes[cur_key_index];
+            object_key_pointers[iKey] = key_p[cur_key_index];
+            
+            //TODO: Remove this two step process ...
+            //TODO: Make all of these indices 0 based
+            //-1 is for matlab to c conversion :/
+            temp_key_index = next_sibling_index_key[cur_key_index]-1;
+            cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+        }
+        
+        //Loop through the other objects and compare
+        //-----------------------------------------------------------------
+        diff_object = false;
+        while (!diff_object){
+            ++cur_object_iter;
+            if (cur_object_iter == n_objects){
+                done = true;
+                break;
+            }
+            
+            cur_process_index = process_order[cur_object_iter];
+            cur_object_index  = RETRIEVE_DATA_INDEX(cur_process_index);
+            
+            if (n_keys_current_object == child_count_object[cur_object_index]){
+                
+                //Same length for each key?????
+                cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+                for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
+                    if (object_key_sizes[iKey] != key_sizes[cur_key_index]){
+                        diff_object = true;
+                        break;
+                    }
+                    
+                    //Again, make this one step ...
+                    temp_key_index = next_sibling_index_key[cur_key_index]-1;
+                    cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+                }    
+                
+                //Same key values????
+                //---------------------------------------------------------
+                cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+                for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
+                    
+                    if (!same_keys(object_key_pointers[iKey],key_p[cur_key_index],object_key_sizes[iKey])){
+                        diff_object = true;
+                        break;
+                    };
+                    
+                    //Again, make this one step ...
+                    temp_key_index = next_sibling_index_key[cur_key_index]-1;
+                    cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+                }  
+                
+                if (!diff_object){
+                    object_ids[cur_object_index] = object_id;
+                    object_indices[cur_object_index] = ++id_index;
+                }
+                
+            }else{
+                // diff_object = true; better here?
+                break;
+            }
+        }
+    }
+    
+    mxFree(process_order);
+    
+    setStructField(plhs[0],object_ids,"object_ids",mxINT32_CLASS,n_objects); 
+    setStructField(plhs[0],object_indices,"object_indices",mxINT32_CLASS,n_objects);
+    setIntScalar(plhs[0],"n_unique_objects",object_id);
+    
+  	TOC_AND_LOG(object_parse,object_parsing_time);
+ 
+}
+
 //=========================================================================
 //=========================================================================
 void populate_array_flags(unsigned char *js,mxArray *plhs[]){
@@ -448,48 +648,50 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
 //  array_depths
 //  array_types
     
+    TIC(array_parse);
 
-    //Extraction of relevant local variables
-    //---------------------------------------------------------------------
-    uint8_t *types = (uint8_t *)get_field(plhs,"types");
-    int *d1 = (int *)get_field(plhs,"d1");
-    mwSize n_entries = get_field_length(plhs,"d1");
-    
-    int *n_arrays_at_depth = (int *)get_field(plhs,"n_arrays_at_depth");
-    mwSize n_depths = get_field_length(plhs,"n_arrays_at_depth");
-    
+    //---- array info ------
     uint8_t *array_depths = (uint8_t *)get_field(plhs,"array_depths");
     int *child_count_array = (int *)get_field(plhs,"child_count_array");
     int *next_sibling_index_array = (int *)get_field(plhs,"next_sibling_index_array");
     mwSize n_arrays = get_field_length(plhs,"next_sibling_index_array");
     
-    //Determining the order to process arrays
-    //---------------------------------------------------------------------
-    //We need to process from the bottom up
-    int *process_order = mxMalloc(n_arrays*sizeof(int));
-    int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
-    
-    int cur_running_index = 0;
-    for (int iDepth = n_depths - 1; iDepth > 0; iDepth--){
-        cur_depth_index[iDepth] = cur_running_index;
-        cur_running_index += n_arrays_at_depth[iDepth];
+    if (n_arrays == 0){
+        TOC_AND_LOG(array_parse,array_parsing_time);
+        return;
     }
-    
-    int cur_array_index = 0;
-    int cur_process_index;
-    for (int iData = 0; iData < n_entries; iData ++){
-        if (types[iData] == TYPE_ARRAY){
-            //This is where will write iData
-            cur_process_index = cur_depth_index[array_depths[cur_array_index]]++;
-            process_order[cur_process_index] = iData;
-            cur_array_index++;
-        }
-    }
-    
-    uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
 
-//Map the input types of an array to more generic mixed types
-//e.g. true and false to logical
+    //Extraction of relevant local variables
+    //---------------------------------------------------------------------
+    //---- main data info -----
+    uint8_t *types = (uint8_t *)get_field(plhs,"types");
+    int *d1 = (int *)get_field(plhs,"d1");
+    mwSize n_entries = get_field_length(plhs,"d1");
+    
+    //---- depth info ------
+    int *n_arrays_at_depth = (int *)get_field(plhs,"n_arrays_at_depth");
+    mwSize n_depths = get_field_length(plhs,"n_arrays_at_depth");
+    
+
+    
+    //---- object info ------
+    int *child_count_object = (int *)get_field(plhs,"child_count_object");
+    int *next_sibling_index_object = (int *)get_field(plhs,"next_sibling_index_object");
+    unsigned char **key_p = (unsigned char **)get_field(plhs,"key_p");
+    int *key_sizes = (int *)get_field(plhs,"key_sizes");
+    int *next_sibling_index_key = (int *)get_field(plhs,"next_sibling_index_key");
+    
+    //Determining the order to process arrays
+    //---------------------------------------------------------------------    
+    int *process_order = mxMalloc(n_arrays*sizeof(int));
+    populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, n_arrays_at_depth, n_depths, array_depths);
+
+    
+    //Variable setup for actual processing
+    //---------------------------------------------------------------------
+
+    //Map the input types of an array to more generic mixed types
+    //e.g. true and false to logical
     uint8_t array_type_map1[9] = { 
         ARRAY_OTHER_TYPE,    //Nothing
         ARRAY_OTHER_TYPE,    //Object
@@ -501,10 +703,11 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
         ARRAY_LOGICAL_TYPE,  //True
         ARRAY_LOGICAL_TYPE}; //False
      
-    //Map     
+    //- Input is the type of processed array
+    //- Output is the new type of processed array
     uint8_t array_type_map2[9] = { 
         ARRAY_OTHER_TYPE,   //Nothing
-        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays, then we become a 2d numeric array
+        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
         ARRAY_ND_STRING,    //string
         ARRAY_ND_LOGICAL,   //logical
         ARRAY_OTHER_TYPE,   //object same type
@@ -512,28 +715,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
         ARRAY_ND_NUMERIC,   //nd_numeric
         ARRAY_ND_STRING,    //nd_string
         ARRAY_ND_LOGICAL};  //nd_logical     
-        
-        
-    
-    //Array processing
-    //------------------------------------------------------------
-    //Things to know:
-    //
-    //Is this array of the same type:
-    //  1 - numeric
-    //  2 - string
-    //  3 - logical
-    //  4 - object
-    //  5 - n-d numeric array
-    //  6 - n-d string array
-    //  7 - n-d logical array
-    //  8 - n-d object array  NYI
-    //
-    //Is this array the parent of same arrays?
-    //Is this array regular - all children are the same (recursively)
-    //Do the objects all have the same keys?    
-        
-    
         
     bool is_nd_array;
     int n_children;
@@ -544,15 +725,29 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     
     int cur_child_array_index2;
     int cur_child_data_index2;
+    int cur_process_index;
+    int cur_array_index;
+    
+    int n_object_keys;
     
     //TODO: Check that this won't ever be exceeded
     //TODO: Dynamically allocate this ...
     int child_size_stack[20];
+
+    
+    //This is the output that is getting populated in this function
+    uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
     
     uint8_t cur_child_array_type;
     for (int iArray = 0; iArray < n_arrays; iArray++){
         cur_process_index = process_order[iArray];
         cur_array_index = RETRIEVE_DATA_INDEX(cur_process_index);
+        
+        //We are redefining what array_depths means at this point
+        //since the memory isn't needed
+        //OLD: - how deep in the JSON structure, 1 => root, 2 => level below root
+        //NEW: 1 means the array holds raw data (numeric, string, logical)
+        //     2 means that the array holds arrays which hold raw data (i.e. 2d array)
         array_depths[cur_array_index] = 0;
         n_children = child_count_array[cur_array_index];
         if (n_children){
@@ -566,6 +761,53 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     //
                     //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
                     //  o1            o2            o3      <= objects are not the same cell array of structs
+                    
+                    
+                    //This is a work in progress ...
+                    
+                    
+                    
+                    
+                    //TODO: Check if n_children > 1 - if not, then short circuit
+                    
+                    //? How do we handle objects of objects 
+                    
+                    //Handle objects first ...? then do arrays later ...
+                    
+// // //                     child_count_object
+// // //                     next_sibling_index_object 
+// // //                     key_p
+// // //                     key_sizes
+// // //                     next_sibling_index_key
+// // //                      
+// // //                     cur_child_data_index = RETRIEVE_DATA_INDEX(cur_process_index+1);
+// // //                     n_object_keys = child_count_object[cur_child_data_index];        
+// // //                     
+// // //                     if (n_object_keys > MAX_NUMBER_KEYS_PER_OBJECT){
+// // //                         
+// // //                     }
+// // //                     
+// // //                     for (int iKey = 0; iKey < n_object_keys; iKey++){
+// // //                             mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");
+// // //                     }
+                    
+//                         int *object_key_sizes = mxMalloc(MAX_NUMBER_KEYS_PER_OBJECT*sizeof(int));
+//     unsigned char **object_key_pointers = mxMalloc(MAX_NUMBER_KEYS_PER_OBJECT*sizeof(unsigned char *));
+                    
+                    
+                            
+                    //For each object
+                    //---------------
+                    //- same # of keys
+                    //- same key sizes
+                    //- same keys
+                    //- if true, then how do we update the keys??????
+                            
+                    //Where to save info
+                    //- array of structs/struct arrays      mxArray ** => n_objects
+                    //
+                    //- indices into those struct arrays    
+                    //- index in the struct element         mxSetFieldByNumber (not mxSetField) 
                     
                     
                     //Are the objects the same ?????
@@ -603,6 +845,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
                             
                             //TODO: The order of these should be switched
+                            //i.e. we should assume that everything will match
                             if (child_size != child_count_array[cur_child_array_index] ||
                                     child_depth != array_depths[cur_child_array_index] ||
                                     cur_child_array_type != array_types[cur_child_array_index]){
@@ -622,9 +865,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                             }
                         }
                     }else{
-                        //Step 1:
-                        //Verify # of children, depth, and type
-
                         for (int iChild = 1; iChild < n_children; iChild++){
                             //TODO: Remove this two step process ... 
                             //TODO: Make all of these indices 0 based
@@ -641,15 +881,9 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                         }
                     }
                     
-                                        //Let's punt on this problem for now ...
-                    //-------------------------------------------------
-                    if (child_depth > 1){
-                        //Now we need to get the children
-                        
-                    }
-                    
                     if (is_nd_array){
                         array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
+                        //Bump up the dimension => e.g. 1d to 2d
                         array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
                     }
                     break;
@@ -674,12 +908,11 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
         }
     }
     
-    setStructField(plhs[0],cur_depth_index,"cur_depth_index",mxINT32_CLASS,n_depths); 
-    setStructField(plhs[0],process_order,"process_order",mxINT32_CLASS,n_arrays); 
+    mxFree(process_order);
     setStructField(plhs[0],array_types,"array_types",mxUINT8_CLASS,n_arrays);
     
-//     mxFree(process_order);
-//     mxFree(cur_depth_index);
+    TOC_AND_LOG(array_parse,array_parsing_time);
+    
 }
 
 //=========================================================================

@@ -363,6 +363,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //------------------
     TIC(start_pp);
     
+    populate_object_flags(json_string,plhs);
+    
     populate_array_flags(json_string,plhs);
     
     parse_numbers(json_string,plhs);

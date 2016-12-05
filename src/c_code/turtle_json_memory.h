@@ -25,8 +25,9 @@
 //-----------------   Object Memory Management ----------------------------
 #define INITIALIZE_OBJECT_DATA \
     int *child_count_object = mxMalloc(object_size_allocated * sizeof(int)); \
-    int *next_sibling_index_object = mxMalloc(object_size_allocated * sizeof(int));
-     
+    int *next_sibling_index_object = mxMalloc(object_size_allocated * sizeof(int)); \
+    uint8_t *object_depths = mxMalloc(object_size_allocated);   
+    
 #define INCREMENT_OBJECT_INDEX \
     ++current_object_index; \
     if (current_object_index > object_size_index_max){ \
@@ -35,12 +36,13 @@
         object_size_index_max = object_size_allocated - 1; \
         child_count_object = mxRealloc(child_count_object,object_size_allocated * sizeof(int)); \
         next_sibling_index_object = mxRealloc(next_sibling_index_object,object_size_allocated * sizeof(int)); \
+     	object_depths = mxRealloc(object_depths,object_size_allocated*sizeof(uint8_t)); \
     }
     
 #define TRUNCATE_OBJECT_DATA \
     child_count_object = mxRealloc(child_count_object,(current_object_index + 1) * sizeof(int)); \
-    next_sibling_index_object = mxRealloc(next_sibling_index_object,(current_object_index + 1) * sizeof(int));    
-    
+    next_sibling_index_object = mxRealloc(next_sibling_index_object,(current_object_index + 1) * sizeof(int)); \
+    object_depths = mxRealloc(object_depths,(current_object_index + 1)*sizeof(uint8_t));
     
 //-----------------  Array Memory Management  ------------------
 #define INITIALIZE_ARRAY_DATA \
