@@ -36,7 +36,6 @@
 #define ARRAY_ND_STRING 7
 #define ARRAY_ND_LOGICAL 8
 
-
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;

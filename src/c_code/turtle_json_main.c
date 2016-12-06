@@ -11,28 +11,11 @@
 //same = index at open equals index at close - n_items - requires logging 
 //logical indices
 
-// parent type - use pointers???
-
-//Memory that could be post processed
-//-----------------------------------
-//  Object
-//  - child_count_object - go to next sibling, is this a key?
-//          If so, then get their siblings and increment
-//
-//  Array
-//  - child count array - maybe, I need to think about this ...
-//      I think we can do a +/- depth and increment when the depth is 
-//      appropriate
-//  - array types
-
 
 
 //TODO: store initial allocation sizes, as well as n_reallocations
 
-
-
 //DEBUGGING
-#define ERROR_DEPTH goto S_ERROR_DEPTH;
 
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
@@ -862,12 +845,10 @@ S_PARSE_FALSE_IN_ARRAY:
 	//=============================================================
 S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
-
     if (!(CURRENT_CHAR == '\0')) {
         mexErrMsgIdAndTxt("turtle_json:invalid_end", 
                 "non-whitespace characters found after end of root token close");
     }
-
 	goto S_FINISH_GOOD;
 
 
@@ -885,6 +866,9 @@ S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("turtle_json:depth_exceeded", "Max depth was exceeded");
+
+S_ERROR_DEPTH:
+    mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");    
     
 S_ERROR_OPEN_OBJECT:
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "S_ERROR_OPEN_OBJECT");
@@ -915,17 +899,15 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
-S_ERROR_DEPTH:
-    mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");
+
     
 S_ERROR_DEBUG:
     mexErrMsgIdAndTxt("turtle_json:debug_error","Debug error");
- 
-//TODO: Write S_FINISH_BAD    
-    
+   
 S_FINISH_GOOD:
     
-    //This wasn't working for some reason, so we initialize earlier and "start" here    
+    //The normal TIC() approach was not working, so we iniitialize earlier
+    //and start the TIC here.
     //TIC(parsed_data_logging);
     START_TIC(parsed_data_logging);
     

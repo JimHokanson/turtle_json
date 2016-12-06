@@ -2,7 +2,11 @@
 
 #define N_PADDING 17
 
-
+//                      1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
+#define BUFFER_STRING "\0\\\"\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        
+//                            1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
+uint8_t BUFFER_STRING2[20] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 void *get_field(mxArray *plhs[],const char *fieldname){
     mxArray *temp = mxGetField(plhs[0],0,fieldname);
@@ -15,31 +19,55 @@ mwSize get_field_length(mxArray *plhs[],const char *fieldname){
 }
 
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
-
-    //TODO: This function is not complete
-    if (input_string_length >= N_PADDING){
-        //We need to look for the padding sequence.
+    //
+    //  Return whether or not the parse buffer is present/necessary. If
+    //  already present, it is not necessary.
+    //
+    //  This is for a string array or byte array input, where we don't 
+    //  know if it has been appropriately padded to prevent parsing
+    //  past the end of the string.
+    
+    int result;
+    
+    if (input_string_length >= N_PADDING){    
+        //mexPrintf("%s",BUFFER_STRING);
         
-        if (input_bytes[input_string_length-N_PADDING] == 0){
-            mexPrintf("Found padding");
+        //Why is this not working, write a for loop
+        result = memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
+        int temp;
+
+        for (int i = 0; i < N_PADDING; i++){
+            temp = BUFFER_STRING2[i];
+            mexPrintf("%d,%d\n",input_bytes[input_string_length-N_PADDING+i],temp);
         }
+        mexPrintf("%d\n",result);
+        return !memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
+    }else{
+        return true;
     }
-    
-    //     //TODO: I'm not thrilled with this being here and above
-//     json_string2[string_byte_length_value] = 0;
-//     json_string2[string_byte_length_value+1] = '\\';
-//     json_string2[string_byte_length_value+2] = '"';
-//     for (int i = 3; i < N_PADDING; i++){
-//         json_string2[string_byte_length_value + i] = 0;
-//     }
-    
-    return true;
-    
 }
 
 void add_parse_buffer(unsigned char *buffer, size_t array_length){
     //
-    //  TODO: Describe this and why we are doing this ...
+    //  Buffer is currently 17 characters of the form:
+    //  0\"000000...  <= 0 means null character, not zero
+    //
+    //  The " character
+    //  stops a potentially non-terminated string. The \ character
+    //  is a natural check anyways in our algorithm where we first find
+    //  a " character, and then backtrack. If we happen to find this 
+    //  last " character, and we backtrack and find the \ character, then
+    //  we need a special check, for the initial null character, to
+    //  differentiate this stop from a normally escaped " character.
+    //
+    //  i.e. differentiate:
+    //      ...test string\" is a good idea",           <= escaped "
+    //      vs
+    //      ...test string is not terminated0\"0000000  <= bad json string
+    //
+    //  The length of the buffer is to prevent search problems with SIMD
+    //  that process multiple characters at a time (i.e. we don't want to
+    //  parse past the end of the string)
     
     buffer[array_length] = 0;
     //On encountering a quote, we always need to look back.
@@ -53,32 +81,41 @@ void add_parse_buffer(unsigned char *buffer, size_t array_length){
     }
 }
 
-void process_input_string(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length){
+void process_input_string(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added){
     //
     //  The input string is raw JSON, which may or may not
     //  have the parsing buffer added.
     //
+    //
+    
     
     size_t input_string_length;
     size_t output_string_length;
     unsigned char *input_string;
     unsigned char *output_string;
     
+    //  TODO: It is not clear that these methods will respect UTF-8 encoding
+    //      => mxArrayToString_UTF8 - when was this deprecated?
+    //      => mxArrayToUTF8String  - 2015a
+    //      - see next TODO, we are likely better off rolling our own ...
+    //      - although for now, correct would be better than fast
+    //  TODO: If the buffer is not present here, we are doing a memory reallocation
+    //  anyway, so we might as well both transform the string and add the buffer
+    //  at the same time, rather than do two memory reallocations
     input_string = (unsigned char *) mxArrayToString(prhs[0]);
     input_string_length = mxGetNumberOfElements(prhs[0]);
     
     if (padding_is_necessary(input_string,input_string_length)){
+        *buffer_added = 1;
+        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string_length = input_string_length + N_PADDING;
         output_string = mxMalloc(output_string_length);
         memcpy(output_string,input_string,input_string_length);
         mxFree(input_string);
-//         mexPrintf("in len: %d\n",input_string_length);
-//         mexPrintf("First char: %c\n",output_string[0]);
-//         mexPrintf("2: %c\n",output_string[1]);
-//         mexPrintf("3: %c\n",output_string[2]);
-//         mexPrintf("4: %c\n",output_string[3]);
         add_parse_buffer(output_string, input_string_length);
     }else{
+        *buffer_added = 0;
+        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string = input_string;
         output_string_length = input_string_length;
     }
@@ -88,7 +125,7 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
     
 }
 
-void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length){
+void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added){
     //
     //  The first input (prhs[0] is a byte (uint8 or int8) array, which
     //  may or may not have the parsing buffer added.
@@ -103,12 +140,16 @@ void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, siz
     input_string_length = mxGetNumberOfElements(prhs[0]);
     
     if (padding_is_necessary(input_string,input_string_length)){
+        *buffer_added = 1;
+        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string_length = input_string_length + N_PADDING;
         output_string = mxMalloc(output_string_length);
         memcpy(output_string,input_string,input_string_length);
         mxFree(input_string);
         add_parse_buffer(output_string, input_string_length);
     }else{
+        *buffer_added = 0;
+        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string = input_string;
         output_string_length = input_string_length;
     }
@@ -118,13 +159,12 @@ void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, siz
 
 }
 
-
-
 void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
     
 	FILE *file;
     char *file_path;
 	size_t file_length;
+    size_t file_path_string_length;
     
     unsigned char *buffer;
 
@@ -137,8 +177,17 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
     #else
         if ((file = fopen(file_path, "rb")) == NULL) {
     #endif
-        mexErrMsgIdAndTxt("turtle_json:file_open","Unable to open file");
-    }
+            file_path_string_length = mxGetNumberOfElements(prhs[0]);
+            //TODO: This could be improved for printing long file paths
+            if (file_path_string_length > 100){
+                file_path[96] = '.';
+                file_path[97] = '.';
+                file_path[98] = '.';
+              	file_path[99] = '\0';
+            }
+            mexErrMsgIdAndTxt("turtle_json:file_open",
+            	"Unable to open file: %s\nIf a string, consider using json.stringToTokens or json.parse instead",file_path);
+        }
 	
 	//Get file length
 	fseek(file, 0, SEEK_END);
@@ -162,7 +211,7 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
     mxFree(file_path);
 }
         
-void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options){
+void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options, int *buffer_added){
     //
     //  The input JSON can be:
     //  1) Path to a file
@@ -183,9 +232,9 @@ void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_strin
      	if (!mxIsClass(prhs[0],"char")){
             mexErrMsgIdAndTxt("turtle_json:invalid_input","'raw_string' input needs to be a string");   
         }
-        process_input_string(prhs,json_string,string_byte_length);
+        process_input_string(prhs,json_string,string_byte_length,buffer_added);
     }else if (options->has_raw_bytes){
-        process_input_bytes(prhs,json_string,string_byte_length);
+        process_input_bytes(prhs,json_string,string_byte_length,buffer_added);
     }else{
         //file_path
         read_file_to_string(prhs,json_string,string_byte_length);
@@ -329,10 +378,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //-------------------------------------
     init_options(nrhs, prhs, &options);
     
-    get_json_string(nrhs, prhs, &json_string, &string_byte_length, &options);
+    int buffer_added;
+    get_json_string(nrhs, prhs, &json_string, &string_byte_length, &options, &buffer_added);
 
     //This needs to precede TOC_AND_LOG() since the logging touches plhs[0]
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+
+    setIntScalar(plhs[0],"buffer_added",buffer_added);
     
     TOC_AND_LOG(start_read,elapsed_read_time);
 
