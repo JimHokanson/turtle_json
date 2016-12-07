@@ -1,5 +1,8 @@
 #include "turtle_json.h"
 
+//  mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v -largeArrayDims
+
+
 #define N_PADDING 17
 
 //                      1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
@@ -7,6 +10,17 @@
         
 //                            1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
 uint8_t BUFFER_STRING2[20] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+//http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
+extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
+
+//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+mxArray *mxCreateReference(const mxArray *mx)
+{
+    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
+    ++my->RefCount;
+    return (mxArray *) mx;
+}
 
 void *get_field(mxArray *plhs[],const char *fieldname){
     mxArray *temp = mxGetField(plhs[0],0,fieldname);
@@ -30,17 +44,6 @@ bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length
     int result;
     
     if (input_string_length >= N_PADDING){    
-        //mexPrintf("%s",BUFFER_STRING);
-        
-        //Why is this not working, write a for loop
-        result = memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
-        int temp;
-
-        for (int i = 0; i < N_PADDING; i++){
-            temp = BUFFER_STRING2[i];
-            mexPrintf("%d,%d\n",input_bytes[input_string_length-N_PADDING+i],temp);
-        }
-        mexPrintf("%d\n",result);
         return !memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
     }else{
         return true;
@@ -107,7 +110,6 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
     
     if (padding_is_necessary(input_string,input_string_length)){
         *buffer_added = 1;
-        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string_length = input_string_length + N_PADDING;
         output_string = mxMalloc(output_string_length);
         memcpy(output_string,input_string,input_string_length);
@@ -115,17 +117,16 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
         add_parse_buffer(output_string, input_string_length);
     }else{
         *buffer_added = 0;
-        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string = input_string;
         output_string_length = input_string_length;
     }
     
     *json_string = output_string;
-    *json_string_length = output_string_length;
+    *json_string_length = output_string_length - N_PADDING;
     
 }
 
-void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added){
+void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added, int *is_input){
     //
     //  The first input (prhs[0] is a byte (uint8 or int8) array, which
     //  may or may not have the parsing buffer added.
@@ -141,21 +142,19 @@ void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, siz
     
     if (padding_is_necessary(input_string,input_string_length)){
         *buffer_added = 1;
-        mexPrintf("Buffer: %d\n",*buffer_added);
         output_string_length = input_string_length + N_PADDING;
         output_string = mxMalloc(output_string_length);
         memcpy(output_string,input_string,input_string_length);
-        mxFree(input_string);
         add_parse_buffer(output_string, input_string_length);
     }else{
         *buffer_added = 0;
-        mexPrintf("Buffer: %d\n",*buffer_added);
+        *is_input = 1;
         output_string = input_string;
         output_string_length = input_string_length;
     }
     
     *json_string = output_string;
-    *json_string_length = output_string_length;
+    *json_string_length = output_string_length - N_PADDING;
 
 }
 
@@ -211,7 +210,7 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
     mxFree(file_path);
 }
         
-void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options, int *buffer_added){
+void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options){
     //
     //  The input JSON can be:
     //  1) Path to a file
@@ -221,9 +220,11 @@ void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_strin
     mxArray *mxArrayTemp;
     unsigned char *raw_string;
     unsigned char *json_string2;
-    size_t string_byte_length_value;
+    int buffer_added = 0;
+    int is_input = 0;
     
     //TODO: Get rid of this, and just do the checks below ...
+    //TODO: Actually, I think we do the checks in the input options handling ...
     if (!(mxIsClass(prhs[0],"char") || options->has_raw_bytes)){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","First input needs to be a string or bytes");   
     }
@@ -232,14 +233,32 @@ void get_json_string(int nrhs, const mxArray *prhs[], unsigned char **json_strin
      	if (!mxIsClass(prhs[0],"char")){
             mexErrMsgIdAndTxt("turtle_json:invalid_input","'raw_string' input needs to be a string");   
         }
-        process_input_string(prhs,json_string,string_byte_length,buffer_added);
+        process_input_string(prhs,json_string,string_byte_length,&buffer_added);
     }else if (options->has_raw_bytes){
-        process_input_bytes(prhs,json_string,string_byte_length,buffer_added);
+        process_input_bytes(prhs,json_string,string_byte_length,&buffer_added,&is_input);
     }else{
         //file_path
         read_file_to_string(prhs,json_string,string_byte_length);
     }
-
+    
+    setIntScalar(plhs[0],"buffer_added",buffer_added);
+    
+	//Let's hold onto the string for the user. Technically it isn't needed
+    //once we exit this function, since all information is contained in
+    //the other variables.
+    //
+    //We subtract the length of the buffer so that the buffer is not 
+    //displayed to the user
+    
+    //http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
+    if (is_input){
+        mxAddField(plhs[0],"json_string");
+        mxSetField(plhs[0],0,"json_string",mxCreateSharedDataCopy(prhs[0]));
+        
+    }else{
+        setStructField(plhs[0],*json_string,"json_string",mxUINT8_CLASS,*string_byte_length);
+    }
+    
 }
 
 void init_options(int nrhs, const mxArray*prhs[],Options *options){
@@ -256,7 +275,6 @@ void init_options(int nrhs, const mxArray*prhs[],Options *options){
     //--------------------------
     options->has_raw_string = false;
     options->has_raw_bytes = false;
-    
     options->n_tokens = 0;
     options->n_keys = 0;
     options->n_strings = 0;
@@ -273,7 +291,7 @@ void init_options(int nrhs, const mxArray*prhs[],Options *options){
         
     mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
     if (mxArrayTemp != NULL){
-        //TODO: Should get that it is true ...
+        //TODO: Should check that the logical value is true ...
         if (mxIsClass(prhs[0],"char")){
             options->has_raw_string = true;
         }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
@@ -341,18 +359,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //  file_path
     //  raw_string
     //
+    //  Optional Inputs
+    //  ---------------
+    //
     //
     //  Outputs:
     //  --------
     //  token_info
     //      - see wrapping Matlab function
     
-    
-    
-    //The initialization isn't really needed but it silences a warning
-    //in the compiler - compiler not recognizing terminal errors in code
-    //so it thinks you can pass in an uninitialized value to the main function
-    
+        
     TIC(start_mex);
     
     size_t string_byte_length;
@@ -363,14 +379,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 
     mxLogical raw_is_padded;
     
-    TIC(start_read);
+    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
+    
     
     //# of inputs check  --------------------------------------------------
     if (!(nrhs == 1 || nrhs == 2)){
         mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
-    }
-    
-    if (!(nlhs == 1)){
+    }else if (!(nlhs == 1)){
         mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of outputs, 1 expected");
     }
     
@@ -378,38 +394,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //-------------------------------------
     init_options(nrhs, prhs, &options);
     
-    int buffer_added;
-    get_json_string(nrhs, prhs, &json_string, &string_byte_length, &options, &buffer_added);
-
-    //This needs to precede TOC_AND_LOG() since the logging touches plhs[0]
-    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
-
-    setIntScalar(plhs[0],"buffer_added",buffer_added);
-    
+    TIC(start_read);
+    get_json_string(plhs, nrhs, prhs, &json_string, &string_byte_length, &options);
     TOC_AND_LOG(start_read,elapsed_read_time);
-
-    //Let's hold onto the string for the user. Technically it isn't needed
-    //once we exit this function, since all information is contained in
-    //the other variables.
-    //
-    //We subtract the length of the buffer so that the buffer is not 
-    //displayed to the user
-    //
-    //TODO: I think this is only valid for string inputs, not for file inputs ...
-    setStructField(plhs[0],json_string,"json_string",mxUINT8_CLASS,string_byte_length-N_PADDING);
     
     //Token parsing
     //-------------
     TIC(start_parse);
-    
     parse_json(json_string, string_byte_length, plhs, &options);
-  
     TOC_AND_LOG(start_parse, elapsed_parse_time);
-      
-    
-    
-    
-    //mexPrintf("finished initial parse\n");
     
     //Post token parsing
     //------------------

@@ -14,16 +14,19 @@ t = json.fileToTokens(js);
 js = '["this is a test"]';
 js(end+1:end+17) = [0 '\"' zeros(1,14)];
 t = json.stringToTokens(js);
+%assert('t.
 %t.mex.buffer_added should be 0
 t = json.stringToTokens(uint8(js));
 
 %This doesn't work, perhaps the conversion function is poor
 js = '["this is a test"]';
 js(end+1:end+17) = [0 '\"' zeros(1,14)];
+
+%We're introducing a mismatch here ...
 js(end-5) = 'a'; 
-t = json.stringToTokens(js);
+tic; t = json.stringToTokens(js); toc;
 %t.mex.buffer_added should be 1
-t = json.stringToTokens(uint8(js));
+tic; t = json.stringToTokens(uint8(js)); toc;
 
 t = json.stringToTokens(js);
 

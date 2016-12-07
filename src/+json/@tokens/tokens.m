@@ -30,9 +30,7 @@ classdef tokens < handle
     %TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
     
     properties
-        file_string %string of the file as bytes (with end padding)
-        %TODO: truncate the end padding by shortening the length of the 
-        %mxArray
+        json_string %string of the file/string as bytes (without end padding)
         
         %Data entries per token
         %----------------------------------------------------------
@@ -142,7 +140,7 @@ classdef tokens < handle
             
             obj.mex = result;
             
-            obj.file_string = result.json_string;
+            obj.json_string = result.json_string;
             
             obj.types = result.types;
             obj.data_indices = result.d1;

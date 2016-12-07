@@ -47,7 +47,15 @@ typedef struct {
    int chars_per_token;
 } Options;
 
-
+//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+struct mxArray_Tag_Partial {
+    void *name_or_CrossLinkReverse;
+    mxClassID ClassID;
+    int VariableType;
+    mxArray *CrossLink;
+    size_t ndim;
+    unsigned int RefCount; /* Number of sub-elements identical to this one */
+};
 
 #define STORE_INDEX(x) \
     /* + 1 for Matlab indexing */ \
@@ -109,6 +117,8 @@ typedef struct {
 //void addParseBuffer(unsigned char **p_buffer, size_t array_length)
     
 //void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
+
+mxArray *mxCreateReference(const mxArray *mx);    
     
 void setIntScalar(mxArray *s, const char *fieldname, int value);    
     

@@ -11,21 +11,9 @@
 //
 //http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
 //--------------------------------------------------------------------------
-struct mxArray_Tag_Partial {
-    void *name_or_CrossLinkReverse;
-    mxClassID ClassID;
-    int VariableType;
-    mxArray *CrossLink;
-    size_t ndim;
-    unsigned int RefCount; /* Number of sub-elements identical to this one */
-};
 
-mxArray *mxCreateReference(const mxArray *mx)
-{
-    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
-    ++my->RefCount;
-    return (mxArray *) mx;
-}
+
+
 //-------------------------------------------------------------------------
 
 
