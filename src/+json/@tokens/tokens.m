@@ -98,7 +98,7 @@ classdef tokens < handle
         function value = get.parse_info(obj)
            value = obj.h_parsed_info;
            if isempty(value)
-              value = json.token_info.parsing_info(obj, obj.mex, obj.toc_total_time);
+              value = json.token_info.parsing_info(obj, obj.mex);
               obj.h_parsed_info = value;
            end
         end

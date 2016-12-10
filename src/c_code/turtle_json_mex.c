@@ -41,10 +41,8 @@ bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length
     //  know if it has been appropriately padded to prevent parsing
     //  past the end of the string.
     
-    int result;
-    
-    if (input_string_length >= N_PADDING){    
-        return !memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
+    if (input_string_length >= N_PADDING){ 
+        return memcmp(&input_bytes[input_string_length-N_PADDING],BUFFER_STRING2,N_PADDING);
     }else{
         return true;
     }
@@ -71,6 +69,8 @@ void add_parse_buffer(unsigned char *buffer, size_t array_length){
     //  The length of the buffer is to prevent search problems with SIMD
     //  that process multiple characters at a time (i.e. we don't want to
     //  parse past the end of the string)
+    
+    //TODO: Do a memcpy
     
     buffer[array_length] = 0;
     //On encountering a quote, we always need to look back.
@@ -150,14 +150,15 @@ void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, siz
         *buffer_added = 0;
         *is_input = 1;
         output_string = input_string;
-        output_string_length = input_string_length;
+        output_string_length = input_string_length ;
     }
     
     *json_string = output_string;
     *json_string_length = output_string_length - N_PADDING;
 
 }
-
+//=========================================================================
+//=========================================================================
 void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
     
 	FILE *file;
@@ -252,9 +253,10 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned 
     
     //http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
     if (is_input){
+        mxArrayTemp = mxCreateSharedDataCopy(prhs[0]);
+        mxSetN(mxArrayTemp,*string_byte_length);
         mxAddField(plhs[0],"json_string");
-        mxSetField(plhs[0],0,"json_string",mxCreateSharedDataCopy(prhs[0]));
-        
+        mxSetField(plhs[0],0,"json_string",mxArrayTemp);
     }else{
         setStructField(plhs[0],*json_string,"json_string",mxUINT8_CLASS,*string_byte_length);
     }
@@ -368,7 +370,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //  token_info
     //      - see wrapping Matlab function
     
-        
+    //I think it might be better to 
+    //make structures that hold info on each thing
+    //  - objects
+    //  - arrays
+    //  etc
+//     const char *fieldnames[] = {
+//         "buffer_added","json_string","allocation_info","timing_info",
+//         "types", "d1","child_count_object","next_sibling_index_object",
+//         "object_depths","n_objects_at_depth","object_ids","object_indices"}
+    
     TIC(start_mex);
     
     size_t string_byte_length;
@@ -380,9 +391,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     mxLogical raw_is_padded;
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
-    
-    
-    
+    mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);
+
     //# of inputs check  --------------------------------------------------
     if (!(nrhs == 1 || nrhs == 2)){
         mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
@@ -396,36 +406,37 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     
     TIC(start_read);
     get_json_string(plhs, nrhs, prhs, &json_string, &string_byte_length, &options);
-    TOC_AND_LOG(start_read,elapsed_read_time);
+    TOC(start_read,elapsed_read_time);
     
     //Token parsing
     //-------------
     TIC(start_parse);
-    parse_json(json_string, string_byte_length, plhs, &options);
-    TOC_AND_LOG(start_parse, elapsed_parse_time);
+    parse_json(json_string, string_byte_length, plhs, &options, timing_info);
+    TOC(start_parse, elapsed_parse_time);
     
     //Post token parsing
     //------------------
     TIC(start_pp);
     
+    TIC(object_parse);
     populate_object_flags(json_string,plhs);
+    TOC(object_parse,object_parsing_time);
     
+    parse_key_chars(json_string,plhs);
+    
+    TIC(array_parse);
     populate_array_flags(json_string,plhs);
+    TOC(array_parse,array_parsing_time);
     
+    TIC(number_parse);
     parse_numbers(json_string,plhs);
+    TOC(number_parse,number_parsing_time);
     
-    //keys
-    //parse_char_data(json_string,plhs, true);
-    
-    //strings
-    parse_char_data(json_string,plhs, false);
-    
-    //void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key)
-    
-    //parse_strings(json_string,plhs);
-    
-    TOC_AND_LOG(start_pp,elapsed_pp_time);
-    TOC_AND_LOG(start_mex,total_elapsed_time_mex);
+    parse_char_data(json_string,plhs,timing_info);
+        
+    TOC(start_pp,elapsed_pp_time);
+    TOC(start_mex,total_elapsed_time_mex);
 
+    ADD_STRUCT_FIELD(timing_info,timing_info);
 }
 

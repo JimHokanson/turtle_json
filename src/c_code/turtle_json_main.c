@@ -491,22 +491,14 @@ STRING_SEEK:
 //=========================================================================
 //=========================================================================
 //=========================================================================
-void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Options *options) {
+void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
+        Options *options, mxArray *timing_info) {
     
     //TODO: Check string_byte_length - can't be zero ...
     
     //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
-    
-    //Note, this occurs after we've opened an array
-    //or a comma. In the case of opening an array, we've already verified
-    //that we aren't closing right away. We can't put this here as
-    //it wouldn't be correct following a comma:
-    //[] ok
-    //["value",]
-    
-    
-    //TODO: Is this better as a 2d array?????
+
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [34]        = &&S_PARSE_STRING_IN_ARRAY,            // "
@@ -911,25 +903,26 @@ S_FINISH_GOOD:
     //TIC(parsed_data_logging);
     START_TIC(parsed_data_logging);
     
+    mxArray *allocation_info = mxCreateStructMatrix(1, 1, 0, 0);
+    
     //Meta data storage
     //--------------------
-    setIntScalar(plhs[0],"n_key_chars",n_key_chars);
-    setIntScalar(plhs[0],"n_string_chars",n_string_chars);
     //This information can be used to tell how efficient we were
     //relative to the allocation
-    setIntScalar(plhs[0],"n_tokens_allocated",data_size_allocated);
-    setIntScalar(plhs[0],"n_objects_allocated",object_size_allocated);
-    setIntScalar(plhs[0],"n_arrays_allocated",array_size_allocated);
-    setIntScalar(plhs[0],"n_keys_allocated",key_size_allocated);
-    setIntScalar(plhs[0],"n_strings_allocated",string_size_allocated);
-    setIntScalar(plhs[0],"n_numbers_allocated",numeric_size_allocated);
+    setIntScalar(allocation_info,"n_tokens_allocated",data_size_allocated);
+    setIntScalar(allocation_info,"n_objects_allocated",object_size_allocated);
+    setIntScalar(allocation_info,"n_arrays_allocated",array_size_allocated);
+    setIntScalar(allocation_info,"n_keys_allocated",key_size_allocated);
+    setIntScalar(allocation_info,"n_strings_allocated",string_size_allocated);
+    setIntScalar(allocation_info,"n_numbers_allocated",numeric_size_allocated);
     
-    setIntScalar(plhs[0],"n_data_allocations",n_data_allocations);
-    setIntScalar(plhs[0],"n_object_allocations",n_object_allocations);
-    setIntScalar(plhs[0],"n_array_allocations",n_array_allocations);
-    setIntScalar(plhs[0],"n_key_allocations",n_key_allocations);
-    setIntScalar(plhs[0],"n_string_allocations",n_string_allocations);
-    setIntScalar(plhs[0],"n_numeric_allocations",n_numeric_allocations);
+    setIntScalar(allocation_info,"n_data_allocations",n_data_allocations);
+    setIntScalar(allocation_info,"n_object_allocations",n_object_allocations);
+    setIntScalar(allocation_info,"n_array_allocations",n_array_allocations);
+    setIntScalar(allocation_info,"n_key_allocations",n_key_allocations);
+    setIntScalar(allocation_info,"n_string_allocations",n_string_allocations);
+    setIntScalar(allocation_info,"n_numeric_allocations",n_numeric_allocations);
+    ADD_STRUCT_FIELD(allocation_info,allocation_info);
     
     //------------------------    Main Data   -----------------------------
     setStructField(plhs[0],n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
@@ -963,7 +956,7 @@ S_FINISH_GOOD:
     //Internally it is just bytes (assuming sizeof is the same)
     setStructField(plhs[0],numeric_p,"numeric_p",mxDOUBLE_CLASS,current_numeric_index + 1);
 
-    TOC_AND_LOG(parsed_data_logging,parsed_data_logging_time);
+    TOC(parsed_data_logging,parsed_data_logging_time);
 
 	return;
     

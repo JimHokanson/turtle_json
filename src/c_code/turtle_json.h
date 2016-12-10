@@ -65,6 +65,10 @@ struct mxArray_Tag_Partial {
     /* -1 since we are undoing the Matlab indexing */ \
     d1[x]-1
 
+#define ADD_STRUCT_FIELD(name,pointer) \
+    mxAddField(plhs[0],#name); \
+    mxSetField(plhs[0],0,#name,pointer);
+            
 /*
  *
  *  Example Usage:
@@ -83,10 +87,10 @@ struct mxArray_Tag_Partial {
 //     clock_t x; \
 //     x = clock();
 //             
-//The toc_and_log() macro saves the timing to a field with the name 
+//The TOC() macro saves the timing to a field with the name 
 //specified by y
 //#y => y as a string, not as a value "stringification"
-// #define TOC_AND_LOG(x,y) \
+// #define TOC(x,y) \
 //     double *y = mxMalloc(sizeof(double)); \
 //     *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
 //     setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
@@ -106,11 +110,11 @@ struct mxArray_Tag_Partial {
     struct timeval x ## _1; \
     gettimeofday(&x##_0,NULL);
     
-#define TOC_AND_LOG(x,y) \
+#define TOC(x,y) \
     gettimeofday(&x##_1,NULL); \
     double *y = mxMalloc(sizeof(double)); \
     *y = (double)(x##_1.tv_sec - x##_0.tv_sec) + (double)(x##_1.tv_usec - x##_0.tv_usec)/1e6; \
-    setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);      
+    setStructField(timing_info,y,#y,mxDOUBLE_CLASS,1);      
     
     
     
@@ -120,6 +124,12 @@ struct mxArray_Tag_Partial {
 
 mxArray *mxCreateReference(const mxArray *mx);    
     
+//Main parsing
+//-------------------------------------------------------------------------
+void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options, mxArray *timing_info);
+
+//Helpers
+//-------------------------------------------------------------------------
 void setIntScalar(mxArray *s, const char *fieldname, int value);    
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
@@ -128,16 +138,15 @@ void *get_field(mxArray *plhs[],const char *fieldname);
 
 mwSize get_field_length(mxArray *plhs[],const char *fieldname);
 
+//Post-processing related
+//-------------------------------------------------------------------------
 void populate_object_flags(unsigned char *js,mxArray *plhs[]);
 
 void populate_array_flags(unsigned char *js,mxArray *plhs[]);
 
-void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key);
+void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info);
 
-//void parse_keys(unsigned char *js,mxArray *plhs[]);    
-    
-//void parse_strings(unsigned char *js,mxArray *plhs[]);
+void parse_key_chars(unsigned char *js,mxArray *plhs[]);
     
 void parse_numbers(unsigned char *js, mxArray *plhs[]);
 
-void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options);
