@@ -5,6 +5,8 @@
     mex CC='/usr/local/Cellar/gcc6/6.1.0/bin/gcc-6' CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" json_info_to_data.c
  */
 
+#define MAX_ARRAY_DIMS 10
+
 #define RETRIEVE_DATA_INDEX2(x)\
     data.d1[x]-1
 
@@ -12,6 +14,8 @@ typedef struct {
     uint8_t *types;
     int *d1;
 
+    mwSize *dims;
+    
     int *child_count_object;
     int *next_sibling_index_object;
     int *object_ids;
@@ -22,12 +26,26 @@ typedef struct {
     
     int *child_count_array;
     int *next_sibling_index_array;
-    uint8_t *array_types;;   
+    uint8_t *array_depths;
+    uint8_t *array_types; 
 
     mxArray *strings;
 
     double *numeric_data;    
 } Data;
+
+mxArray *parseArray(Data data, int md_index);
+
+//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+//--------------------------------------------------------------------------
+
+mxArray *mxCreateReference(const mxArray *mx)
+{
+    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
+    ++my->RefCount;
+    return (mxArray *) mx;
+}
+
 
 mxArray *getStruct(Data data, int object_data_index, int n_objects){
     //
@@ -55,22 +73,82 @@ mxArray *getStruct(Data data, int object_data_index, int n_objects){
     return return_obj;
 }
 
-void parseObject(Data data, mxArray *obj, int obj_index, int main_index){
+mxArray *getString(Data data,int md_index){
+	int temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
+	mxArray *temp_mxArray = mxGetCell(data.strings,temp_data_index);
+    return mxCreateReference(temp_mxArray);    
+}
+
+mxArray *getNumber(Data data,int md_index){
+    
+    int temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
+	mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+	double *numeric_data = mxGetData(temp_mxArray);
+	*numeric_data = data.numeric_data[temp_data_index];
+    
+    return temp_mxArray;
+}
+
+mxArray *getNull(Data data,int md_index){
+    
+    //TODO: Just increment a reference
+    int temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
+	mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+	double *numeric_data = mxGetData(temp_mxArray);
+	*numeric_data = mxGetNaN();
+    
+    return temp_mxArray;
+}
+
+mxArray *getTrue(Data data,int md_index){
+    
+    //TODO: Just increment a reference
+	mxArray *temp_mxArray = mxCreateLogicalMatrix(1,1);
+	bool *ldata = mxGetData(temp_mxArray);
+	*ldata = 1;
+    
+    return temp_mxArray;
+}
+
+mxArray *getFalse(Data data,int md_index){
+    //TODO: Just increment a reference
+    //Default value is false
+	return mxCreateLogicalMatrix(1,1);
+}
+
+void populateDims(Data data, int array_data_index, int md_index, int array_depth){
+
+    //TODO: We need to populate the dimensions in reverse
+    //Start with highest depth and go to 0
+    
+    int temp_data_index;
+    mwSize *dims = data.dims;
+    dims[0] = data.child_count_array[array_data_index];
+    for (int iDim = 1; iDim < array_depth; iDim++){
+        md_index++;
+        temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
+        dims[iDim] = data.child_count_array[temp_data_index];
+    }  
+    
+}
+
+
+void parseObject(Data data, mxArray *obj, int obj_index, int md_index){
     //
     //  Inputs
     //  ------
     //  s : the structure or structure array
     //  s_index : index in that structure
-    //  main_index: 
+    //  main_index: TODO: rename to md_index
     //TODO: Pass in a pointer to the object to populate and an index
     
-    int object_data_index = RETRIEVE_DATA_INDEX2(main_index);
+    int object_data_index = RETRIEVE_DATA_INDEX2(md_index);
     int n_keys = data.child_count_object[object_data_index];
     
     mxArray *temp_mxArray;
     int     temp_data_index;;
     
-    int cur_key_md_index = main_index + 1;
+    int cur_key_md_index = md_index + 1;
     int cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
     for (int iKey = 0; iKey < n_keys; iKey++){
         int cur_key_value_md_index = cur_key_md_index + 1;
@@ -83,36 +161,211 @@ void parseObject(Data data, mxArray *obj, int obj_index, int main_index){
                 //getStruct(data, object_data_index,1);
                 break;
             case TYPE_ARRAY:
+                mxSetFieldByNumber(obj,obj_index,iKey,
+              	parseArray(data,cur_key_value_md_index));
                 break;
             case TYPE_KEY:
                 mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
                 break;
             case TYPE_STRING:
+                mxSetFieldByNumber(obj,obj_index,iKey,getString(data,cur_key_value_md_index));
                 break;
             case TYPE_NUMBER:
-                temp_data_index = RETRIEVE_DATA_INDEX2(cur_key_value_md_index);
-                temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
-                double *numeric_data = mxGetData(temp_mxArray);
-                *numeric_data = data.numeric_data[temp_data_index];
-                mxSetFieldByNumber(obj,obj_index,iKey,temp_mxArray);
+                mxSetFieldByNumber(obj,obj_index,iKey,getNumber(data,cur_key_value_md_index));
                 break;
             case TYPE_NULL:
+             	mxSetFieldByNumber(obj,obj_index,iKey,getNull(data,cur_key_value_md_index));
                 break;
             case TYPE_TRUE:
+                mxSetFieldByNumber(obj,obj_index,iKey,getTrue(data,cur_key_value_md_index));
                 break;
             case TYPE_FALSE:
+                mxSetFieldByNumber(obj,obj_index,iKey,getFalse(data,cur_key_value_md_index));
                 break;
         }
         cur_key_md_index = data.next_sibling_index_key[cur_key_data_index]-1;
         cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
     }
-    
-    //Object
-    //------
 }
 
-mxArray *parseArray(Data data, int index){
-    mexPrintf("Parsing an array\n");
+mxArray *parseArray(Data data, int md_index){
+    
+    int cur_array_data_index = RETRIEVE_DATA_INDEX2(md_index);
+    
+//         int *child_count_array;
+//     int *next_sibling_index_array;
+//     uint8_t *array_types; 
+
+// #define ARRAY_OTHER_TYPE   0
+// #define ARRAY_NUMERIC_TYPE 1
+// #define ARRAY_STRING_TYPE  2
+// #define ARRAY_LOGICAL_TYPE 3
+// #define ARRAY_OBJECT_SAME_TYPE  4
+// #define ARRAY_OBJECT_DIFF_TYPE 5
+// #define ARRAY_ND_NUMERIC 6
+// #define ARRAY_ND_STRING 7
+// #define ARRAY_ND_LOGICAL 8
+    
+    int temp_count;
+    int temp_data_index;
+    int temp_md_index;
+    int temp_array_depth;
+    mwSize *dims;
+    double *temp_value;
+    mxArray *output;
+    mxArray *temp_obj;
+    
+    switch (data.array_types[cur_array_data_index]){
+        case ARRAY_OTHER_TYPE:
+            //This is the "messiest" option of all.
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = mxCreateCellMatrix(1,temp_count);
+        
+            temp_md_index = md_index + 1;    
+            for (int iData = 0; iData < temp_count; iData++){
+                switch (data.types[md_index]){
+                    case TYPE_OBJECT:
+                        temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+                        temp_obj = getStruct(data,temp_data_index,1);
+                        parseObject(data, temp_obj, 0, temp_md_index);
+                        mxSetCell(output,iData,temp_obj);
+                        temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+                        break;
+                    case TYPE_ARRAY:
+                        temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+                        mxSetCell(output,iData,parseArray(data,temp_md_index));
+                        temp_md_index = data.next_sibling_index_array[temp_data_index]-1;
+                        break;
+                    case TYPE_KEY:
+                      	mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
+                        break;
+                    case TYPE_STRING:
+                        mxSetCell(output,iData,getString(data,temp_md_index));
+                        temp_md_index++;
+                        break;
+                    case TYPE_NUMBER:
+                        mxSetCell(output,iData,getNumber(data,temp_md_index));
+                        temp_md_index++;
+                        break;
+                    case TYPE_NULL:
+                        mxSetCell(output,iData,getNull(data,temp_md_index));
+                        temp_md_index++;
+                        break;
+                    case TYPE_TRUE:
+                        mxSetCell(output,iData,getTrue(data,temp_md_index));
+                        temp_md_index++;
+                        break;
+                    case TYPE_FALSE:
+                        mxSetCell(output,iData,getFalse(data,temp_md_index));
+                        temp_md_index++;
+                        break;
+                }
+            }
+            break;
+        case ARRAY_NUMERIC_TYPE:
+            //
+            //  In this case, we have an array of numbers => [1,2,3,4]
+            temp_count = data.child_count_array[cur_array_data_index];
+            
+            temp_md_index = md_index + 1;
+            temp_data_index = RETRIEVE_DATA_INDEX2(md_index+1);
+            
+            output = mxCreateNumericMatrix(1,0,mxDOUBLE_CLASS,0);
+            temp_value = mxMalloc(temp_count*sizeof(double));
+            memcpy(temp_value,&data.numeric_data[temp_data_index],temp_count*sizeof(double));
+            mxSetData(output,temp_value);
+            mxSetN(output,temp_count);
+            break;
+        case ARRAY_STRING_TYPE:
+            //
+            //  This is a cell array of strings => {'as','df','cheese'}
+            //
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = mxCreateCellMatrix(1,temp_count);
+            temp_md_index = md_index + 1;    
+            for (int iData = 0; iData < temp_count; iData++){
+                mxSetCell(output,iData,getString(data,temp_md_index));
+                temp_md_index++;
+            }
+            break;
+        case ARRAY_LOGICAL_TYPE:
+            output = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+            temp_value = mxGetData(output);
+            *temp_value = 4;
+            break;
+        case ARRAY_OBJECT_SAME_TYPE:
+            temp_md_index = md_index + 1;
+            temp_data_index = RETRIEVE_DATA_INDEX2(md_index+1);
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = getStruct(data,temp_data_index,temp_count);
+            for (int iObj = 0; iObj < temp_count; iObj++){
+                parseObject(data,output,iObj,temp_md_index);                
+                temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+                temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+            }
+            break;
+        case ARRAY_OBJECT_DIFF_TYPE:
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = mxCreateCellMatrix(1,temp_count);
+            temp_md_index = md_index + 1;    
+            for (int iData = 0; iData < temp_count; iData++){
+                temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+                temp_obj = getStruct(data,temp_data_index,1);
+                parseObject(data, temp_obj, 0, temp_md_index);
+                mxSetCell(output,iData,temp_obj);
+                temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+            }
+            break;
+        case ARRAY_ND_NUMERIC:
+            temp_array_depth = data.array_depths[cur_array_data_index];
+//             mexPrintf("CA: %d\n",cur_array_data_index);
+//             mexPrintf("Depth: %d\n",temp_array_depth);
+            if (temp_array_depth > MAX_ARRAY_DIMS){
+            	mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+            }
+            
+            //-1 for Matlab to C
+            //-1 for previous value before the next sibling
+            temp_md_index = data.next_sibling_index_array[cur_array_data_index]-2;
+            
+            //We have nested arrays
+            //  [  [  [   #
+            //  0  1  2   3   <= indices past md_index
+            //                Note, the depth is also 3
+            
+            temp_count = data.d1[temp_md_index] - data.d1[md_index + temp_array_depth] + 1;
+            
+//             mexPrintf("temp_md_index: %d\n",temp_md_index);
+//             mexPrintf("data.d1: %d\n",data.d1[md_index + temp_array_depth]);
+//             mexPrintf("data.d2: %d\n",data.d1[temp_md_index]);
+//             mexPrintf("Count: %d\n",temp_count);
+//             mexErrMsgIdAndTxt("turtle_json:wtf","The maximum was exceeded");
+
+            temp_value = mxMalloc(temp_count*sizeof(double));
+            
+            temp_data_index = RETRIEVE_DATA_INDEX2((md_index + temp_array_depth));
+            
+            memcpy(temp_value,&data.numeric_data[temp_data_index],temp_count*sizeof(double));
+            
+            populateDims(data,cur_array_data_index,md_index,temp_array_depth);
+            
+            output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
+            mxSetData(output,temp_value);
+            mxSetDimensions(output,data.dims,temp_array_depth);
+            break;
+        case ARRAY_ND_STRING:
+            output = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+            temp_value = mxGetData(output);
+            *temp_value = 7;
+            break;
+        case ARRAY_ND_LOGICAL:
+            output = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+            temp_value = mxGetData(output);
+            *temp_value = 8;
+            break;
+        
+    }  
+    return output;
 }
 
 uint8_t *getU8Field(const mxArray *s,const char *fieldname){
@@ -165,9 +418,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     data.child_count_array = getIntField(s,"child_count_array");
     data.next_sibling_index_array = getIntField(s,"next_sibling_index_array");
     data.array_types = getU8Field(s,"array_types");
+    data.array_depths = getU8Field(s,"array_depths");
     
     //String Data --------------------------
     data.strings = getMXField(s,"strings");
+    
+    data.dims = mxMalloc(MAX_ARRAY_DIMS*sizeof(mwSize));
     
     //Numeric Data -------------------------
     data.numeric_data = (double *)mxGetData(mxGetField(s,0,"numeric_p"));
