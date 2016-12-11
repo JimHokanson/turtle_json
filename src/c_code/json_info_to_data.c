@@ -140,10 +140,20 @@ void parseObject(Data data, mxArray *obj, int obj_index, int md_index){
     //  s : the structure or structure array
     //  s_index : index in that structure
     //  main_index: TODO: rename to md_index
-    //TODO: Pass in a pointer to the object to populate and an index
+    //
+    //  TODO: A lot of these variables need to be renamed
     
     int object_data_index = RETRIEVE_DATA_INDEX2(md_index);
     int n_keys = data.child_count_object[object_data_index];
+    
+//     mexPrintf("object_data_index: %d\n",object_data_index);
+//     
+//     if (data.types[md_index] != TYPE_OBJECT){
+//         mexPrintf("BAD =====\n");
+//         mexPrintf("Type: %d\n",data.types[md_index]);
+//         mexPrintf("Cur obj md_index: %d\n",md_index);
+//         mexErrMsgIdAndTxt("turtle_json:code_error","Bad md_index, doesn't point to object");
+//     }
     
     mxArray *temp_mxArray;
     int     temp_data_index;;
@@ -151,6 +161,7 @@ void parseObject(Data data, mxArray *obj, int obj_index, int md_index){
     int cur_key_md_index = md_index + 1;
     int cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
     for (int iKey = 0; iKey < n_keys; iKey++){
+// //         mexPrintf("Cur Key 2: %d\n",iKey);
         int cur_key_value_md_index = cur_key_md_index + 1;
         switch (data.types[cur_key_value_md_index]){
             case TYPE_OBJECT:
@@ -162,9 +173,15 @@ void parseObject(Data data, mxArray *obj, int obj_index, int md_index){
                 break;
             case TYPE_ARRAY:
                 mxSetFieldByNumber(obj,obj_index,iKey,
-              	parseArray(data,cur_key_value_md_index));
+                    parseArray(data,cur_key_value_md_index));
                 break;
             case TYPE_KEY:
+//                 mexPrintf("object_data_index: %d\n",object_data_index);
+//                 mexPrintf("obj_index (struct array index): %d\n",obj_index);
+//                 mexPrintf("Cur field name: %s\n",mxGetFieldNameByNumber(obj,iKey));
+//                 mexPrintf("Cur obj md_index: %d\n",md_index);
+//                 mexPrintf("Cur Key: %d\n",iKey);
+//                 mexPrintf("Cur_key_md_index: %d\n",cur_key_md_index);
                 mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
                 break;
             case TYPE_STRING:
@@ -221,9 +238,10 @@ mxArray *parseArray(Data data, int md_index){
             temp_count = data.child_count_array[cur_array_data_index];
             output = mxCreateCellMatrix(1,temp_count);
         
+            //mexPrintf("Running array other type\n");
             temp_md_index = md_index + 1;    
             for (int iData = 0; iData < temp_count; iData++){
-                switch (data.types[md_index]){
+                switch (data.types[temp_md_index]){
                     case TYPE_OBJECT:
                         temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
                         temp_obj = getStruct(data,temp_data_index,1);
@@ -299,7 +317,12 @@ mxArray *parseArray(Data data, int md_index){
             temp_count = data.child_count_array[cur_array_data_index];
             output = getStruct(data,temp_data_index,temp_count);
             for (int iObj = 0; iObj < temp_count; iObj++){
-                parseObject(data,output,iObj,temp_md_index);                
+//                 mexPrintf("iObj: %d\n",iObj);
+//                 mexPrintf("md_index: %d\n",temp_md_index);
+                
+                parseObject(data, output, iObj, temp_md_index); 
+                
+//                 mexPrintf("done\n");
                 temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
                 temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
             }

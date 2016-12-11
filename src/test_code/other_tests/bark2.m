@@ -7,7 +7,7 @@ for i = 1:N
     jt = json.tokens(file_path,'n_tokens',15000005,'n_keys',6000002,...
         'n_strings',1000001,'n_numbers',4000000);
 	%jt = json.tokens(file_path,'chars_per_token',10);
-    d1_all(i) = jt.parse_info.non_read_time;
+    d1_all(i) = jt.parse_info.timing_info.non_read_time;
     %sobj = jt.get_parsed_data();
 end
 
