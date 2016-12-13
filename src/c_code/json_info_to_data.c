@@ -420,6 +420,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //
     //  Inputs
     //  ------
+    //  mex_struct : output structure from turtle_json
     
     //
     
