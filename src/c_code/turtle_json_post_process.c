@@ -433,18 +433,13 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
     //
     //  The names have been made generic to accomodate both arrays and objects.
     //
-    //
     //  Output
     //  ------
     //  process_order : array
     //       - order in which to process array objects, from the 0th index
     //       to the end of the array
-    //       - indices are main_data_index values (not indices to the 
-    //       array or object specific arrays
-    //
-    //
-    //  See Also
-    //  ----------
+    //       - indices are md_index values (not indices to the 
+    //       array or object specific arrays)
     
     //TODO: We could do both arrays and objects at the same time ...
     
@@ -463,7 +458,7 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
     //
     //   0 1 2 3 4 5 6 7
     //  [x x   x     x  ]  <- x denotes first index for that depth
-    //   1 2   3     2    
+    //   1 2   3     2     <- n values at depth
     //
     //  Now if we populate an array, with each of these starting locations
     //  and process the array in order, we'll go continuously in depth
@@ -511,6 +506,8 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     //
     //  For each object, identify which "unique" object it belongs to and
     //  which index it has in that object.
+    //
+    //  TODO: Indices aren't needed
     //
     //  Populates
     //  ---------
@@ -566,6 +563,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     }
     setIntScalar(plhs[0],"max_keys_in_object",max_children);
 
+    //TODO: Make object id start at 0, not 1
     int object_id = 0;
     int id_index = 0;
     
@@ -578,6 +576,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     int *object_indices = mxMalloc(n_objects*sizeof(int));
     
     //TODO: Improve this (use %?, min? max?)
+    //i.e. this value is a guess ...
     int n_unique_allocated = 10;
     
     int *unique_object_first_data_indices = mxMalloc(n_unique_allocated*sizeof(int));
@@ -606,7 +605,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
         //-----------------------------------------------------------------
         // - other objects will be compared to this object
         cur_process_index = process_order[cur_object_iter];
-        cur_object_index  = RETRIEVE_DATA_INDEX(cur_process_index);
+        cur_object_index  = RETRIEVE_MD_INDEX(cur_process_index);
         n_keys_current_object = child_count_object[cur_object_index];
         
         object_ids[cur_object_index] = ++object_id;
@@ -628,16 +627,14 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
         
         //Store key information for comparison to other objects ...
         //-----------------------------------------------------------------
-        cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+        cur_key_index = RETRIEVE_MD_INDEX((cur_process_index + 1));
         for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
             object_key_sizes[iKey] = key_sizes[cur_key_index];
             object_key_pointers[iKey] = key_p[cur_key_index];
             
             //TODO: Remove this two step process ...
-            //TODO: Make all of these indices 0 based
-            //-1 is for matlab to c conversion :/
-            temp_key_index = next_sibling_index_key[cur_key_index]-1;
-            cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+            temp_key_index = next_sibling_index_key[cur_key_index];
+            cur_key_index = RETRIEVE_MD_INDEX(temp_key_index);
         }
         
         //Loop through the other objects and compare
@@ -651,35 +648,35 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
             }
             
             cur_process_index = process_order[cur_object_iter];
-            cur_object_index  = RETRIEVE_DATA_INDEX(cur_process_index);
+            cur_object_index  = RETRIEVE_MD_INDEX(cur_process_index);
             
             if (n_keys_current_object == child_count_object[cur_object_index]){
                 
                 //Here we check if the keys are the same length
                 //---------------------------------------------------------
-                cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+                cur_key_index = RETRIEVE_MD_INDEX((cur_process_index + 1));
                 for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
                     if (object_key_sizes[iKey] != key_sizes[cur_key_index]){
                         diff_object = true;
                         break;
                     }
                     //Again, make this one step ...
-                    temp_key_index = next_sibling_index_key[cur_key_index]-1;
-                    cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+                    temp_key_index = next_sibling_index_key[cur_key_index];
+                    cur_key_index = RETRIEVE_MD_INDEX(temp_key_index);
                 }    
                 
                 //Here we check if the key values are the same
                 //---------------------------------------------------------
                 if (!diff_object){
-                    cur_key_index = RETRIEVE_DATA_INDEX((cur_process_index + 1));
+                    cur_key_index = RETRIEVE_MD_INDEX((cur_process_index + 1));
                     for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
                         if (!same_keys(object_key_pointers[iKey],key_p[cur_key_index],object_key_sizes[iKey])){
                             diff_object = true;
                             break;
                         };
                         //Again, make this one step ...
-                        temp_key_index = next_sibling_index_key[cur_key_index]-1;
-                        cur_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+                        temp_key_index = next_sibling_index_key[cur_key_index];
+                        cur_key_index = RETRIEVE_MD_INDEX(temp_key_index);
                     }  
                 }
                 
@@ -821,7 +818,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     uint8_t cur_child_array_type;
     for (int iArray = 0; iArray < n_arrays; iArray++){
         cur_process_index = process_order[iArray];
-        cur_array_index = RETRIEVE_DATA_INDEX(cur_process_index);
+        cur_array_index = RETRIEVE_MD_INDEX(cur_process_index);
         
         //We are redefining what array_depths means at this point
         //since the memory isn't needed
@@ -842,7 +839,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
                     //  o1            o2            o3      <= objects are not the same cell array of structs
                     
-                    cur_object_index = RETRIEVE_DATA_INDEX((cur_process_index+1));
+                    cur_object_index = RETRIEVE_MD_INDEX((cur_process_index+1));
                     reference_object_id = object_ids[cur_object_index];
                     
                     //We need to check 2 things:
@@ -850,9 +847,9 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     //2 - is the object of the same type?
                     object_array_type = ARRAY_OBJECT_SAME_TYPE;
                     for (int iChild = 1; iChild < n_children; iChild++){
-                        cur_md_index = next_sibling_index_object[cur_object_index]-1;
+                        cur_md_index = next_sibling_index_object[cur_object_index];
                         if (types[cur_md_index] == TYPE_OBJECT){
-                            cur_object_index = RETRIEVE_DATA_INDEX(cur_md_index);
+                            cur_object_index = RETRIEVE_MD_INDEX(cur_md_index);
                             if (reference_object_id != object_ids[cur_object_index]){
                                 object_array_type = ARRAY_OBJECT_DIFF_TYPE;
                             }
@@ -902,7 +899,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                                 break;
                             }
                                     
-                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+                            cur_child_array_index = RETRIEVE_MD_INDEX(cur_child_data_index);
                             
                             //TODO: The order of these should be switched
                             //i.e. we should assume that everything will match
@@ -937,7 +934,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                                 break;
                             }
                             
-                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+                            cur_child_array_index = RETRIEVE_MD_INDEX(cur_child_data_index);
 
                             if (child_size != child_count_array[cur_child_array_index] || 
                                     child_depth != array_depths[cur_child_array_index] ||
@@ -1023,12 +1020,12 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
     int n_keys_in_object;
     for (int iObj = 0; iObj < *n_unique_objects; iObj++){        
         cur_object_data_index = unique_object_first_data_indices[iObj];
-        cur_object_object_index = RETRIEVE_DATA_INDEX(cur_object_data_index); 
+        cur_object_object_index = RETRIEVE_MD_INDEX(cur_object_data_index); 
         
         n_keys_in_object = child_count_object[cur_object_object_index];
 
         cur_key_data_index = cur_object_data_index + 1;
-        cur_key_key_index = RETRIEVE_DATA_INDEX(cur_key_data_index);
+        cur_key_key_index = RETRIEVE_MD_INDEX(cur_key_data_index);
                 
         for (int iKey = 0; iKey < n_keys_in_object; iKey++){
             cur_key_p = key_p[cur_key_key_index];
@@ -1040,9 +1037,7 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
             
             fieldnames[iKey] = cur_key_p;
             
-            //-1 is a Matlab to C conversion :/
-            temp_key_index = next_sibling_index_key[cur_key_key_index]-1;
-            cur_key_key_index = RETRIEVE_DATA_INDEX(temp_key_index);
+            cur_key_key_index = NEXT_KEY__KEY_INDEX(cur_key_key_index);
         }
         
         //We'll initialize as empty here, because we don't get much of 
@@ -1330,4 +1325,28 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     TOC(string_parse,string_parsing_time);
     ADD_STRUCT_FIELD(strings,cell_array);
 
+}
+
+void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_info){
+    
+    TIC(start_pp);
+    
+    TIC(object_parse);
+    populate_object_flags(json_string,plhs);
+    TOC(object_parse,object_parsing_time);
+    
+    parse_key_chars(json_string,plhs);
+    
+    TIC(array_parse);
+    populate_array_flags(json_string,plhs);
+    TOC(array_parse,array_parsing_time);
+    
+    TIC(number_parse);
+    parse_numbers(json_string,plhs);
+    TOC(number_parse,number_parsing_time);
+    
+    parse_char_data(json_string,plhs,timing_info);
+        
+    TOC(start_pp,elapsed_pp_time);  
+    
 }

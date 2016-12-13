@@ -1,7 +1,8 @@
 #include "turtle_json.h"
 
-//  mex CFLAGS="$CFLAGS -std=c11 -fopenmp -mavx" LDFLAGS="$LDFLAGS -fopenmp" COPTIMFLAGS="-O3 -DNDEBUG" turtle_json_mex.c turtle_json_main.c turtle_json_post_process.c -O -v -largeArrayDims
+/*
 
+*/
 
 #define N_PADDING 17
 
@@ -10,27 +11,6 @@
         
 //                            1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
 uint8_t BUFFER_STRING2[20] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
-//http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
-extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
-
-//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
-mxArray *mxCreateReference(const mxArray *mx)
-{
-    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
-    ++my->RefCount;
-    return (mxArray *) mx;
-}
-
-void *get_field(mxArray *plhs[],const char *fieldname){
-    mxArray *temp = mxGetField(plhs[0],0,fieldname);
-    return mxGetData(temp);
-}
-
-mwSize get_field_length(mxArray *plhs[],const char *fieldname){
-    mxArray *temp = mxGetField(plhs[0],0,fieldname);
-    return mxGetN(temp);
-}
 
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
     //
@@ -415,26 +395,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     TOC(start_parse, elapsed_parse_time);
     
     //Post token parsing
-    //------------------
-    TIC(start_pp);
+    post_process(json_string, plhs, timing_info);
     
-    TIC(object_parse);
-    populate_object_flags(json_string,plhs);
-    TOC(object_parse,object_parsing_time);
-    
-    parse_key_chars(json_string,plhs);
-    
-    TIC(array_parse);
-    populate_array_flags(json_string,plhs);
-    TOC(array_parse,array_parsing_time);
-    
-    TIC(number_parse);
-    parse_numbers(json_string,plhs);
-    TOC(number_parse,number_parsing_time);
-    
-    parse_char_data(json_string,plhs,timing_info);
-        
-    TOC(start_pp,elapsed_pp_time);
     TOC(start_mex,total_elapsed_time_mex);
 
     ADD_STRUCT_FIELD(timing_info,timing_info);

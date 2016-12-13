@@ -7,7 +7,7 @@
     uint8_t *types = mxMalloc(data_size_allocated); \
     int *d1 = mxMalloc(data_size_allocated * sizeof(int)); 
 
-#define INCREMENT_DATA_INDEX \
+#define INCREMENT_MD_INDEX \
     ++current_data_index; \
 	if (current_data_index > data_size_index_max){ \
         ++n_data_allocations; \

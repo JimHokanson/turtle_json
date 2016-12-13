@@ -8,14 +8,6 @@
  *
  */
 
-//same = index at open equals index at close - n_items - requires logging 
-//logical indices
-
-
-
-//TODO: store initial allocation sizes, as well as n_reallocations
-
-//DEBUGGING
 
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
@@ -30,12 +22,10 @@
 //      3) navigation to the next state
 //        
     
-
 //===================  Index functions  ===================================
 
 
 //===================    Opening    [ { :    ==============================
-
 #define INCREMENT_PARENT_SIZE \
     parent_sizes[current_depth] += 1
 
@@ -50,15 +40,7 @@
         parent_types[current_depth] = x; \
         parent_indices[current_depth] = current_data_index; \
         parent_sizes[current_depth] = 0;
-        
-#define LOG_ARRAY_DEPTH \
-        array_depths[current_array_index] = current_depth; \
-        n_arrays_at_depth[current_depth] += 1;
-        
-#define LOG_OBJECT_DEPTH \
-        object_depths[current_object_index] = current_depth; \
-        n_objects_at_depth[current_depth] += 1;          
- 
+
 //TODO: Including a separate definition for key may give worse performance ...
 //key does not care about size, size = 1
 #define INITIALIZE_PARENT_INFO_KEY(x) \
@@ -67,45 +49,48 @@
             goto S_ERROR_DEPTH_EXCEEDED; \
         }\
         parent_types[current_depth] = x; \
-        parent_indices[current_depth] = current_data_index;
-
+        parent_indices[current_depth] = current_data_index;        
         
-//========================      Closing     ===============================
+#define LOG_ARRAY_DEPTH \
+        array_depths[current_array_index] = current_depth; \
+        n_arrays_at_depth[current_depth] += 1;
+        
+#define LOG_OBJECT_DEPTH \
+        object_depths[current_object_index] = current_depth; \
+        n_objects_at_depth[current_depth] += 1;          
     
+//========================      Closing     ===============================
 #define RETRIEVE_CURRENT_PARENT_INDEX \
     current_parent_data_index = parent_indices[current_depth];
     
-//Origin of -1
-//------------------
-// d1 is 1 based, but we are in C, so we need to index based on being 0 based
-// so we subtract 1
-//  This can be seen in the other calls below with d1 and -1
-//
-//Origin of +2
-//------------------
-//+1 to next element
-//+1 for Matlab 1 based indexing
+//Origin of +1 => points to element after current index
+//TODO: We might want to redefine the sibling index to point to 
+//The next value at the same level -> i.e. instead of current_data_index
+// use something like cur_key_index, etc.
+// - I think this redefinition might be most useful for keys
+// - probably needs to stay this way for arrays
 #define STORE_NEXT_SIBLING_OF_OBJECT \
-    next_sibling_index_object[d1[current_parent_data_index]-1] = current_data_index + 2;
+    next_sibling_index_object[d1[current_parent_data_index]] = current_data_index + 1;
 
 #define STORE_NEXT_SIBLING_OF_ARRAY \
-    next_sibling_index_array[d1[current_parent_data_index]-1] = current_data_index + 2;
-        
+    next_sibling_index_array[d1[current_parent_data_index]] = current_data_index + 1;
+ 
+#define STORE_NEXT_SIBLING_KEY_COMPLEX \
+    next_sibling_index_key[d1[current_parent_data_index]] = current_data_index + 1;
+    
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
 //Note that we're working with the current_data_index since we haven't
 //advanced it yet and don't need to rely on a parent index (which hasn't even
 //been set since the value is simple)
-    
 #define STORE_NEXT_SIBLING_KEY_SIMPLE \
-    next_sibling_index_key[current_key_index] = current_data_index + 3;
-
-#define STORE_NEXT_SIBLING_KEY_COMPLEX \
-    next_sibling_index_key[d1[current_parent_data_index]-1] = current_data_index + 2;
-                  
-#define STORE_SIZE_OBJECT child_count_object[d1[current_parent_data_index]-1] = parent_sizes[current_depth];
+    next_sibling_index_key[current_key_index] = current_data_index + 2;
+   
+#define STORE_SIZE_OBJECT \
+    child_count_object[d1[current_parent_data_index]] = parent_sizes[current_depth];
     
-#define STORE_SIZE_ARRAY child_count_array[d1[current_parent_data_index]-1] = parent_sizes[current_depth];    
+#define STORE_SIZE_ARRAY \
+    child_count_array[d1[current_parent_data_index]] = parent_sizes[current_depth];    
         
 #define MOVE_UP_PARENT_INDEX --current_depth;
 
@@ -117,76 +102,73 @@
 //=================          Processing      ==============================
 //=========================================================================
 #define PROCESS_OPENING_OBJECT \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     INCREMENT_OBJECT_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
-    STORE_INDEX(current_object_index); \
+    STORE_MD_INDEX(current_object_index); \
     INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT); \
     LOG_OBJECT_DEPTH;
     
 #define PROCESS_OPENING_ARRAY \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     INCREMENT_ARRAY_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
-    STORE_INDEX(current_array_index); \
+    STORE_MD_INDEX(current_array_index); \
     INITIALIZE_PARENT_INFO_OA(TYPE_ARRAY); \
     LOG_ARRAY_DEPTH;        
 
 #define PROCESS_STRING \
     INCREMENT_STRING_INDEX; \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_STRING); \
     temp_p = CURRENT_POINTER; \
     /* +1 to point past the opening quote */ \
     string_p[current_string_index] = CURRENT_POINTER + 1; \
-    STORE_INDEX(current_string_index); \
+    STORE_MD_INDEX(current_string_index); \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     string_sizes[current_string_index] = CURRENT_POINTER - string_p[current_string_index]; \
-    n_string_chars += string_sizes[current_string_index];
 
 #define PROCESS_KEY_NAME \
     INCREMENT_KEY_INDEX; \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     /* Parent info initialization now done in key values */ \
-    /* //INITIALIZE_PARENT_INFO(TYPE_KEY); */ \
     SET_TYPE(TYPE_KEY); \
     /* We want to skip the opening quotes so + 1 */ \
     key_p[current_key_index] = CURRENT_POINTER + 1; \
-    STORE_INDEX(current_key_index); \
+    STORE_MD_INDEX(current_key_index); \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     /* We won't count the closing quote, but we would normally add 1 to */ \
     /* be inclusive on a count, so they cancel out */ \
     key_sizes[current_key_index] = CURRENT_POINTER - key_p[current_key_index]; \
-    n_key_chars += key_sizes[current_key_index];
                 
 #define PROCESS_NUMBER \
     EXPAND_NUMERIC_CHECK; \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NUMBER); \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    STORE_INDEX(current_numeric_index); \
+    STORE_MD_INDEX(current_numeric_index); \
     string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
     
 #define PROCESS_NULL \
     EXPAND_NUMERIC_CHECK; \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NULL); \
     numeric_p[current_numeric_index] = 0; \
-    STORE_INDEX(current_numeric_index); \
+    STORE_MD_INDEX(current_numeric_index); \
     /*TODO: Add null check ... */ \
 	ADVANCE_POINTER_BY_X(3)    
            
 #define PROCESS_TRUE \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_TRUE); \
-    STORE_INDEX(++current_logical_index); \
+    STORE_MD_INDEX(++current_logical_index); \
     /*TODO: Add true check ... */ \
 	ADVANCE_POINTER_BY_X(3);
             
 #define PROCESS_FALSE \
-    INCREMENT_DATA_INDEX; \
+    INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_FALSE); \
-    STORE_INDEX(++current_logical_index); \
+    STORE_MD_INDEX(++current_logical_index); \
     /*TODO: Add false check ... */ \
 	ADVANCE_POINTER_BY_X(4);
                 
@@ -335,45 +317,6 @@ const int SIMD_SEARCH_MODE = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGAT
 __m128i chars_to_search_for_ws;
 int ws_search_result;            
 //-------------------------------------------------------------------------
-void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
-{
-    //This is a helper function for setting the field in the output struct
-    //
-    //This should be used for storing dynamically allocated memory
-    //
-    //  See Also
-    //  --------
-    //  setIntScalar
-        
-    mxArray *pm;
-    
-    pm = mxCreateNumericArray(0, 0, classid, mxREAL);
-    mxSetData(pm, pr);
-    mxSetM(pm, 1);
-    mxSetN(pm, N);
-    mxAddField(s,fieldname);
-    mxSetField(s,0,fieldname,pm);
-}
-//-------------------------------------------------------------------------
-void setIntScalar(mxArray *s, const char *fieldname, int value){
-
-    //This function allows us to hold onto integer scalars
-    //We need to make an allocation to grab a value off the stack
-    
-    mxArray *pm;
-    
-    int *temp_value = mxMalloc(sizeof(double));
-    
-    *temp_value = value;
-    
-    pm = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
-    mxSetData(pm, temp_value);
-    mxSetM(pm, 1);
-    mxSetN(pm, 1);
-    mxAddField(s,fieldname);
-    mxSetField(s,0,fieldname,pm);    
-    
-}
 
 //=========================================================================
 //=========================================================================
@@ -541,15 +484,11 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     unsigned char *temp_p;
     
     DEFINE_TIC(parsed_data_logging);
-    
-    //clock_t parsed_data_logging;
-    
+        
     //---------------------------------------------------------------------
     //TODO: This should be made dynamic, with user capable modification
     const int MAX_DEPTH = 20; //0 to N
     int parent_types[21];
-    //This needs to be indices instead of pointers because
-    //we might resize data and the pointers would become invalid
     int parent_indices[21];
     int parent_sizes[21];
     int *n_arrays_at_depth = mxCalloc(21,sizeof(int));
@@ -619,8 +558,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     int current_numeric_index = -1;
     INITIALIZE_NUMERIC_DATA
     //---------------------------------------------------------------------
-    
-//Start of the parsing ====================================================
+//=========================================================================    
+//        ================= Start of the parsing =================
 //=========================================================================
             
     //We decrement so that we can use the same advance to non-whisespace

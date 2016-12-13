@@ -8,8 +8,6 @@ classdef parsing_info
        timing_info
        
        d_content = '---------- content  --------'
-       n_key_chars
-       n_string_chars
        chars_per_token
        
        

@@ -1,0 +1,57 @@
+#include "turtle_json.h"
+
+//http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
+
+
+//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
+mxArray *mxCreateReference(const mxArray *mx)
+{
+    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
+    ++my->RefCount;
+    return (mxArray *) mx;
+}
+
+void *get_field(mxArray *plhs[],const char *fieldname){
+    mxArray *temp = mxGetField(plhs[0],0,fieldname);
+    return mxGetData(temp);
+}
+
+mwSize get_field_length(mxArray *plhs[],const char *fieldname){
+    mxArray *temp = mxGetField(plhs[0],0,fieldname);
+    return mxGetN(temp);
+}    
+    
+void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
+{
+    //This is a helper function for setting the field in the output struct.
+    //It should only be used on dynamically allocated memory.
+        
+    mxArray *pm;
+    
+    pm = mxCreateNumericArray(0, 0, classid, mxREAL);
+    mxSetData(pm, pr);
+    mxSetM(pm, 1);
+    mxSetN(pm, N);
+    mxAddField(s,fieldname);
+    mxSetField(s,0,fieldname,pm);
+}
+//-------------------------------------------------------------------------
+void setIntScalar(mxArray *s, const char *fieldname, int value){
+
+    //This function allows us to hold onto integer scalars
+    //We need to make an allocation to grab a value off the stack
+    
+    mxArray *pm;
+    
+    int *temp_value = mxMalloc(sizeof(double));
+    
+    *temp_value = value;
+    
+    pm = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
+    mxSetData(pm, temp_value);
+    mxSetM(pm, 1);
+    mxSetN(pm, 1);
+    mxAddField(s,fieldname);
+    mxSetField(s,0,fieldname,pm);    
+    
+}

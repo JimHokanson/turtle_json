@@ -8,7 +8,7 @@
 #define MAX_ARRAY_DIMS 10
 
 #define RETRIEVE_DATA_INDEX2(x)\
-    data.d1[x]-1
+    data.d1[x]
 
 typedef struct {
     uint8_t *types;
@@ -200,7 +200,7 @@ void parseObject(Data data, mxArray *obj, int obj_index, int md_index){
                 mxSetFieldByNumber(obj,obj_index,iKey,getFalse(data,cur_key_value_md_index));
                 break;
         }
-        cur_key_md_index = data.next_sibling_index_key[cur_key_data_index]-1;
+        cur_key_md_index = data.next_sibling_index_key[cur_key_data_index];
         cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
     }
 }
@@ -247,12 +247,12 @@ mxArray *parseArray(Data data, int md_index){
                         temp_obj = getStruct(data,temp_data_index,1);
                         parseObject(data, temp_obj, 0, temp_md_index);
                         mxSetCell(output,iData,temp_obj);
-                        temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+                        temp_md_index = data.next_sibling_index_object[temp_data_index];
                         break;
                     case TYPE_ARRAY:
                         temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
                         mxSetCell(output,iData,parseArray(data,temp_md_index));
-                        temp_md_index = data.next_sibling_index_array[temp_data_index]-1;
+                        temp_md_index = data.next_sibling_index_array[temp_data_index];
                         break;
                     case TYPE_KEY:
                       	mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
@@ -317,13 +317,8 @@ mxArray *parseArray(Data data, int md_index){
             temp_count = data.child_count_array[cur_array_data_index];
             output = getStruct(data,temp_data_index,temp_count);
             for (int iObj = 0; iObj < temp_count; iObj++){
-//                 mexPrintf("iObj: %d\n",iObj);
-//                 mexPrintf("md_index: %d\n",temp_md_index);
-                
                 parseObject(data, output, iObj, temp_md_index); 
-                
-//                 mexPrintf("done\n");
-                temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+                temp_md_index = data.next_sibling_index_object[temp_data_index];
                 temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
             }
             break;
@@ -336,7 +331,7 @@ mxArray *parseArray(Data data, int md_index){
                 temp_obj = getStruct(data,temp_data_index,1);
                 parseObject(data, temp_obj, 0, temp_md_index);
                 mxSetCell(output,iData,temp_obj);
-                temp_md_index = data.next_sibling_index_object[temp_data_index]-1;
+                temp_md_index = data.next_sibling_index_object[temp_data_index];
             }
             break;
         case ARRAY_ND_NUMERIC:
@@ -347,9 +342,8 @@ mxArray *parseArray(Data data, int md_index){
             	mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
             }
             
-            //-1 for Matlab to C
             //-1 for previous value before the next sibling
-            temp_md_index = data.next_sibling_index_array[cur_array_data_index]-2;
+            temp_md_index = data.next_sibling_index_array[cur_array_data_index]-1;
             
             //We have nested arrays
             //  [  [  [   #
@@ -420,6 +414,15 @@ mxArray *getMXField(const mxArray *s,const char *fieldname){
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
+    
+    //
+    //  json_info_to_data(mex_struct)
+    //
+    //  Inputs
+    //  ------
+    
+    //
+    
     
     const mxArray *s = prhs[0];
     Data data;

@@ -57,18 +57,14 @@ struct mxArray_Tag_Partial {
     unsigned int RefCount; /* Number of sub-elements identical to this one */
 };
 
-#define STORE_INDEX(x) \
-    /* + 1 for Matlab indexing */ \
-    d1[current_data_index] = x + 1;
+extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
 
-#define RETRIEVE_DATA_INDEX(x) \
-    /* -1 since we are undoing the Matlab indexing */ \
-    d1[x]-1
+#define STORE_MD_INDEX(x) d1[current_data_index] = x;
 
-#define ADD_STRUCT_FIELD(name,pointer) \
-    mxAddField(plhs[0],#name); \
-    mxSetField(plhs[0],0,#name,pointer);
-            
+#define RETRIEVE_MD_INDEX(x) d1[x]
+
+#define NEXT_KEY__KEY_INDEX(cur_key__key_index) \
+        RETRIEVE_MD_INDEX(next_sibling_index_key[cur_key__key_index])
 /*
  *
  *  Example Usage:
@@ -80,21 +76,7 @@ struct mxArray_Tag_Partial {
  */
 
 //http://stackoverflow.com/questions/10673732/openmp-time-and-clock-calculates-two-different-results
-
 //These two MACROS are meant to be used like TIC and TOC in Matlab
-
-// #define TIC(x) \
-//     clock_t x; \
-//     x = clock();
-//             
-//The TOC() macro saves the timing to a field with the name 
-//specified by y
-//#y => y as a string, not as a value "stringification"
-// #define TOC(x,y) \
-//     double *y = mxMalloc(sizeof(double)); \
-//     *y = (double)(clock() - x)/(double)(CLOCKS_PER_SEC); \
-//     setStructField(plhs[0],y,#y,mxDOUBLE_CLASS,1);
-    
 //These were added when I got an error declaring TIC(x) immediately
 //after a label
 #define DEFINE_TIC(x) \
@@ -116,13 +98,9 @@ struct mxArray_Tag_Partial {
     *y = (double)(x##_1.tv_sec - x##_0.tv_sec) + (double)(x##_1.tv_usec - x##_0.tv_usec)/1e6; \
     setStructField(timing_info,y,#y,mxDOUBLE_CLASS,1);      
     
-    
-    
-//void addParseBuffer(unsigned char **p_buffer, size_t array_length)
-    
-//void processInputBytes(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length)    
-
-mxArray *mxCreateReference(const mxArray *mx);    
+#define ADD_STRUCT_FIELD(name,pointer) \
+    mxAddField(plhs[0],#name); \
+    mxSetField(plhs[0],0,#name,pointer);    
     
 //Main parsing
 //-------------------------------------------------------------------------
@@ -130,6 +108,8 @@ void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options
 
 //Helpers
 //-------------------------------------------------------------------------
+mxArray *mxCreateReference(const mxArray *mx);
+
 void setIntScalar(mxArray *s, const char *fieldname, int value);    
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N);
@@ -140,6 +120,8 @@ mwSize get_field_length(mxArray *plhs[],const char *fieldname);
 
 //Post-processing related
 //-------------------------------------------------------------------------
+void post_process(unsigned char *js,mxArray *plhs[], mxArray *timing_info);
+
 void populate_object_flags(unsigned char *js,mxArray *plhs[]);
 
 void populate_array_flags(unsigned char *js,mxArray *plhs[]);
