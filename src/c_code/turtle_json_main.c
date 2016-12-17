@@ -777,6 +777,7 @@ S_PARSE_FALSE_IN_ARRAY:
 S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
     if (!(CURRENT_CHAR == '\0')) {
+        mexPrintf("Current char: %d",CURRENT_CHAR);
         mexErrMsgIdAndTxt("turtle_json:invalid_end", 
                 "non-whitespace characters found after end of root token close");
     }
@@ -864,27 +865,35 @@ S_FINISH_GOOD:
     ADD_STRUCT_FIELD(allocation_info,allocation_info);
     
     //------------------------    Main Data   -----------------------------
-    setStructField(plhs[0],n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
-    setStructField(plhs[0],n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    
+    
     
     TRUNCATE_MAIN_DATA
     setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
     setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
     
     TRUNCATE_OBJECT_DATA
-    setStructField(plhs[0],child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
-    setStructField(plhs[0],next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
-    setStructField(plhs[0],object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
-    
+    mxArray *object_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(object_info,child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
+    setStructField(object_info,next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
+    setStructField(object_info,object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
+    setStructField(object_info,n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    ADD_STRUCT_FIELD(object_info,object_info);
+
     TRUNCATE_ARRAY_DATA
-    setStructField(plhs[0],child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
-    setStructField(plhs[0],next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
-    setStructField(plhs[0],array_depths,"array_depths",mxUINT8_CLASS,current_array_index + 1);
-    
+    mxArray *array_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(array_info,n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    setStructField(array_info,child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
+    setStructField(array_info,next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
+    setStructField(array_info,array_depths,"array_depths",mxUINT8_CLASS,current_array_index + 1);
+    ADD_STRUCT_FIELD(array_info,array_info);
+
     TRUNCATE_KEY_DATA
-    setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
-    setStructField(plhs[0],key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
-    setStructField(plhs[0],next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_key_index + 1);
+   	mxArray *key_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(key_info,key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
+    setStructField(key_info,key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
+    setStructField(key_info,next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_key_index + 1);
+    ADD_STRUCT_FIELD(key_info,key_info);
     
     TRUNCATE_STRING_DATA
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);

@@ -2,12 +2,19 @@ classdef object_token_info
     %
     %   Class:
     %   json.token_info.object_token_info
+    %
+    %   Consumption methods
+    %   -------------------
+    %   1) getParsedObjectData(s_or_obj,index,fields_to_ignore)
     
     properties
         type = 'object'
         name
         full_name
-        index
+        md_index
+    end
+    
+    properties
         key_indices
         key_names
         attribute_indices
@@ -15,54 +22,38 @@ classdef object_token_info
     end
     
     properties (Hidden)
-        map
         p
     end
     
     methods
         function output = getParsedData(obj,varargin)
             %TODO: rename getParsedData to getParsedData
+            error('This needs to be fixed')
+            %Involves passing in the index ...
            output = obj.p.getParsedData(varargin{:}); 
         end
-        function obj = object_token_info(name,full_name,index,parse_object)
+        function obj = object_token_info(name,full_name,md_index,parse_object)
             obj.name = name;
             obj.full_name = full_name;
-            obj.index = index;
+            obj.md_index = md_index;
             obj.p = parse_object;
-            
-            p = parse_object;
-            
-%     object: 1) type  2) n_values        3) tac
-%     array:  1) type  2) n_values        3) tac
-%     key:    1) type  2) start_pointer   3) tac
-%             
-%     string: 1) type  2) start_pointer   3) end of string
-%     number: 1) type  2) start_pointer
-%     null:   1) type  2) start_pointer
-%     tf      1) type
-            
-            n_attributes = p.d1(index);
-            
-            [local_key_names,local_key_indices] = p.getKeyInfo(index);
-            
-            obj.key_indices = local_key_indices;
-            obj.key_names = local_key_names;
-            obj.attribute_indices = local_key_indices + 1;
-            obj.attribute_types = p.types(obj.attribute_indices);
-            
-            obj.map = containers.Map(obj.key_names,1:n_attributes);
-            
         end
 		function getNumericArray(obj,name)
 			error('Code not yet implemented')
 		end
         function output = getToken(obj,name)
-
-            I = h__getMapIndex(obj,name);
-
-            local_full_name = [obj.full_name '.' name];
-            local_index = obj.attribute_indices(I);
+            %v3
+            %
+            %  
             
+            key_index = json_info_to_data(1,obj.p,obj.md_index,name);
+            
+            if ~key_index
+               error('Key not a member of the specified object') 
+            end
+            
+            [key_value_type,key_value_md_index] = json_info_to_data(2,obj.p,obj.md_index,key_index);
+                        
             lp = obj.p;
             
             
@@ -76,18 +67,20 @@ classdef object_token_info
             % #define TYPE_FALSE  8
             
             
-            switch lp.types(local_index)
+            switch key_value_type
                 case 1
-                    output = json.token_info.object_token_info(name,local_full_name,local_index,lp);
+                    local_full_name = [obj.full_name '.' name];
+                    output = json.token_info.object_token_info(name,local_full_name,key_value_md_index,lp);
                 case 2
-                    output = json.token_info.array_token_info(name,local_full_name,local_index,lp);
+                    local_full_name = [obj.full_name '.' name];
+                    output = json.token_info.array_token_info(name,local_full_name,key_value_md_index,lp);
                 case 3
                     error('Unexpected value type of key')
                 case 4
-                    output = lp.strings{lp.d1(local_index)};
+                    output = lp.strings{lp.d1(key_value_md_index)};
                 case 5
                     %TODO: Support scalars
-                    output = lp.numeric_data(lp.d1(local_index));
+                    output = lp.numeric_p(lp.d1(key_value_md_index));
                 case 6
                     output = NaN;
                 case 7
@@ -95,7 +88,7 @@ classdef object_token_info
                 case 8
                     output = false;
                 otherwise
-                    error('Unrecognized token type: %d',lp.types(local_index))
+                    error('Unrecognized token type: %d',key_value_type)
             end
         end
         function output = getParsedToken(obj,name)

@@ -32,59 +32,18 @@ classdef tokens < handle
     properties
         json_string %string of the file/string as bytes (without end padding)
         
+        object_info
+        array_info
+        key_info
+        
+        
         %Data entries per token
         %----------------------------------------------------------
         types 
         data_indices
         
-        object_next_sibling_indices
-        object_child_counts
-        
-        array_next_sibling_indices
-        array_child_counts
-
-        key_next_sibling_indices
-        
-        
-%         %TODO: next_sibling_index is a better name
-%         token_after_close %Only valid for objects, arrays, and keys
-%         
-%         value_index %index of the value into array of that data type
-%         %numeric or null => 'numeric_data' property
-%         %string => 'strings' property
-%         %key => 'keys' property
-%         %
-%         %Value is not valid for other types
-%         child_count
-        
-        %************ Current Definitions ************
-        %                       d1                  d2
-        %     object: 1) type  2) n_values        3) tac
-        %     array:  1) type  2) n_values        3) tac
-        %     key:    1) type  2) start_pointer   3) tac      key_p    key_sizes
-        %
-        %     string: 1) type  2) start_pointer   3) end of string
-        %     number: 1) type  2) start_pointer
-        %     null:   1) type  2) start_pointer
-        %     tf      1) type
-        
-        %-------------- New Definitions --------------                      POST PROCESS
-        %  
-        %   object : type  index   n_values    tac
-        %
-        %   array  : type  index   n_values    tac                          content_info
-        %
-        %   key    : type  index   length      tac      key_p               value
-        %   string : type  index   length               string_p            value
-        %   number : type  index   pointer/value         
-        %   null   : type  index   value
-        %   tf     : type  
-        %
-        %
-        
         %TODO: rename to numbers
-        numeric_data
-        keys 
+        numbers
         strings
         
         mex %structure that is populated from mex data
@@ -145,37 +104,22 @@ classdef tokens < handle
             obj.types = result.types;
             obj.data_indices = result.d1;
             
-            %Objects and Arrays -------------
-            obj.object_next_sibling_indices = result.next_sibling_index_object;
-            obj.object_child_counts = result.child_count_object;
             
-            obj.array_next_sibling_indices = result.next_sibling_index_array;
-            obj.array_child_counts = result.child_count_array;
-            
-            %Keys ---------------------------
-            %We may not need this once we've write process_arrays in mex
-            obj.key_next_sibling_indices = result.next_sibling_index_key;
-            
-            
-            
-            %Aliasing ------------------------
-%             obj.token_after_close = obj.d2;
-%             obj.value_index = obj.d1;
-%             obj.child_count = obj.d1;
-            
-            
-            obj.numeric_data = result.numeric_p;            
+            obj.numbers = result.numeric_p;            
             obj.strings = result.strings;
-            %obj.keys = result.keys;
             
+        end
+        function data = getParsedData(obj)
+            %Call the mex code
+            data = json_info_to_data(0,obj.mex);
         end
         function root = getRootInfo(obj)
             switch obj.types(1)
                 case 1
                     %name,full_name,index,parse_object
-                    root = json.token_info.object_token_info('root','root',1,obj);
+                    root = json.token_info.object_token_info('root','root',1,obj.mex);
                 case 2
-                    root = json.token_info.array_token_info('root','root',1,obj);
+                    root = json.token_info.array_token_info('root','root',1,obj.mex);
                     %error('Not yet implemented')
                     %output = parse_array(str,j,1,numeric_data,in);
                 otherwise

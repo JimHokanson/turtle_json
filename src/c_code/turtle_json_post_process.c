@@ -3,17 +3,6 @@
 //TODO: Document what this is ...
 #define IS_CONTINUATION_BYTE *p >> 6 == 0b10
 
-//Issues
-//------
-
-//This code is not curently being used, but may at some point be used
-//when optimizing the code
-//
-//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
-//--------------------------------------------------------------------------
-
-
-
 //-------------------------------------------------------------------------
 
 
@@ -315,7 +304,8 @@ void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_
     
     *value_p = value;
 }
-
+//=========================================================================
+//=========================================================================
 void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     //
     //  numeric_p - this array starts as a set of pointers
@@ -518,18 +508,20 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     //  object_indices
     //
     
+    mxArray *object_info = mxGetField(plhs[0],0,"object_info");
+    int n_objects = get_field_length2(object_info,"next_sibling_index_object");
 
-    uint8_t *object_depths = (uint8_t *)get_field(plhs,"object_depths");
-    int *child_count_object = (int *)get_field(plhs,"child_count_object");
-    int *next_sibling_index_object = (int *)get_field(plhs,"next_sibling_index_object");
-    int n_objects = get_field_length(plhs,"next_sibling_index_object");
-    
     if (n_objects == 0){
-        setStructField(plhs[0],0,"object_ids",mxINT32_CLASS,0); 
-        setStructField(plhs[0],0,"object_indices",mxINT32_CLASS,0);
-        setIntScalar(plhs[0],"n_unique_objects",0);
+        setStructField(object_info,0,"object_ids",mxINT32_CLASS,0); 
+        setStructField(object_info,0,"object_indices",mxINT32_CLASS,0);
+        setIntScalar(object_info,"n_unique_objects",0);
         return;
     }
+    
+    uint8_t *object_depths = get_u8_field(object_info,"object_depths");
+    int *child_count_object = get_int_field(object_info,"child_count_object");
+    int *next_sibling_index_object = get_int_field(object_info,"next_sibling_index_object");
+    
     
     //TODO: Short circuit on 1 as well
     //else if (n_object == 1){}
@@ -543,12 +535,14 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     int *d1 = (int *)get_field(plhs,"d1");
     mwSize n_entries = get_field_length(plhs,"d1");
 
-  	int *n_objects_at_depth = (int *)get_field(plhs,"n_objects_at_depth");
-    mwSize n_depths = get_field_length(plhs,"n_objects_at_depth");
+  	int *n_objects_at_depth = get_int_field(object_info,"n_objects_at_depth");
+    mwSize n_depths = get_field_length2(object_info,"n_objects_at_depth");
     
-    unsigned char **key_p = (unsigned char **)get_field(plhs,"key_p");
-    int *key_sizes = (int *)get_field(plhs,"key_sizes");
-    int *next_sibling_index_key = (int *)get_field(plhs,"next_sibling_index_key");
+    mxArray *key_info = mxGetField(plhs[0],0,"key_info");
+    mxArray *temp_key_p = mxGetField(key_info,0,"key_p");
+    unsigned char **key_p = (unsigned char **)mxGetData(temp_key_p);
+    int *key_sizes = get_int_field(key_info,"key_sizes");
+    int *next_sibling_index_key = get_int_field(key_info,"next_sibling_index_key");
     
     int *process_order = mxMalloc(n_objects*sizeof(int));
     populateProcessingOrder(process_order, types, n_entries, TYPE_OBJECT, n_objects_at_depth, n_depths, object_depths);
@@ -561,7 +555,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
             max_children = child_count_object[iObject];
         }
     }
-    setIntScalar(plhs[0],"max_keys_in_object",max_children);
+    setIntScalar(object_info,"max_keys_in_object",max_children);
 
     //TODO: Make object id start at 0, not 1
     int object_id = 0;
@@ -707,14 +701,17 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     
     mxFree(process_order);
     //TODO: We could truncate these ...
-    setStructField(plhs[0],unique_object_first_data_indices,"unique_object_first_data_indices",mxINT32_CLASS,object_id);
-    setStructField(plhs[0],n_objects_per_unique,"n_objects_per_unique",mxINT32_CLASS,object_id);
+    setStructField(object_info,unique_object_first_data_indices,"unique_object_first_data_indices",mxINT32_CLASS,object_id);
+    setStructField(object_info,n_objects_per_unique,"n_objects_per_unique",mxINT32_CLASS,object_id);
     
-    setStructField(plhs[0],object_ids,"object_ids",mxINT32_CLASS,n_objects); 
-    setStructField(plhs[0],object_indices,"object_indices",mxINT32_CLASS,n_objects);
-    setIntScalar(plhs[0],"n_unique_objects",object_id);
+    setStructField(object_info,object_ids,"object_ids",mxINT32_CLASS,n_objects); 
+    setStructField(object_info,object_indices,"object_indices",mxINT32_CLASS,n_objects);
+    setIntScalar(object_info,"n_unique_objects",object_id);
 }
 
+//=========================================================================
+//=========================================================================
+//                          Array Flags
 //=========================================================================
 //=========================================================================
 void populate_array_flags(unsigned char *js,mxArray *plhs[]){
@@ -726,15 +723,16 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
 //  array_types
     
     //---- array info ------
-    uint8_t *array_depths = (uint8_t *)get_field(plhs,"array_depths");
-    int *child_count_array = (int *)get_field(plhs,"child_count_array");
-    int *next_sibling_index_array = (int *)get_field(plhs,"next_sibling_index_array");
-    mwSize n_arrays = get_field_length(plhs,"next_sibling_index_array");
+    mxArray *array_info = mxGetField(plhs[0],0,"array_info");
+    mwSize n_arrays = get_field_length2(array_info,"next_sibling_index_array");
     
     if (n_arrays == 0){
         return;
     }
-
+    uint8_t *array_depths = get_u8_field(array_info,"array_depths");
+    int *child_count_array = get_int_field(array_info,"child_count_array");
+    int *next_sibling_index_array = get_int_field(array_info,"next_sibling_index_array");
+    
     //Extraction of relevant local variables
     //---------------------------------------------------------------------
     //---- main data info -----
@@ -743,12 +741,13 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     mwSize n_entries = get_field_length(plhs,"d1");
     
     //---- depth info ------
-    int *n_arrays_at_depth = (int *)get_field(plhs,"n_arrays_at_depth");
-    mwSize n_depths = get_field_length(plhs,"n_arrays_at_depth");
+    int *n_arrays_at_depth = get_int_field(array_info,"n_arrays_at_depth");
+    mwSize n_depths = get_field_length2(array_info,"n_arrays_at_depth");
     
     //---- object info ------
-    int *object_ids = (int *)get_field(plhs,"object_ids");    
-    int *next_sibling_index_object = (int *)get_field(plhs,"next_sibling_index_object");
+    mxArray *object_info = mxGetField(plhs[0],0,"object_info");
+    int *object_ids = get_int_field(object_info,"object_ids");    
+    int *next_sibling_index_object = get_int_field(object_info,"next_sibling_index_object");
     
     //Determining the order to process arrays
     //---------------------------------------------------------------------    
@@ -975,7 +974,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     }
     
     mxFree(process_order);
-    setStructField(plhs[0],array_types,"array_types",mxUINT8_CLASS,n_arrays);
+    setStructField(array_info,array_types,"array_types",mxUINT8_CLASS,n_arrays);
     
 }
 //=========================================================================
@@ -988,25 +987,26 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
     
     int *d1 = (int *)get_field(plhs,"d1");
     
-    int *n_objects_per_unique = (int *)get_field(plhs,"n_objects_per_unique"); 
-    int *child_count_object = (int *)get_field(plhs,"child_count_object");    
+    mxArray *object_info = mxGetField(plhs[0],0,"object_info");
     
-    unsigned char **key_p = (unsigned char **)get_field(plhs,"key_p");
-    int *key_sizes = (int *)get_field(plhs,"key_sizes");
-    int *next_sibling_index_key = (int *)get_field(plhs,"next_sibling_index_key");
+    int *n_objects_per_unique = get_int_field(object_info,"n_objects_per_unique"); 
+    int *child_count_object = get_int_field(object_info,"child_count_object");    
+    int *unique_object_first_data_indices = get_int_field(object_info,"unique_object_first_data_indices");
+    int *n_unique_objects = get_int_field(object_info,"n_unique_objects");
+    int *max_keys_in_object = get_int_field(object_info,"max_keys_in_object");
+    int *object_ids = get_int_field(object_info,"object_ids");
+    int *object_indices = get_int_field(object_info,"object_indices");
         
-    int *unique_object_first_data_indices = (int *)get_field(plhs,"unique_object_first_data_indices");
-    
-    int *n_unique_objects = (int *)get_field(plhs,"n_unique_objects");
-    int *max_keys_in_object = (int *)get_field(plhs,"max_keys_in_object");
+    mxArray *key_info = mxGetField(plhs[0],0,"key_info");
+    mxArray *temp_key_p = mxGetField(key_info,0,"key_p");
+    unsigned char **key_p = (unsigned char **)mxGetData(temp_key_p);
+    int *key_sizes = get_int_field(key_info,"key_sizes");
+    int *next_sibling_index_key = get_int_field(key_info,"next_sibling_index_key");
     
     const char **fieldnames = mxMalloc(*max_keys_in_object*sizeof(char *));
     
     mxArray *all_objects = mxCreateCellMatrix(1, *n_unique_objects);
-    
-    int *object_ids = (int *)get_field(plhs,"object_ids");
-    int *object_indices = (int *)get_field(plhs,"object_indices");
-            
+     
     mxArray *s;
     
     unsigned char *cur_key_p;
@@ -1051,7 +1051,12 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
         mxSetCell(all_objects, iObj, s);
     }
     
-    ADD_STRUCT_FIELD(objects,all_objects);
+    mxFree(fieldnames);
+    mxAddField(object_info,"objects");
+    mxSetField(object_info,0,"objects",all_objects);  
+    
+    
+    //ADD_STRUCT_FIELD(objects,all_objects);
     
 }
 //=====================      End of Key Processing    =====================
@@ -1331,20 +1336,25 @@ void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_in
     
     TIC(start_pp);
     
+    //mexPrintf("Object flags\n");
     TIC(object_parse);
     populate_object_flags(json_string,plhs);
     TOC(object_parse,object_parsing_time);
     
+    //mexPrintf("Key chars\n");
     parse_key_chars(json_string,plhs);
     
+    //mexPrintf("Array parse\n");
     TIC(array_parse);
     populate_array_flags(json_string,plhs);
     TOC(array_parse,array_parsing_time);
     
+    //mexPrintf("Number parase\n");
     TIC(number_parse);
     parse_numbers(json_string,plhs);
     TOC(number_parse,number_parsing_time);
     
+    //mexPrintf("char data\n");
     parse_char_data(json_string,plhs,timing_info);
         
     TOC(start_pp,elapsed_pp_time);  

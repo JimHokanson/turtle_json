@@ -118,6 +118,13 @@ void *get_field(mxArray *plhs[],const char *fieldname);
 
 mwSize get_field_length(mxArray *plhs[],const char *fieldname);
 
+uint8_t * get_u8_field(mxArray *p,const char *fieldname);
+
+int *get_int_field(mxArray *p,const char *fieldname);
+
+mwSize get_field_length2(mxArray *p,const char *fieldname);
+
+
 //Post-processing related
 //-------------------------------------------------------------------------
 void post_process(unsigned char *js,mxArray *plhs[], mxArray *timing_info);

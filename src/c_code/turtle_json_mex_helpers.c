@@ -16,10 +16,35 @@ void *get_field(mxArray *plhs[],const char *fieldname){
     return mxGetData(temp);
 }
 
+uint8_t * get_u8_field(mxArray *p,const char *fieldname){
+    mxArray *temp = mxGetField(p,0,fieldname);
+    uint8_t *data = mxGetData(temp);
+    //This is a temporary check
+    if (data == 0){
+    	mexErrMsgIdAndTxt("turtle_json:bad pointer","bad pointer %s",fieldname);
+    }
+    return data;
+}
+
+int *get_int_field(mxArray *p,const char *fieldname){
+    mxArray *temp = mxGetField(p,0,fieldname);
+    int *data = mxGetData(temp);
+    //This is a temporary check
+    if (data == 0){
+    	mexErrMsgIdAndTxt("turtle_json:bad pointer","bad pointer %s",fieldname);
+    }
+    return data;
+}
+
 mwSize get_field_length(mxArray *plhs[],const char *fieldname){
     mxArray *temp = mxGetField(plhs[0],0,fieldname);
     return mxGetN(temp);
 }    
+
+mwSize get_field_length2(mxArray *p,const char *fieldname){
+    mxArray *temp = mxGetField(p,0,fieldname);
+    return mxGetN(temp);
+}   
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {
