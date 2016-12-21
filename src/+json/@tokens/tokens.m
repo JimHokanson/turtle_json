@@ -111,7 +111,7 @@ classdef tokens < handle
         end
         function data = getParsedData(obj)
             %Call the mex code
-            data = json_info_to_data(0,obj.mex);
+            data = json_info_to_data(0,obj.mex,1);
         end
         function root = getRootInfo(obj)
             switch obj.types(1)

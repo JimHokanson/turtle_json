@@ -59,12 +59,13 @@ struct mxArray_Tag_Partial {
 
 extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
 
-#define STORE_MD_INDEX(x) d1[current_data_index] = x;
+#define STORE_DATA_INDEX(x) d1[current_data_index] = x;
 
-#define RETRIEVE_MD_INDEX(x) d1[x]
+#define RETRIEVE_DATA_INDEX(x) d1[x]
 
+//TODO: I'd like to rename cur_key__key_index to cur_key_data_index
 #define NEXT_KEY__KEY_INDEX(cur_key__key_index) \
-        RETRIEVE_MD_INDEX(next_sibling_index_key[cur_key__key_index])
+        RETRIEVE_DATA_INDEX(next_sibling_index_key[cur_key__key_index])
 /*
  *
  *  Example Usage:
@@ -127,6 +128,8 @@ mwSize get_field_length2(mxArray *p,const char *fieldname);
 
 //Post-processing related
 //-------------------------------------------------------------------------
+void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, uint8_t type_to_match, int *n_values_at_depth, int n_depths, uint8_t *value_depths);
+
 void post_process(unsigned char *js,mxArray *plhs[], mxArray *timing_info);
 
 void populate_object_flags(unsigned char *js,mxArray *plhs[]);

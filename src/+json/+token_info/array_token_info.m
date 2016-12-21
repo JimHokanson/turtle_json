@@ -16,7 +16,7 @@ classdef array_token_info
         type = 'array'
         name
         full_name
-        index
+        md_index
         n_elements
     end
     
@@ -46,34 +46,20 @@ classdef array_token_info
     end
     
     methods
-        function obj = array_token_info(name,full_name,index,p)
+        function obj = array_token_info(name,full_name,md_index,p)
             obj.name = name;
             obj.full_name = full_name;
-            obj.index = index;
+            obj.md_index = md_index;
             obj.p = p;            
-            obj.n_elements = p.child_count(index);
+            %obj.n_elements = p.child_count(md_index);
         end
         function output = getCellstr(obj)
             %
             %   output = getCellstr(obj)
             %   
             %   cell array of strings => {'as' 'df'}
-            
-            %TODO: Add on optional error check ...
-            lp = obj.p;
-            n_values = lp.child_count;
-            local_index = obj.index;
-            if n_values(local_index)
-                value_indices = lp.value_index;
-                next_sibling_index = lp.token_after_close;
-                
-                start_index = value_indices(local_index+1);
-                end_index = value_indices(next_sibling_index(local_index)-1);
-
-                output = lp.strings(start_index:end_index);
-            else
-                output = {};
-            end
+                        
+            output = json_info_to_data(3,obj.p,obj.md_index);
         end
         function output = get1dNumericArray(obj)
             %

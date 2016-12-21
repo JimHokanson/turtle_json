@@ -21,7 +21,7 @@ uint8_t * get_u8_field(mxArray *p,const char *fieldname){
     uint8_t *data = mxGetData(temp);
     //This is a temporary check
     if (data == 0){
-    	mexErrMsgIdAndTxt("turtle_json:bad pointer","bad pointer %s",fieldname);
+    	mexErrMsgIdAndTxt("turtle_json:bad_pointer","bad pointer %s",fieldname);
     }
     return data;
 }
@@ -30,8 +30,9 @@ int *get_int_field(mxArray *p,const char *fieldname){
     mxArray *temp = mxGetField(p,0,fieldname);
     int *data = mxGetData(temp);
     //This is a temporary check
+    //Apparently this doesn't work ...
     if (data == 0){
-    	mexErrMsgIdAndTxt("turtle_json:bad pointer","bad pointer %s",fieldname);
+    	mexErrMsgIdAndTxt("turtle_json:bad_pointer","bad pointer %s",fieldname);
     }
     return data;
 }

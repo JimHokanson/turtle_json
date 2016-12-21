@@ -105,7 +105,7 @@
     INCREMENT_MD_INDEX; \
     INCREMENT_OBJECT_INDEX; \
     SET_TYPE(TYPE_OBJECT); \
-    STORE_MD_INDEX(current_object_index); \
+    STORE_DATA_INDEX(current_object_index); \
     INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT); \
     LOG_OBJECT_DEPTH;
     
@@ -113,7 +113,7 @@
     INCREMENT_MD_INDEX; \
     INCREMENT_ARRAY_INDEX; \
     SET_TYPE(TYPE_ARRAY); \
-    STORE_MD_INDEX(current_array_index); \
+    STORE_DATA_INDEX(current_array_index); \
     INITIALIZE_PARENT_INFO_OA(TYPE_ARRAY); \
     LOG_ARRAY_DEPTH;        
 
@@ -124,7 +124,7 @@
     temp_p = CURRENT_POINTER; \
     /* +1 to point past the opening quote */ \
     string_p[current_string_index] = CURRENT_POINTER + 1; \
-    STORE_MD_INDEX(current_string_index); \
+    STORE_DATA_INDEX(current_string_index); \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     string_sizes[current_string_index] = CURRENT_POINTER - string_p[current_string_index]; \
 
@@ -135,7 +135,7 @@
     SET_TYPE(TYPE_KEY); \
     /* We want to skip the opening quotes so + 1 */ \
     key_p[current_key_index] = CURRENT_POINTER + 1; \
-    STORE_MD_INDEX(current_key_index); \
+    STORE_DATA_INDEX(current_key_index); \
     seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
     /* We won't count the closing quote, but we would normally add 1 to */ \
     /* be inclusive on a count, so they cancel out */ \
@@ -146,7 +146,7 @@
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NUMBER); \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    STORE_MD_INDEX(current_numeric_index); \
+    STORE_DATA_INDEX(current_numeric_index); \
     string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
     
 #define PROCESS_NULL \
@@ -154,21 +154,21 @@
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NULL); \
     numeric_p[current_numeric_index] = 0; \
-    STORE_MD_INDEX(current_numeric_index); \
+    STORE_DATA_INDEX(current_numeric_index); \
     /*TODO: Add null check ... */ \
 	ADVANCE_POINTER_BY_X(3)    
            
 #define PROCESS_TRUE \
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_TRUE); \
-    STORE_MD_INDEX(++current_logical_index); \
+    STORE_DATA_INDEX(++current_logical_index); \
     /*TODO: Add true check ... */ \
 	ADVANCE_POINTER_BY_X(3);
             
 #define PROCESS_FALSE \
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_FALSE); \
-    STORE_MD_INDEX(++current_logical_index); \
+    STORE_DATA_INDEX(++current_logical_index); \
     /*TODO: Add false check ... */ \
 	ADVANCE_POINTER_BY_X(4);
                 
@@ -345,7 +345,7 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         //TODO: I should explicitly describe the max here
         //####.#####E###
         if (digit_search_result == 16){
-        	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too many digits when parsing a number");
+        	mexErrMsgIdAndTxt("turtle_json:too_long_math", "too many digits when parsing a number");
         }
     }
     
