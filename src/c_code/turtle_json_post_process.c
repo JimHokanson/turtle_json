@@ -518,7 +518,12 @@ void check_for_nd_array(int array_md_index, int array_data_index,
         return;
     }
     
+    
+    
 //     mexPrintf("2\n");
+    if (child_data_index < 90){
+     mexPrintf("First child: %d\n",child_data_index);   
+    }
     
     int first_child_size = child_count_array[child_data_index];
     uint8_t first_child_depth = array_depths[child_data_index];
@@ -575,6 +580,7 @@ void check_for_nd_array(int array_md_index, int array_data_index,
                 first_child_array_type == array_types[child_data_index]){
             //Depth verification
             moving_child_data_index = child_data_index+1;
+            //mexPrintf("Got to depth sameness check\n");
             for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
                 if (child_size_stack[iDepth] != child_count_array[moving_child_data_index]){
                     is_nd_array = false;
@@ -583,6 +589,11 @@ void check_for_nd_array(int array_md_index, int array_data_index,
                 moving_child_data_index++;
             }
         }else{
+            if (child_data_index < 90){
+                mexPrintf("1:size  %d:%d\n",first_child_size,child_count_array[child_data_index]);
+                mexPrintf("2:depth %d:%d\n",first_child_depth,array_depths[child_data_index]);
+                mexPrintf("3:type  %d:%d\n",first_child_array_type,array_types[child_data_index]);
+            }
             is_nd_array = false;
         }
     }
