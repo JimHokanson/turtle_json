@@ -517,14 +517,7 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     if (first_child_array_type == 0){
         return;
     }
-    
-    
-    
-//     mexPrintf("2\n");
-    if (child_data_index < 90){
-     mexPrintf("First child: %d\n",child_data_index);   
-    }
-    
+
     int first_child_size = child_count_array[child_data_index];
     uint8_t first_child_depth = array_depths[child_data_index];
     
@@ -567,14 +560,26 @@ void check_for_nd_array(int array_md_index, int array_data_index,
 
         child_md_index = next_sibling_index_array[child_data_index];
 
+        child_data_index = d1[child_md_index];
+        
+//         if (child_data_index < 30){
+//             mexPrintf("child_md_index  %d\n",child_md_index);
+//             mexPrintf("child_data_index  %d\n",child_data_index);
+//         }
+        
         //This is a data type check, not an array type check ...
         if (types[child_md_index] != TYPE_ARRAY){
             is_nd_array = false;
             break;
         }
 
-        child_data_index = d1[child_data_index];
-
+//         First child: 5
+// child_md_index  15197
+// 1:size  11:5057
+// 2:depth 1:1
+// 3:type  1:1
+// child_md_index  5063
+        
         if (first_child_size == child_count_array[child_data_index] &&
                 first_child_depth == array_depths[child_data_index] &&
                 first_child_array_type == array_types[child_data_index]){
@@ -589,11 +594,11 @@ void check_for_nd_array(int array_md_index, int array_data_index,
                 moving_child_data_index++;
             }
         }else{
-            if (child_data_index < 90){
-                mexPrintf("1:size  %d:%d\n",first_child_size,child_count_array[child_data_index]);
-                mexPrintf("2:depth %d:%d\n",first_child_depth,array_depths[child_data_index]);
-                mexPrintf("3:type  %d:%d\n",first_child_array_type,array_types[child_data_index]);
-            }
+//             if (child_data_index < 7){
+//                 mexPrintf("1:size  %d:%d\n",first_child_size,child_count_array[child_data_index]);
+//                 mexPrintf("2:depth %d:%d\n",first_child_depth,array_depths[child_data_index]);
+//                 mexPrintf("3:type  %d:%d\n",first_child_array_type,array_types[child_data_index]);
+//             }
             is_nd_array = false;
         }
     }

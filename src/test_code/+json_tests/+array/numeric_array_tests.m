@@ -4,11 +4,15 @@ function numeric_array_tests()
 %http://stackoverflow.com/questions/40833647/proper-translation-of-multi-dimensional-array-to-json-and-back/
 
 data = reshape(1:24,[4,3,2]);
-js = mexEncodeJSON(data)
+js = mexEncodeJSON(data);
 
 data2 = zeros(4,1,2);
 data3 = {data data2};
-js = mexEncodeJSON(data3)
+js = mexEncodeJSON(data3);
+
+
+data = 1:10;
+js = mexEncodeJSON(data);
 
 %JSON writers
 %------------
