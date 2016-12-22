@@ -484,7 +484,117 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
 //=========================================================================
 //=========================================================================
 
+void check_for_nd_array(int array_md_index, int array_data_index, 
+        uint8_t *array_types, int *child_count_array, 
+        uint8_t *array_depths, int* child_size_stack, int *next_sibling_index_array,
+        uint8_t *types, int *d1, int n_children){
+    //
+    //Populates array_types[array_data_index]
+    
+//     mexPrintf("1\n");
+    
+    //- Input is the type of processed array
+    //- Output is the new type of processed array
+    const uint8_t array_type_map2[9] = { 
+        ARRAY_OTHER_TYPE,   //Nothing
+        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
+        ARRAY_ND_STRING,    //string
+        ARRAY_ND_LOGICAL,   //logical
+        ARRAY_OTHER_TYPE,   //object same type
+        ARRAY_OTHER_TYPE,   //object diff type
+        ARRAY_ND_NUMERIC,   //nd_numeric
+        ARRAY_ND_STRING,    //nd_string
+        ARRAY_ND_LOGICAL};  //nd_logical     
+    
+    
+    int child_md_index = array_md_index + 1;
+    int child_data_index = array_data_index + 1;
+    uint8_t first_child_array_type = array_types[child_data_index];
+    
+    //0 indicates that the child array does not hold homogenous data
+    //TODO: Do we want to allow nd arrays for objects?
+    //TODO: We should only allow ND_NUMERIC, ND_STRING, ND_LOGICAL, numeric, string, and logical
+    if (first_child_array_type == 0){
+        return;
+    }
+    
+//     mexPrintf("2\n");
+    
+    int first_child_size = child_count_array[child_data_index];
+    uint8_t first_child_depth = array_depths[child_data_index];
+    
+    int moving_child_data_index;
+    
+    //Log the sizes of the first arrays
+    //i.e length(x[0]), length(x[0][0]), etc.
+    if (first_child_depth > 1){
+       moving_child_data_index = child_data_index + 1; 
+       for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
+           child_size_stack[iDepth] = child_count_array[moving_child_data_index];
+           moving_child_data_index++;
+       } 
+    }
+    
+    bool is_nd_array = true;
+    
+    //Algorithm explanation:
+    //----------------------
+    //Approach, for each child of the current array, compare its
+    //"first sizes" to the "first sizes" of the first child array
+    //
+    //i.e. does length(x[1]) == length(x[0]) and
+    //          length(x[1][0] == length(x[0][0]) and
+    //          length(x[1][0][0] == length(x[0][0][0]) etc.
+    //
+    //  We don't need to check something like the following:
+    //      length(x[1][1]) == length(x[0][0])
+    //  This is because we have already verified that all children
+    //  are the same (based on the array type). In other words, we
+    //  already know that if x[1] is an nd-array type, that
+    //  length(x[1][0]) == length(x[1][1]) == length(x[1][2]) etc.
+    //  Thus, checking length(x[1][1]) == length(x[0][0]) is 
+    //  redudndant if we know length(x[1][0]) == length(x[0][0])
 
+    
+//     mexPrintf("3\n");
+    
+    for (int iChild = 1; iChild < n_children; iChild++){
+
+        child_md_index = next_sibling_index_array[child_data_index];
+
+        //This is a data type check, not an array type check ...
+        if (types[child_md_index] != TYPE_ARRAY){
+            is_nd_array = false;
+            break;
+        }
+
+        child_data_index = d1[child_data_index];
+
+        if (first_child_size == child_count_array[child_data_index] &&
+                first_child_depth == array_depths[child_data_index] &&
+                first_child_array_type == array_types[child_data_index]){
+            //Depth verification
+            moving_child_data_index = child_data_index+1;
+            for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
+                if (child_size_stack[iDepth] != child_count_array[moving_child_data_index]){
+                    is_nd_array = false;
+                    break;
+                } 
+                moving_child_data_index++;
+            }
+        }else{
+            is_nd_array = false;
+        }
+    }
+    
+//     mexPrintf("4\n");
+    
+    if (is_nd_array){
+        array_types[array_data_index]  = array_type_map2[array_types[child_data_index]];
+        //Bump up the dimension => e.g. 1d to 2d
+        array_depths[array_data_index] = array_depths[child_data_index] + 1;
+    }
+}
 
 
 
@@ -566,19 +676,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
         ARRAY_LOGICAL_TYPE,  //True
         ARRAY_LOGICAL_TYPE}; //False
      
-    //- Input is the type of processed array
-    //- Output is the new type of processed array
-    uint8_t array_type_map2[9] = { 
-        ARRAY_OTHER_TYPE,   //Nothing
-        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
-        ARRAY_ND_STRING,    //string
-        ARRAY_ND_LOGICAL,   //logical
-        ARRAY_OTHER_TYPE,   //object same type
-        ARRAY_OTHER_TYPE,   //object diff type
-        ARRAY_ND_NUMERIC,   //nd_numeric
-        ARRAY_ND_STRING,    //nd_string
-        ARRAY_ND_LOGICAL};  //nd_logical     
-        
     bool is_nd_array;
     int object_array_type;
     int n_children;
@@ -612,7 +709,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     uint8_t cur_child_array_type;
     for (int iArray = 0; iArray < n_arrays; iArray++){
         cur_process_index = process_order[iArray];
-        cur_array_index = RETRIEVE_DATA_INDEX(cur_process_index);
+        cur_array_index = d1[cur_process_index];
         
         //We are redefining what array_depths means at this point
         //since the memory isn't needed
@@ -656,94 +753,101 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                 case TYPE_ARRAY:
                     //This indicates that our array holds an array.
                     
-                    cur_child_array_index = cur_array_index + 1;
-                    cur_child_array_type = array_types[cur_child_array_index];
+                    check_for_nd_array(cur_process_index, cur_array_index, 
+                        array_types, child_count_array, 
+                        array_depths, child_size_stack, next_sibling_index_array,
+                        types, d1, n_children);
                     
-                    //0 indicates that the child array does not hold homogenous data
-                    if (cur_child_array_type == 0){
-                        break;
-                    }
-                    
-                    cur_child_data_index  = cur_process_index + 1;
-                    child_size  = child_count_array[cur_child_array_index];
-                    child_depth = array_depths[cur_child_array_index];
-
-                    
-                    //Log the sizes of the first array
-                    if (child_depth > 1){
-                       cur_child_array_index2 = cur_child_array_index + 1; 
-                       for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
-                           child_size_stack[iDepth] = child_count_array[cur_child_array_index2];
-                           cur_child_array_index2++;
-                       } 
-                    }
-                    
-                    //Split, based on whether we need to verify deeper or not
-                    is_nd_array = true;
-                    if (child_depth > 1){
-                        for (int iChild = 1; iChild < n_children; iChild++){
-                            //Note, we are now comparing the 2nd and later children
-                            //to the first one ...
-                            
-                            //TODO: Make all of these indices 0 based
-                            //-1 is for matlab to c conversion :/
-                            cur_child_data_index = next_sibling_index_array[cur_child_array_index]-1;
-                            if (types[cur_child_data_index] != TYPE_ARRAY){
-                                is_nd_array = false;
-                                break;
-                            }
-                                    
-                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
-                            
-                            //TODO: The order of these should be switched
-                            //i.e. we should assume that everything will match
-                            if (child_size != child_count_array[cur_child_array_index] ||
-                                    child_depth != array_depths[cur_child_array_index] ||
-                                    cur_child_array_type != array_types[cur_child_array_index]){
-                                is_nd_array = false;
-                                break;
-                            }else{
-                                //Depth verification
-                                cur_child_array_index2 = cur_child_array_index + 1;
-                                for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
-                                    if (child_size_stack[iDepth] != child_count_array[cur_child_array_index2]){
-                                        is_nd_array = false;
-                                        break;
-                                    } 
-                                    cur_child_array_index2++;
-                                }
-                            }
-                        }
-                        
-                    //Single child depth, only need to check consistency of 
-                    //size of children, not children's children
-                    }else{
-                        for (int iChild = 1; iChild < n_children; iChild++){
-                            //TODO: Remove this two step process ... 
-                            //TODO: Make all of these indices 0 based
-                            //-1 is for matlab to c conversion :/
-                            cur_child_data_index = next_sibling_index_array[cur_child_array_index]-1;
-                            if (types[cur_child_data_index] != TYPE_ARRAY){
-                                is_nd_array = false;
-                                break;
-                            }
-                            
-                            cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
-
-                            if (child_size != child_count_array[cur_child_array_index] || 
-                                    child_depth != array_depths[cur_child_array_index] ||
-                                    cur_child_array_type != array_types[cur_child_array_index]){
-                                is_nd_array = false;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (is_nd_array){
-                        array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
-                        //Bump up the dimension => e.g. 1d to 2d
-                        array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
-                    }
+// // // // //                     mexPrintf("Nested array: %d\n",cur_array_index);
+// // // // //                     
+// // // // //                     cur_child_array_index = cur_array_index + 1;
+// // // // //                     cur_child_array_type = array_types[cur_child_array_index];
+// // // // //                     
+// // // // //                     //0 indicates that the child array does not hold homogenous data
+// // // // //                     if (cur_child_array_type == 0){
+// // // // //                         break;
+// // // // //                     }
+// // // // //                     
+// // // // //                     cur_child_data_index  = cur_process_index + 1;
+// // // // //                     child_size  = child_count_array[cur_child_array_index];
+// // // // //                     child_depth = array_depths[cur_child_array_index];
+// // // // // 
+// // // // //                     
+// // // // //                     //Log the sizes of the first array
+// // // // //                     if (child_depth > 1){
+// // // // //                        cur_child_array_index2 = cur_child_array_index + 1; 
+// // // // //                        for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+// // // // //                            child_size_stack[iDepth] = child_count_array[cur_child_array_index2];
+// // // // //                            cur_child_array_index2++;
+// // // // //                        } 
+// // // // //                     }
+// // // // //                     
+// // // // //                     //Split, based on whether we need to verify deeper or not
+// // // // //                     is_nd_array = true;
+// // // // //                     if (child_depth > 1){
+// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
+// // // // //                             //Note, we are now comparing the 2nd and later children
+// // // // //                             //to the first one ...
+// // // // //                             
+// // // // //                             //TODO: Make all of these indices 0 based
+// // // // //                             //-1 is for matlab to c conversion :/
+// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
+// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                                     
+// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+// // // // //                             
+// // // // //                             //TODO: The order of these should be switched
+// // // // //                             //i.e. we should assume that everything will match
+// // // // //                             if (child_size != child_count_array[cur_child_array_index] ||
+// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
+// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }else{
+// // // // //                                 //Depth verification
+// // // // //                                 cur_child_array_index2 = cur_child_array_index + 1;
+// // // // //                                 for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+// // // // //                                     if (child_size_stack[iDepth] != child_count_array[cur_child_array_index2]){
+// // // // //                                         is_nd_array = false;
+// // // // //                                         break;
+// // // // //                                     } 
+// // // // //                                     cur_child_array_index2++;
+// // // // //                                 }
+// // // // //                             }
+// // // // //                         }
+// // // // //                         
+// // // // //                     //Single child depth, only need to check consistency of 
+// // // // //                     //size of children, not children's children
+// // // // //                     }else{
+// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
+// // // // //                             //TODO: Remove this two step process ... 
+// // // // //                             //TODO: Make all of these indices 0 based
+// // // // //                             //-1 is for matlab to c conversion :/
+// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
+// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                             
+// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+// // // // // 
+// // // // //                             if (child_size != child_count_array[cur_child_array_index] || 
+// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
+// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                         }
+// // // // //                     }
+// // // // //                     
+// // // // //                     if (is_nd_array){
+// // // // //                         array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
+// // // // //                         //Bump up the dimension => e.g. 1d to 2d
+// // // // //                         array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
+// // // // //                     }
                     break;
                 case TYPE_KEY:
                     mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, key was found as child of array in post-processing");

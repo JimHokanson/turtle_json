@@ -213,13 +213,10 @@ mxArray *get_object_ref_from_md_index(const mxArray *mex_input,int md_index){
 
 }
 
-
-
-
 void populateDims(Data data, int array_data_index, int md_index, int array_depth){
     
     //TODO: We need to populate the dimensions in reverse
-    //Start with highest depth and go to 0
+    //Start with highest depth and go to 0 (JAH 12/21 Not sure what I meant)
     
     int temp_data_index;
     mwSize *dims = data.dims;
@@ -229,7 +226,15 @@ void populateDims(Data data, int array_data_index, int md_index, int array_depth
         temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
         dims[iDim] = data.child_count_array[temp_data_index];
     }
-    
+}
+
+void populateDims2(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int array_depth){
+      
+    dims[0] = child_count_array[array_data_index];
+    for (int iDim = 1; iDim < array_depth; iDim++){
+        array_data_index = d1[++array_md_index];
+        dims[iDim] = child_count_array[array_data_index];
+    }     
 }
 
 
@@ -316,6 +321,47 @@ mxArray* parse_1d_array(int *d1, double *numeric_data, int array_size, int array
     return output;
 }
 
+mxArray* parse_nd_array(int *d1, mwSize *dims, int *child_count_array, double *numeric_data, int array_md_index, uint8_t *array_depths, int *next_sibling_index_array){
+    
+    int array_data_index = d1[array_md_index];
+    
+    int array_depth = array_depths[array_data_index];
+    
+    //TODO: We could avoid this if we allocated based on the max
+    //TODO: Alternatively, we could allocate this permanently for mex
+    //and recycle ...
+    if (array_depth > MAX_ARRAY_DIMS){
+        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+    }
+    
+    //-1 for previous value before the next sibling
+    // "my_data": [[1,2],[3,4],[5,6]], "next_data": ...
+    //            s                    n   (s start, n next)
+    //                            ^ => (n - 1)
+    int last_numeric_md_index  = next_sibling_index_array[array_data_index]-1;
+    //
+    // [ [ [ 23, 15 ], [ ...
+    // s   
+    // 0 1 2 3  <= indices
+    // 3 2 1    <= array depths
+    //       ^ => (s + array_depth[s])
+    int first_numeric_md_index = array_md_index + array_depth;
+    int first_numeric_data_index = d1[first_numeric_md_index];
+    
+    int n_numbers = d1[last_numeric_md_index] - first_numeric_data_index + 1;
+    
+    double *data = mxMalloc(n_numbers*sizeof(double));
+    memcpy(data,&numeric_data[first_numeric_data_index],n_numbers*sizeof(double));
+    
+    populateDims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
+    
+    mxArray *output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
+    mxSetData(output,data);
+    mxSetDimensions(output,dims,array_depth);
+    return output;
+}
+
+
 mxArray *parse_array(Data data, int md_index){
     
     int cur_array_data_index = RETRIEVE_DATA_INDEX2(md_index);
@@ -383,9 +429,7 @@ mxArray *parse_array(Data data, int md_index){
                     data.child_count_array[cur_array_data_index],md_index);
             break;
         case ARRAY_STRING_TYPE:
-            //
             //  This is a cell array of strings => {'as','df','cheese'}
-            
             parse_cellstr(&output,data.d1,data.child_count_array[cur_array_data_index],md_index,data.strings);
             break;
         case ARRAY_LOGICAL_TYPE:
@@ -417,38 +461,37 @@ mxArray *parse_array(Data data, int md_index){
             }
             break;
         case ARRAY_ND_NUMERIC:
-            temp_array_depth = data.array_depths[cur_array_data_index];
-            if (temp_array_depth > MAX_ARRAY_DIMS){
-                mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
-            }
             
-            //-1 for previous value before the next sibling
-            temp_md_index = data.next_sibling_index_array[cur_array_data_index]-1;
+// // //             temp_array_depth = data.array_depths[cur_array_data_index];
+// // //             if (temp_array_depth > MAX_ARRAY_DIMS){
+// // //                 mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+// // //             }
+// // //             
+// // //             //-1 for previous value before the next sibling
+// // //             temp_md_index = data.next_sibling_index_array[cur_array_data_index]-1;
+// // //             
+// // //             //We have nested arrays
+// // //             //  [  [  [   #
+// // //             //  0  1  2   3   <= indices past md_index
+// // //             //                Note, the depth is also 3
+// // //             
+// // //             temp_count = data.d1[temp_md_index] - data.d1[md_index + temp_array_depth] + 1;
+// // //                         
+// // //             temp_value = mxMalloc(temp_count*sizeof(double));
+// // //             
+// // //             temp_data_index = RETRIEVE_DATA_INDEX2((md_index + temp_array_depth));
+// // //             
+// // //             memcpy(temp_value,&data.numeric_data[temp_data_index],temp_count*sizeof(double));
+// // //             
+// // //             populateDims(data,cur_array_data_index,md_index,temp_array_depth);
+// // //             
+// // //             output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
+// // //             mxSetData(output,temp_value);
+// // //             mxSetDimensions(output,data.dims,temp_array_depth);
             
-            //We have nested arrays
-            //  [  [  [   #
-            //  0  1  2   3   <= indices past md_index
-            //                Note, the depth is also 3
+            parse_nd_array(data.d1, data.dims, data.child_count_array, data.numeric_data, md_index, data.array_depths, data.next_sibling_index_array);
             
-            temp_count = data.d1[temp_md_index] - data.d1[md_index + temp_array_depth] + 1;
             
-//             mexPrintf("temp_md_index: %d\n",temp_md_index);
-//             mexPrintf("data.d1: %d\n",data.d1[md_index + temp_array_depth]);
-//             mexPrintf("data.d2: %d\n",data.d1[temp_md_index]);
-//             mexPrintf("Count: %d\n",temp_count);
-//             mexErrMsgIdAndTxt("turtle_json:wtf","The maximum was exceeded");
-            
-            temp_value = mxMalloc(temp_count*sizeof(double));
-            
-            temp_data_index = RETRIEVE_DATA_INDEX2((md_index + temp_array_depth));
-            
-            memcpy(temp_value,&data.numeric_data[temp_data_index],temp_count*sizeof(double));
-            
-            populateDims(data,cur_array_data_index,md_index,temp_array_depth);
-            
-            output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
-            mxSetData(output,temp_value);
-            mxSetDimensions(output,data.dims,temp_array_depth);
             break;
         case ARRAY_ND_STRING:
             output = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
