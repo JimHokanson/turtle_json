@@ -35,7 +35,7 @@ typedef struct {
 } Data;
 
 mxArray *parse_array(Data data, int md_index);
-
+void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index);
 
 void set_double_output(mxArray **s, double value){
     mxArray *temp = mxCreateDoubleMatrix(1,1,0);
@@ -73,15 +73,9 @@ mxArray *getStruct(Data data, int object_data_index, int n_objects){
     //int n_fields = data.child_count_object[object_data_index];
     int n_fields  = mxGetNumberOfFields(return_obj);
     
-    //mxArray **object_data = mxMalloc(n_fields*n_objects*sizeof(mxArray*));
     mxArray **object_data = mxCalloc(n_fields*n_objects,sizeof(mxArray*));
     
     mxSetData(return_obj,object_data);
-//     for (int iObj = 0; iObj < n_objects; iObj++){
-//         for (int iField = 0; iField < n_fields; iField++){
-//             mxSetFieldByNumber(return_obj,iObj,iField,0);
-//         }
-//     }
     
     mxSetN(return_obj,n_objects);
     return return_obj;
@@ -92,14 +86,6 @@ mxArray *getString(int *d1, mxArray *strings, int md_index){
     mxArray *temp_mxArray = mxGetCell(strings,temp_data_index);
     return mxCreateReference(temp_mxArray);
 }
-
-// mxArray *getString(Data data, int md_index){    
-//     //int temp_data_index = RETRIEVE_DATA_INDEX(md_index);
-//     int temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
-//     mxArray *temp_mxArray = mxGetCell(data.strings,temp_data_index);
-//     return mxCreateReference(temp_mxArray);
-// }
-
 
 mxArray *getNumber(Data data,int md_index){
     int temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
@@ -172,15 +158,12 @@ mxArray *getMXField(const mxArray *s,const char *fieldname){
 //=========================================================================
 
 int index_safely(int *value_array, int n_values, int index){
-
     if (index < 0){
         mexErrMsgIdAndTxt("turtle_json:indexing","index out of range, less than 0");
     }else if (index >= n_values){
         mexErrMsgIdAndTxt("turtle_json:indexing","index out of range, exceeds # of elements");
     }
-    
     return value_array[index];
-    
 }
 
 mxArray *get_object_ref_from_md_index(const mxArray *mex_input,int md_index){
@@ -210,7 +193,6 @@ mxArray *get_object_ref_from_md_index(const mxArray *mex_input,int md_index){
     const mxArray *objects = getMXField(object_info,"objects");
         
     return mxGetCell(objects,object_id);
-
 }
 
 void populateDims(Data data, int array_data_index, int md_index, int array_depth){
@@ -228,7 +210,7 @@ void populateDims(Data data, int array_data_index, int md_index, int array_depth
     }
 }
 
-void populateDims2(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int array_depth){
+void populate_dims2(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int array_depth){
       
     dims[0] = child_count_array[array_data_index];
     for (int iDim = 1; iDim < array_depth; iDim++){
@@ -237,6 +219,57 @@ void populateDims2(mwSize *dims, int *d1, int *child_count_array, int array_data
     }     
 }
 
+mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_md_index){
+
+    //This is the "messiest" array option of all. Since we need to go through item
+    //by item and parse the result ...
+    int array_size = data.child_count_array[array_data_index];
+    mxArray* output = mxCreateCellMatrix(1,array_size);
+
+    int current_md_index = array_md_index + 1;
+    int current_data_index;
+    for (int iData = 0; iData < array_size; iData++){
+        switch (data.types[current_md_index]){
+            case TYPE_OBJECT:
+                current_data_index = data.d1[current_md_index];
+                mxArray* temp_obj = getStruct(data,current_data_index,1);
+                parse_object(data, temp_obj, 0, current_md_index);
+                mxSetCell(output,iData,temp_obj);
+                current_md_index = data.next_sibling_index_object[current_data_index];
+                break;
+            case TYPE_ARRAY:
+                current_data_index = data.d1[current_md_index];
+                mxSetCell(output,iData,parse_array(data,current_md_index));
+                current_md_index = data.next_sibling_index_array[current_data_index];
+                break;
+            case TYPE_KEY:
+                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
+                break;
+            case TYPE_STRING:
+                mxSetCell(output,iData,getString(data.d1,data.strings,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_NUMBER:
+                mxSetCell(output,iData,getNumber(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_NULL:
+                mxSetCell(output,iData,getNull(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_TRUE:
+                mxSetCell(output,iData,getTrue(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_FALSE:
+                mxSetCell(output,iData,getFalse(data,current_md_index));
+                current_md_index++;
+                break;
+        }
+    }   
+    
+    return output;
+}
 
 void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index){
     //
@@ -276,7 +309,6 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index)
                 break;
             case TYPE_STRING:
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,getString(data.d1,data.strings,cur_key_value_md_index));
-                //mxSetFieldByNumber(obj,ouput_struct_index,iKey,getString(data,cur_key_value_md_index));
                 break;
             case TYPE_NUMBER:
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,getNumber(data,cur_key_value_md_index));
@@ -296,18 +328,15 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index)
     }
 }
 
-void parse_cellstr(mxArray **output, int *d1, int array_size, int array_md_index, mxArray *strings){
-    mxArray *p_output = mxCreateCellMatrix(1,array_size);
-    int temp_md_index = array_md_index + 1;
+mxArray* parse_cellstr(int *d1, int array_size, int array_md_index, mxArray *strings){
+    mxArray *output = mxCreateCellMatrix(1,array_size);
+    int string_md_index = array_md_index + 1;
+    int string_data_index = d1[string_md_index];
     for (int iData = 0; iData < array_size; iData++){
-        //TODO: the getString call is bad here, since we know we 
-        //are grabbing consecutive strings
-        //replace with simpler version that increments the data index
-        //not the md_index - see nd version
-        mxSetCell(p_output,iData,getString(d1,strings,temp_md_index));
-        temp_md_index++;
+        mxSetCell(output,iData,mxCreateReference(mxGetCell(strings,string_data_index)));
+        string_data_index++;
     }
-    *output = p_output;
+    return output;
 }
 
 mxArray* parse_1d_array(int *d1, double *numeric_data, int array_size, int array_md_index){
@@ -359,7 +388,7 @@ mxArray* parse_nd_numeric_array(int *d1, mwSize *dims, int *child_count_array,
     double *data = mxMalloc(n_numbers*sizeof(double));
     memcpy(data,&numeric_data[first_numeric_data_index],n_numbers*sizeof(double));
     
-    populateDims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
+    populate_dims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
     
     mxArray *output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
     mxSetData(output,data);
@@ -367,17 +396,15 @@ mxArray* parse_nd_numeric_array(int *d1, mwSize *dims, int *child_count_array,
     return output;
 }
 
-mxArray* parse_nd_string_array(int *d1, mwSize *dims, int *child_count_array, 
-        int array_md_index, uint8_t *array_depths, 
+mxArray* parse_nd_string_array(int *d1, mwSize *dims, 
+        int *child_count_array, int array_md_index, uint8_t *array_depths, 
         int *next_sibling_index_array, mxArray *strings){
 
     int array_data_index = d1[array_md_index];
     int array_depth = array_depths[array_data_index];
     
-    populateDims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
-
-    mxArray *output = mxCreateCellArray(array_depth,dims); 
-  
+    populate_dims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
+    
     //See explanation in parse_nd_numeric_array
     int last_string_md_index  = next_sibling_index_array[array_data_index]-1;
     int first_string_md_index = array_md_index + array_depth;
@@ -385,6 +412,7 @@ mxArray* parse_nd_string_array(int *d1, mwSize *dims, int *child_count_array,
     
     int n_strings = d1[last_string_md_index] - first_string_data_index + 1;
     
+    mxArray *output = mxCreateCellArray(array_depth,dims);
     int string_data_index = first_string_data_index;
     for (int iString = 0; iString < n_strings; iString++){
         mxSetCell(output,iString,mxCreateReference(mxGetCell(strings,string_data_index)));
@@ -393,30 +421,61 @@ mxArray* parse_nd_string_array(int *d1, mwSize *dims, int *child_count_array,
     return output;    
 }
 
-mxArray* parse_logical_array(int *d1, uint8_t *types, int array_size, int array_md_index){
+mxArray* parse_logical_array(int *d1, uint8_t *types, int array_size, 
+            int array_md_index){
 
-    
     int md_index = array_md_index + 1;
     
     uint8_t *data = mxMalloc(array_size*sizeof(uint8_t));
-    uint8_t *p_data = data;
     
     for (int iElem = 0; iElem < array_size; iElem++){
         data[iElem] = types[md_index] == TYPE_TRUE;
-        ++md_index;
+        md_index++;
     }
     
     mxArray *output = mxCreateLogicalMatrix(1,0);
     mxSetData(output,data);
     mxSetN(output,array_size);
     return output;
+}
+
+mxArray* parse_logical_nd_array(int *d1, uint8_t *types, mwSize *dims, 
+        int *child_count_array, int array_md_index, uint8_t *array_depths, 
+        int *next_sibling_index_array){
+
+    int array_data_index = d1[array_md_index];
+    int array_depth = array_depths[array_data_index];
     
+    populate_dims2(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
+
+    //See explanation in parse_nd_numeric_array
+    int last_logical_md_index  = next_sibling_index_array[array_data_index]-1;
+    int first_logical_md_index = array_md_index + array_depth;
+    int first_logical_count = d1[first_logical_md_index];
+    int last_logical_count = d1[last_logical_md_index];
+    
+    int n_values = last_logical_count - first_logical_count + 1;
+    
+    uint8_t *data = mxMalloc(n_values*sizeof(uint8_t));
+    
+    int iData = 0;
+    for (int iType = first_logical_md_index; iType <= last_logical_md_index; iType++){
+        if (types[iType] != TYPE_ARRAY){
+            data[iData] = types[iType] == TYPE_TRUE;
+            iData++;
+        }
+    }
+    
+    mxArray *output = mxCreateLogicalArray(0,0);
+    mxSetData(output,data);
+    mxSetDimensions(output,dims,array_depth);
+    return output;    
 }
 
 
 mxArray *parse_array(Data data, int md_index){
     
-    int cur_array_data_index = RETRIEVE_DATA_INDEX2(md_index);
+    int cur_array_data_index = data.d1[md_index];
         
     int temp_count;
     int temp_data_index;
@@ -429,69 +488,28 @@ mxArray *parse_array(Data data, int md_index){
     
     switch (data.array_types[cur_array_data_index]){
         case ARRAY_OTHER_TYPE:
-            //This is the "messiest" option of all. Since we need to go through item
-            //by item and parse the result ...
-            temp_count = data.child_count_array[cur_array_data_index];
-            output = mxCreateCellMatrix(1,temp_count);
-            
-            temp_md_index = md_index + 1;
-            for (int iData = 0; iData < temp_count; iData++){
-                switch (data.types[temp_md_index]){
-                    case TYPE_OBJECT:
-                        temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
-                        temp_obj = getStruct(data,temp_data_index,1);
-                        parse_object(data, temp_obj, 0, temp_md_index);
-                        mxSetCell(output,iData,temp_obj);
-                        temp_md_index = data.next_sibling_index_object[temp_data_index];
-                        break;
-                    case TYPE_ARRAY:
-                        temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
-                        mxSetCell(output,iData,parse_array(data,temp_md_index));
-                        temp_md_index = data.next_sibling_index_array[temp_data_index];
-                        break;
-                    case TYPE_KEY:
-                        mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
-                        break;
-                    case TYPE_STRING:
-                        mxSetCell(output,iData,getString(data.d1,data.strings,temp_md_index));
-                        //mxSetCell(output,iData,getString(data,temp_md_index));
-                        temp_md_index++;
-                        break;
-                    case TYPE_NUMBER:
-                        mxSetCell(output,iData,getNumber(data,temp_md_index));
-                        temp_md_index++;
-                        break;
-                    case TYPE_NULL:
-                        mxSetCell(output,iData,getNull(data,temp_md_index));
-                        temp_md_index++;
-                        break;
-                    case TYPE_TRUE:
-                        mxSetCell(output,iData,getTrue(data,temp_md_index));
-                        temp_md_index++;
-                        break;
-                    case TYPE_FALSE:
-                        mxSetCell(output,iData,getFalse(data,temp_md_index));
-                        temp_md_index++;
-                        break;
-                }
-            }
+            //  [1,false,"apples"]
+            output = parse_non_homogenous_array(data, cur_array_data_index, md_index);     
             break;
         case ARRAY_NUMERIC_TYPE:
+            //  [1,2,3,4]
             output = parse_1d_array(data.d1,data.numeric_data,
                     data.child_count_array[cur_array_data_index],md_index);
             break;
         case ARRAY_STRING_TYPE:
-            //  This is a cell array of strings => {'as','df','cheese'}
-            parse_cellstr(&output,data.d1,data.child_count_array[cur_array_data_index],
+            //  ['cheese','crow']
+            output = parse_cellstr(data.d1,
+                    data.child_count_array[cur_array_data_index],
                     md_index,data.strings);
             break;
         case ARRAY_LOGICAL_TYPE:
+            //  [true, false, true]
             output = parse_logical_array(data.d1, data.types, 
                     data.child_count_array[cur_array_data_index], md_index);
             break;
         case ARRAY_OBJECT_SAME_TYPE:
             temp_md_index = md_index + 1;
-            temp_data_index = RETRIEVE_DATA_INDEX2(md_index+1);
+            temp_data_index = data.d1[temp_md_index];
             temp_count = data.child_count_array[cur_array_data_index];
             output = getStruct(data,temp_data_index,temp_count);
             for (int iObj = 0; iObj < temp_count; iObj++){
@@ -512,7 +530,7 @@ mxArray *parse_array(Data data, int md_index){
                 temp_md_index = data.next_sibling_index_object[temp_data_index];
             }
             break;
-        case ARRAY_ND_NUMERIC:            
+        case ARRAY_ND_NUMERIC:
             output = parse_nd_numeric_array(data.d1, data.dims, 
                     data.child_count_array, data.numeric_data, md_index, 
                     data.array_depths, data.next_sibling_index_array);
@@ -523,9 +541,9 @@ mxArray *parse_array(Data data, int md_index){
                         data.next_sibling_index_array, data.strings);
             break;
         case ARRAY_ND_LOGICAL:
-            output = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
-            temp_value = mxGetData(output);
-            *temp_value = 8;
+            output = parse_logical_nd_array(data.d1, data.types, data.dims, 
+                    data.child_count_array, md_index, data.array_depths, 
+                    data.next_sibling_index_array);
             break;
             
     }
@@ -579,8 +597,6 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
         data.next_sibling_index_key = get_int_field_safe(key_info,"next_sibling_index_key");
     }
     
-
-    
     //Array Data  ---------------------------------------------------------
     const mxArray *array_info = mxGetField(s,0,"array_info");
     data.child_count_array = get_int_field_safe(array_info,"child_count_array");
@@ -613,7 +629,7 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
             parse_object(data, plhs[0], 0, md_index);
             break;
         case TYPE_ARRAY:
-            data_index = RETRIEVE_DATA_INDEX2(0);
+            //data_index = dat.d1[md_index];
             plhs[0] = parse_array(data, md_index);
             break;
         case TYPE_KEY:
@@ -789,7 +805,7 @@ void f3__get_cellstr(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","Requested cellstr, but array was not a cellstr");
     }
         
-    parse_cellstr(&plhs[0],d1,child_count_array[cur_array_data_index], 
+    plhs[0] = parse_cellstr(d1,child_count_array[cur_array_data_index], 
             array_md_index,getMXField(mex_input,"strings"));
     
 }
