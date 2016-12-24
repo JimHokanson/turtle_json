@@ -21,24 +21,25 @@ classdef array_token_info
     end
     
     properties
-        array_depth
+%         array_depth
     end
     
     methods
-        function value = get.array_depth(obj)
-            cur_index = obj.index;
-            n_arrays = 1;
-            local_types = obj.p.types;
-            for i = 1:obj.n_elements
-                cur_index = cur_index + 1;
-                if local_types(cur_index) == 2
-                    n_arrays = n_arrays + 1;
-                else
-                    break
-                end
-            end
-            value = n_arrays;
-        end
+%         function value = get.array_depth(obj)
+%             value = obj.p.array_info
+%             cur_index = obj.index;
+%             n_arrays = 1;
+%             local_types = obj.p.types;
+%             for i = 1:obj.n_elements
+%                 cur_index = cur_index + 1;
+%                 if local_types(cur_index) == 2
+%                     n_arrays = n_arrays + 1;
+%                 else
+%                     break
+%                 end
+%             end
+%             value = n_arrays;
+%         end
     end
     
     properties (Hidden)
@@ -51,7 +52,6 @@ classdef array_token_info
             obj.full_name = full_name;
             obj.md_index = md_index;
             obj.p = p;            
-            %obj.n_elements = p.child_count(md_index);
         end
         function output = getCellstr(obj)
             %
@@ -67,21 +67,7 @@ classdef array_token_info
             %   
             %   1d numeric array => [1,2,3,4,5]
             
-            lp = obj.p;
-            n_values = lp.child_count;
-            local_index = obj.index;
-            if (n_values(local_index))
-                value_indices = lp.value_index;
-                next_sibling_index = lp.token_after_close;
-                
-                start_index = value_indices(local_index+1);
-                end_index = value_indices(next_sibling_index(local_index)-1);
-                
-                output = lp.numeric_data(start_index:end_index);
-            else
-                output = [];
-            end
-            
+            output = json_info_to_data(4,obj.p,obj.md_index,0);            
         end
         function output = get2dNumericArray(obj)
             %
@@ -90,54 +76,7 @@ classdef array_token_info
             %   2d numeric array => [1,2,3;
             %                        4,5,6];
             
-            lp = obj.p;
-            local_index = obj.index;
-            
-            next_sibling_index = lp.token_after_close;
-            child_count = lp.child_count;
-            
-            value_indices = lp.value_index;
-            
-            
-            %Retrieval of indices
-            %--------------------------------------------------------------
-            % [    [     #
-            % 0    +1   +2
-            first_data_value_index = value_indices(local_index + 2);
-            
-            %note, array closings don't take up space, so the final #
-            %is positioned at 1 less than next sibling element 
-            %
-            %This could fail if the 2d array assumption is invalid
-            %since we haven't checked the type of n_s_e(local_index)-1
-            %so value_indices of this value might be 0
-            last_data_value_index  = value_indices(next_sibling_index(local_index)-1);
-            
-            %Basic verification for now ...
-            %--------------------------------------------------------------
-            %This could still be wrong if the arrays are unevenly shaped
-            %but somehow counterbalance each other
-            %e.g. 3 1d arrays of sizes 2,1,3
-            %   {[1,2],[3],[4,5,6]} => interpreted as [1,2;3,4;5,6]
-            %
-            %A more proper error check would go through the subarrays
-            %and verify that they are all of arrays and that their sizes
-            %are consistent
-            
-            n_1d_arrays = child_count(local_index);
-            
-            %This could be different for each child, we'll just
-            %check that 2d is possible given the first entry
-            n_elements_per_1d_array = child_count(local_index+1);
-            
-            if (last_data_value_index - first_data_value_index + 1) ... 
-                    == n_1d_arrays*n_elements_per_1d_array
-               output = reshape(lp.numeric_data(first_data_value_index:last_data_value_index),[n_elements_per_1d_array n_1d_arrays]);
-            else
-                %TODO: Show numbers that failed ...
-               error('Current array object is not a proper 2d array') 
-            end
-
+            output = json_info_to_data(4,obj.p,obj.md_index,0);  
         end
         function output = getArrayOf1dNumericArrays(obj)
             %

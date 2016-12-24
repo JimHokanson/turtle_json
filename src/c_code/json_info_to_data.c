@@ -476,14 +476,17 @@ mxArray* parse_logical_nd_array(int *d1, uint8_t *types, mwSize *dims,
 mxArray *parse_array(Data data, int md_index){
     
     int cur_array_data_index = data.d1[md_index];
-        
+    mxArray *output;
+    
+    
+    
     int temp_count;
     int temp_data_index;
     int temp_md_index;
     int temp_array_depth;
     mwSize *dims;
     double *temp_value;
-    mxArray *output;
+    
     mxArray *temp_obj;
     
     switch (data.array_types[cur_array_data_index]){
@@ -555,9 +558,8 @@ mxArray *parse_array(Data data, int md_index){
 
 //0 =======================================================================
 void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
-    
     //
-    //  
+    //  data = json_info_to_data(0,mex_struct,start_index)
     //
     //  TODO: We could add on options here eventually
     //
@@ -629,7 +631,6 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
             parse_object(data, plhs[0], 0, md_index);
             break;
         case TYPE_ARRAY:
-            //data_index = dat.d1[md_index];
             plhs[0] = parse_array(data, md_index);
             break;
         case TYPE_KEY:
@@ -638,7 +639,6 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
             break;
         case TYPE_STRING:
             plhs[0] = getString(data.d1,data.strings,md_index);
-            //plhs[0] = getString(data,md_index);
             break;
         case TYPE_NUMBER:
             plhs[0] = getNumber(data,md_index);
@@ -658,10 +658,12 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
 //=========================================================================
 void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //
+    //  index_1b = json_info_to_data(1,mex_struct,obj_md_index,key_name)
+    //
     //  Given an object and a key name, get the key index. We also check
     //  that the key exists.
     //
-    //  index_1b = json_info_to_data(1,mex_struct,obj_md_index,key_name)
+    //  
     
     if (nrhs != 4){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.getKeyIndex requires at four inputs");
@@ -696,9 +698,11 @@ void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]
 //=========================================================================
 void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //
-    //  2: key_index to (type,md_index_1b)
-    //      [type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b
+    //   [type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b
     //
+    //   2: key_index to (type,md_index_1b)
+    //
+    
     if (nrhs != 4){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f2 requires 4 inputs");
     }else if (!mxIsClass(prhs[1],"struct")){
@@ -725,7 +729,6 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     int md_index = ((int)mxGetScalar(prhs[2]))-1;
     int object_data_index = index_safely(d1,n_values,md_index);
     
-    //TODO: 
     const mxArray *object_info = mxGetField(mex_input,0,"object_info");
     
     int *object_counts = get_int_field_and_length(object_info,"child_count_object",&n_values);
@@ -750,8 +753,9 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     //Stopping condition
     //------------------
     //key_index 
-    //0 - skip loop
-    //1 - only run first iteration of loop (so while < key_index)
+    //Index  - # of loops
+    //  0    - skip loop
+    //  1    - only run first iteration of loop (so while < key_index)
     
     //Advance from object to the 1st key
     md_index++;
@@ -760,8 +764,7 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
         md_index = next_sibling_index_key[cur_key_data_index];
     }
     
-    //md_index should now point to the key, but we want the value
-    //advancing to value
+    //md_index should now point to the key, but we want the key's value
     md_index++;
     
     set_double_output(&plhs[0],(double)types[md_index]);   
@@ -770,6 +773,9 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
 }
 
 void f3__get_cellstr(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+    //
+    //  cellstr = json_info_to_data(3,mex_struct,array_md_index)
+    //
     
     if (nrhs != 3){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f3 requires 3 inputs");
@@ -797,8 +803,6 @@ void f3__get_cellstr(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     
     const mxArray *array_info = mxGetField(mex_input,0,"array_info");
     const int *child_count_array = get_int_field_safe(array_info,"child_count_array");
-    //data.child_count_array = get_int_field_safe(array_info,"child_count_array");
-    //data.next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
     uint8_t *array_types = get_u8_field_safe(array_info,"array_types");
     
     if (!(array_types[cur_array_data_index] == ARRAY_STRING_TYPE)){
@@ -811,6 +815,14 @@ void f3__get_cellstr(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
 }
 
 void f4__get_nd_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+    //
+    //  nd_arrray = json_info_to_data(4,mex_struct,array_md_index,expected_array_type)  
+    //
+    //      expected_array_type:
+    //          0 - numeric
+    //          1 - string
+    //          2 - logical
+    //
     
     if (nrhs != 3){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f4 requires 3 inputs");
@@ -828,45 +840,61 @@ void f4__get_nd_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 
     int n_values;
     const mxArray *mex_input = prhs[1];
-    int *d1 = get_int_field_and_length(mex_input,"d1",&n_values);
-    uint8_t *types = get_u8_field_safe(mex_input,"types");
-        
     int array_md_index = ((int)mxGetScalar(prhs[2]))-1;
     uint8_t expected_array_type = ((uint8_t)mxGetScalar(prhs[3]));
     
-    
+    int *d1 = get_int_field_and_length(mex_input,"d1",&n_values);
+    uint8_t *types = get_u8_field_safe(mex_input,"types");
+        
     int cur_array_data_index = index_safely(d1,n_values,array_md_index);   
     
     if (!(types[array_md_index] == TYPE_ARRAY)){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","Requested nd-array, but index did not point to an array");
     }
     
-    const mxArray *array_info = mxGetField(mex_input,0,"array_info");
+    //Array info extraction ...
+    const mxArray *array_info = mxGetField(mex_input,0,"array_info");    
     uint8_t *array_types = get_u8_field_safe(array_info,"array_types");
+    int *child_count_array = get_int_field_safe(array_info,"child_count_array");
+    int *next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
+    uint8_t *array_depths = get_u8_field_safe(array_info,"array_depths");
+    
+    mxArray *strings = getMXField(mex_input,"strings");
+    double *numeric_data = (double *)mxGetData(mxGetField(mex_input,0,"numeric_p"));
     
     uint8_t observed_array_type = array_types[cur_array_data_index];
     
+    //TODO: We could improve this ...
+    //- I think this might be best to allocate on the stack ...
+    //- if not, allocate based on the size
+    mwSize *dims = mxMalloc(MAX_ARRAY_DIMS*sizeof(mwSize));
+    
+
     switch (observed_array_type){
         case ARRAY_OTHER_TYPE:
             mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array option not support for non nd-array");
             break;
         case ARRAY_NUMERIC_TYPE:
             if (expected_array_type == 0){
-             //Yay!   
+                plhs[0] = parse_1d_array(d1,numeric_data,
+                    child_count_array[cur_array_data_index],array_md_index);
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array numeric observed but not expected");
             }
             break;
         case ARRAY_STRING_TYPE:
          	if (expected_array_type == 1){
-             //Yay!   
+                plhs[0] = parse_cellstr(d1,
+                    child_count_array[cur_array_data_index],
+                    array_md_index,strings);  
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array string observed but not expected");
             }
             break;
         case ARRAY_LOGICAL_TYPE:
             if (expected_array_type == 2){
-             //Yay!   
+            	plhs[0] = parse_logical_array(d1, types, 
+                    child_count_array[cur_array_data_index], array_md_index); 
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array logical observed but not expected");
             }
@@ -879,27 +907,73 @@ void f4__get_nd_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             break;
         case ARRAY_ND_NUMERIC:
            	if (expected_array_type == 0){
-             //Yay!   
+             	plhs[0] = parse_nd_numeric_array(d1, dims, 
+                    child_count_array, numeric_data, array_md_index, 
+                    array_depths, next_sibling_index_array);  
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array numeric observed but not expected");
             }
             break;
         case ARRAY_ND_STRING:
           	if (expected_array_type == 1){
-             //Yay!   
+                   plhs[0] = parse_nd_string_array(d1, dims, 
+                        child_count_array, array_md_index, array_depths,
+                        next_sibling_index_array, strings);
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array string observed but not expected");
             }
             break;
         case ARRAY_ND_LOGICAL:
          	if (expected_array_type == 2){
-             //Yay!   
+                plhs[0] = parse_logical_nd_array(d1, types, dims, 
+                    child_count_array, array_md_index, array_depths, 
+                    next_sibling_index_array);
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array logical observed but not expected");
             }
             break;
+    } 
+}
+
+void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+
+    if (nrhs != 3){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f5 requires 3 inputs");
+    }else if (!mxIsClass(prhs[1],"struct")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f5 needs to be a structure");
+    }else if (!mxIsClass(prhs[2],"double")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f5 needs to be a double");
     }
+    
+    if (nlhs != 1){
+    	mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f3 requires 1 output");
+    }
+
+    int n_values;
+    const mxArray *mex_input = prhs[1];
+    int *d1 = get_int_field_and_length(mex_input,"d1",&n_values);
+    uint8_t *types = get_u8_field_safe(mex_input,"types");
         
+    int array_md_index = ((int)mxGetScalar(prhs[2]))-1;
+    int cur_array_data_index = index_safely(d1,n_values,array_md_index);   
+    
+    const mxArray *array_info = mxGetField(mex_input,0,"array_info");    
+    uint8_t *array_types = get_u8_field_safe(array_info,"array_types");
+    //int *child_count_array = get_int_field_safe(array_info,"child_count_array");
+    //int *next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
+    uint8_t *array_depths = get_u8_field_safe(array_info,"array_depths");
+    
+    
+    //Checks
+    //1) array
+    //2) depth is 2 - NO, only needs to hold types of numeric array ARRAY_NUMERIC_TYPE
+    //3) array type is numeric 2d array - NO, again, 
+    if ((types[array_md_index] != TYPE_ARRAY)){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","Requested array of 1d arrays, but index did not point to an array");
+    }
+    
+    //Now, loop through the array and grab, need to verify type ...
+    
 }
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
@@ -922,8 +996,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //          0 - numeric
     //          1 - string
     //          2 - logical
-    //
-    //
+    //  5: Retrieve cell of 1d numeric arrays
+    //      cell_output = json_info_to_data(5,mex_struct,array_md_index);
     //
     //  json_info_to_data(mex_struct)
     //
@@ -953,9 +1027,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
       	case 3:
             f3__get_cellstr(nlhs,plhs,nrhs,prhs);
             break;
-//         case 4:
-//             f4__get_nd_array(nlhs,plhs,nrhs,prhs);
-//             break;
+        case 4:
+            f4__get_nd_array(nlhs,plhs,nrhs,prhs);
+            break;
         default:
             mexErrMsgIdAndTxt("turtle_json:invalid_input","Function option not recognized");
             
