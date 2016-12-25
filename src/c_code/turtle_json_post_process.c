@@ -1,30 +1,8 @@
 #include "turtle_json.h"
 
+//TODO: Document what this is ...
 #define IS_CONTINUATION_BYTE *p >> 6 == 0b10
 
-//Issues
-//------
-
-//This code is not curently being used, but may at some point be used
-//when optimizing the code
-//
-//http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
-//--------------------------------------------------------------------------
-struct mxArray_Tag_Partial {
-    void *name_or_CrossLinkReverse;
-    mxClassID ClassID;
-    int VariableType;
-    mxArray *CrossLink;
-    size_t ndim;
-    unsigned int RefCount; /* Number of sub-elements identical to this one */
-};
-
-mxArray *mxCreateReference(const mxArray *mx)
-{
-    struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;
-    ++my->RefCount;
-    return (mxArray *) mx;
-}
 //-------------------------------------------------------------------------
 
 
@@ -32,6 +10,7 @@ mxArray *mxCreateReference(const mxArray *mx)
 //------------------------------------
 //Note that I'm avoiding subtracting 0 which makes these arrays rather large ...
 //TODO: test time difference on subtracting
+//TODO: Integer math would probably be better, with double conversion ...
 //
 //This code allows us to do double_value = ple#[current_character]
 //
@@ -326,7 +305,8 @@ void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_
     
     *value_p = value;
 }
-
+//=========================================================================
+//=========================================================================
 void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     //
     //  numeric_p - this array starts as a set of pointers
@@ -343,17 +323,14 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     //  I am currently assuming that a pointer is 64 bits, which means
     //  that I recycle the memory to store the array of doubles
     
-    TIC(number_parse);
-    
     mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
     
     //Casting for input handling
     unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
+    
     //Casting for output handling (recycling of memory)
     double *numeric_p_double = (double *)mxGetData(temp);
     
-    //Note, we are making an assumption here about the max size
-    //of doubles
     int n_numbers = mxGetN(temp);
     
     int *error_locations;
@@ -369,7 +346,6 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        
         int error_location = 0;
         int error_value;
 
@@ -384,7 +360,6 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
         
         *(error_locations + tid) = error_location;
         *(error_values + tid) = error_value;
-        
     }
     
     //Error processing
@@ -432,59 +407,502 @@ void parse_numbers(unsigned char *js,mxArray *plhs[]) {
             }
         }
         ++error_locations;
+    } 
+}
+//=====================   END OF NUMBER PARSING  ==========================
+
+//=========================================================================
+//=========================================================================
+//=========================================================================
+
+void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, uint8_t type_to_match, int *n_values_at_depth, int n_depths, uint8_t *value_depths){
+    //
+    //  This is a helper function which orders data by depth (nesting level).
+    //
+    //  The names have been made generic to accomodate both arrays and objects.
+    //
+    //  Inputs
+    //  ------
+    //  types: array (length => n_entries)
+    //  n_entries: 
+    //  type_to_match: scalar
+    //  n_values_at_depth: array
+    //  n_depths:
+    //  value_depths:
+    //
+    //  Output
+    //  ------
+    //  process_order : array
+    //       - order in which to process array objects, from the 0th index
+    //       to the end of the array
+    //       - indices are md_index values (not indices to the 
+    //       array or object specific arrays)
+    
+
+    int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
+    
+    int cur_running_index = 0;
+    //- This sets the start index in 'process_order' for each depth
+    //- The order is based on how many arrays came at lower depths
+    //- Note that we start from lowest depth first
+    //- Depth currently starts at 1 (0 index is empty) ... TODO: We should code this in with
+    //  defined levels in some header
+    //
+    //- e.g. if we have the following numbers of things (arrays or objects) at each depth:
+    //
+    //   0 1 2 3  <= depths
+    //  [2 3 2 1] Then we will note the following starts 
+    //                  (starting with deepest first)
+    //
+    //   0 1 2 3 4 5 6 7   <- indices in array
+    //  [x x   x     x  ]  <- x denotes first index for that depth
+    //   1 2   3     2     <- n values at depth
+    //
+    //  Now if we populate an array, with each of these starting locations
+    //  and process the array in order, we'll go continuously in depth
+    //  and, importantly for the arrays, we'll process deepest first.
+    for (int iDepth = n_depths - 1; iDepth > 0; iDepth--){
+        cur_depth_index[iDepth] = cur_running_index;
+        cur_running_index += n_values_at_depth[iDepth];
     }
     
-    TOC_AND_LOG(number_parse,number_parsing_time);
+    int cur_value_index = 0;
+    int cur_process_index;
+    //- Now we actually log the order in which to process the arrays
+    //- For every array, log when to process it, placing it as the 'next'
+    //  arrray to process based on its depth
+    for (int iData = 0; iData < n_entries; iData ++){
+        //TODO: We could do both arrays and objects at the same time ...
+        if (types[iData] == type_to_match){
+            cur_process_index = cur_depth_index[value_depths[cur_value_index]]++;
+            process_order[cur_process_index] = iData;
+            cur_value_index++;
+        }
+    }    
+    mxFree(cur_depth_index);
+}
+//=========================================================================
+//=========================================================================
+
+void check_for_nd_array(int array_md_index, int array_data_index, 
+        uint8_t *array_types, int *child_count_array, 
+        uint8_t *array_depths, int* child_size_stack, int *next_sibling_index_array,
+        uint8_t *types, int *d1, int n_children){
+    //
+    //Populates array_types[array_data_index]
     
+//     mexPrintf("1\n");
+    
+    //- Input is the type of processed array
+    //- Output is the new type of processed array
+    const uint8_t array_type_map2[9] = { 
+        ARRAY_OTHER_TYPE,   //Nothing
+        ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
+        ARRAY_ND_STRING,    //string
+        ARRAY_ND_LOGICAL,   //logical
+        ARRAY_OTHER_TYPE,   //object same type
+        ARRAY_OTHER_TYPE,   //object diff type
+        ARRAY_ND_NUMERIC,   //nd_numeric
+        ARRAY_ND_STRING,    //nd_string
+        ARRAY_ND_LOGICAL};  //nd_logical     
+    
+    
+    int child_md_index = array_md_index + 1;
+    int child_data_index = array_data_index + 1;
+    uint8_t first_child_array_type = array_types[child_data_index];
+    
+    //0 indicates that the child array does not hold homogenous data
+    //TODO: Do we want to allow nd arrays for objects?
+    //TODO: We should only allow ND_NUMERIC, ND_STRING, ND_LOGICAL, numeric, string, and logical
+    if (first_child_array_type == 0){
+        return;
+    }
+
+    int first_child_size = child_count_array[child_data_index];
+    uint8_t first_child_depth = array_depths[child_data_index];
+    
+    int moving_child_data_index;
+    
+    //Log the sizes of the first arrays
+    //i.e length(x[0]), length(x[0][0]), etc.
+    if (first_child_depth > 1){
+       moving_child_data_index = child_data_index + 1; 
+       for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
+           child_size_stack[iDepth] = child_count_array[moving_child_data_index];
+           moving_child_data_index++;
+       } 
+    }
+    
+    bool is_nd_array = true;
+    
+    //Algorithm explanation:
+    //----------------------
+    //Approach, for each child of the current array, compare its
+    //"first sizes" to the "first sizes" of the first child array
+    //
+    //i.e. does length(x[1]) == length(x[0]) and
+    //          length(x[1][0] == length(x[0][0]) and
+    //          length(x[1][0][0] == length(x[0][0][0]) etc.
+    //
+    //  We don't need to check something like the following:
+    //      length(x[1][1]) == length(x[0][0])
+    //  This is because we have already verified that all children
+    //  are the same (based on the array type). In other words, we
+    //  already know that if x[1] is an nd-array type, that
+    //  length(x[1][0]) == length(x[1][1]) == length(x[1][2]) etc.
+    //  Thus, checking length(x[1][1]) == length(x[0][0]) is 
+    //  redudndant if we know length(x[1][0]) == length(x[0][0])
+
+    
+//     mexPrintf("3\n");
+    
+    for (int iChild = 1; iChild < n_children; iChild++){
+
+        child_md_index = next_sibling_index_array[child_data_index];
+
+        child_data_index = d1[child_md_index];
+        
+//         if (child_data_index < 30){
+//             mexPrintf("child_md_index  %d\n",child_md_index);
+//             mexPrintf("child_data_index  %d\n",child_data_index);
+//         }
+        
+        //This is a data type check, not an array type check ...
+        if (types[child_md_index] != TYPE_ARRAY){
+            is_nd_array = false;
+            break;
+        }
+
+//         First child: 5
+// child_md_index  15197
+// 1:size  11:5057
+// 2:depth 1:1
+// 3:type  1:1
+// child_md_index  5063
+        
+        if (first_child_size == child_count_array[child_data_index] &&
+                first_child_depth == array_depths[child_data_index] &&
+                first_child_array_type == array_types[child_data_index]){
+            //Depth verification
+            moving_child_data_index = child_data_index+1;
+            //mexPrintf("Got to depth sameness check\n");
+            for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
+                if (child_size_stack[iDepth] != child_count_array[moving_child_data_index]){
+                    is_nd_array = false;
+                    break;
+                } 
+                moving_child_data_index++;
+            }
+        }else{
+//             if (child_data_index < 7){
+//                 mexPrintf("1:size  %d:%d\n",first_child_size,child_count_array[child_data_index]);
+//                 mexPrintf("2:depth %d:%d\n",first_child_depth,array_depths[child_data_index]);
+//                 mexPrintf("3:type  %d:%d\n",first_child_array_type,array_types[child_data_index]);
+//             }
+            is_nd_array = false;
+        }
+    }
+    
+//     mexPrintf("4\n");
+    
+    if (is_nd_array){
+        array_types[array_data_index]  = array_type_map2[array_types[child_data_index]];
+        //Bump up the dimension => e.g. 1d to 2d
+        array_depths[array_data_index] = array_depths[child_data_index] + 1;
+    }
 }
 
+
+
+//=========================================================================
+//=========================================================================
+//                          Array Flags
+//=========================================================================
+//=========================================================================
 void populate_array_flags(unsigned char *js,mxArray *plhs[]){
-    
-    //Transverse the structure
-    //i.e. if we have an object => check its keys
-    //if we have an array, summarize as described below
-    //
-    //Things to know
-    //- object array - 1d
-    //   - homogenous fields?
-    //- nd logical array
-    //- nd cellstr array
-    //- nd numerical array
-    
-    
-//Same object has:
-//1) Same # of children
-//2) Could keep track of # of characters - this could be post processed
-//3) Each string has the same length
-//4) final comparison of the actual strings - this could be done in parallel
-//with a potential cleanup of those that turned out not to be the same
-//Note, this could get messy as we run into comparing many to many
 //
-//Do we do this based on the same parent or the same depth?
 //
-//Same parent may not be optimum, but it probably is sufficient
-//- on not being the same, we could fall back to some alternative strategy
-//Parents would need to be post processed
-//
-//[ {'a':1,'b':2},{'a':1,'b':2}]
-//  o1            o2              <= both objects are the same, create a struct array
-//
-//[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
-//  o1            o2            o3      <= objects are not the same cell array of structs
+//  Populates
+//  ---------
+//  array_depths
+//  array_types
     
+    //TODO: I need to go through and rename things 
+    
+    //---- array info ------
+    mxArray *array_info = mxGetField(plhs[0],0,"array_info");
+    mwSize n_arrays = get_field_length2(array_info,"next_sibling_index_array");
+    
+    if (n_arrays == 0){
+        return;
+    }
+    uint8_t *array_depths = get_u8_field(array_info,"array_depths");
+    int *child_count_array = get_int_field(array_info,"child_count_array");
+    int *next_sibling_index_array = get_int_field(array_info,"next_sibling_index_array");
+    
+    //Extraction of relevant local variables
+    //---------------------------------------------------------------------
+    //---- main data info -----
+    uint8_t *types = (uint8_t *)get_field(plhs,"types");
+    int *d1 = (int *)get_field(plhs,"d1");
+    mwSize n_entries = get_field_length(plhs,"d1");
+    
+    //---- depth info ------
+    int *n_arrays_at_depth = get_int_field(array_info,"n_arrays_at_depth");
+    mwSize n_depths = get_field_length2(array_info,"n_arrays_at_depth");
+    
+    //---- object info ------
+    
+    mxArray *object_info = mxGetField(plhs[0],0,"object_info");
+    int n_objects = get_field_length2(object_info,"next_sibling_index_object");
+    
+    int *object_ids;
+    int *next_sibling_index_object;
+    if (n_objects != 0){
+        //object_ids could be null, which is fine
+        //but we are running a check to make sure it is not null so
+        //that we don't run into problems later on (from trying to use a null field)
+        //
+        //  i.e. we can't distinguish between a null pointer and
+        //  a missing call to mxGetField
+        
+        object_ids = get_int_field(object_info,"object_ids");  
+        next_sibling_index_object = get_int_field(object_info,"next_sibling_index_object");
+    }
+        
+    //Determining the order to process arrays
+    //---------------------------------------------------------------------    
+    int *process_order = mxMalloc(n_arrays*sizeof(int));
+    populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, n_arrays_at_depth, n_depths, array_depths);
+
+    
+    //Variable setup for actual processing
+    //---------------------------------------------------------------------
+
+    //Map the input types of an array to more generic mixed types
+    //e.g. true and false to logical
+    uint8_t array_type_map1[9] = { 
+        ARRAY_OTHER_TYPE,    //Nothing
+        ARRAY_OTHER_TYPE,    //Object
+        ARRAY_OTHER_TYPE,    //Array
+        ARRAY_OTHER_TYPE,    //Key
+        ARRAY_STRING_TYPE,   //String
+        ARRAY_NUMERIC_TYPE,  //Number
+        ARRAY_NUMERIC_TYPE,  //Null
+        ARRAY_LOGICAL_TYPE,  //True
+        ARRAY_LOGICAL_TYPE}; //False
+     
+    bool is_nd_array;
+    int object_array_type;
+    int n_children;
+    int child_size;
+    int child_depth;
+    int cur_child_array_index;
+    int cur_child_data_index;
+    
+    //md - main data
+    int cur_md_index;
+    
+    int cur_object_index;
+    
+    int cur_child_array_index2;
+    int cur_child_data_index2;
+    int cur_process_index;
+    int cur_array_index;
+    
+    int reference_object_id;
+    
+    int n_object_keys;
+    
+    //TODO: Check that this won't ever be exceeded
+    //TODO: Dynamically allocate this ...
+    int child_size_stack[20];
+
+    
+    //This is the output that is getting populated in this function
+    uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
+    
+    uint8_t cur_child_array_type;
+    for (int iArray = 0; iArray < n_arrays; iArray++){
+        cur_process_index = process_order[iArray];
+        cur_array_index = d1[cur_process_index];
+        
+        //We are redefining what array_depths means at this point
+        //since the memory isn't needed
+        //OLD: - how deep in the JSON structure, 1 => root, 2 => level below root
+        //NEW: 1 means the array holds raw data (numeric, string, logical)
+        //     2 means that the array holds arrays which hold raw data (i.e. 2d array)
+        array_depths[cur_array_index] = 0;
+        n_children = child_count_array[cur_array_index];
+        if (n_children){
+            //We are switching on the contents of the array, and we want
+            //to use this to determine the type of the array
+            switch (types[cur_process_index+1]){
+                case TYPE_OBJECT:
+                    //
+                    //[ {'a':1,'b':2},{'a':1,'b':2}]
+                    //  o1            o2              <= both objects are the same, create a struct array
+                    //
+                    //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
+                    //  o1            o2            o3      <= objects are not the same cell array of structs
+                    
+                    cur_object_index = RETRIEVE_DATA_INDEX((cur_process_index+1));
+                    reference_object_id = object_ids[cur_object_index];
+                    
+                    //We need to check 2 things:
+                    //1 - do we have an object in the next entry
+                    //2 - is the object of the same type?
+                    object_array_type = ARRAY_OBJECT_SAME_TYPE;
+                    for (int iChild = 1; iChild < n_children; iChild++){
+                        cur_md_index = next_sibling_index_object[cur_object_index];
+                        if (types[cur_md_index] == TYPE_OBJECT){
+                            cur_object_index = RETRIEVE_DATA_INDEX(cur_md_index);
+                            if (reference_object_id != object_ids[cur_object_index]){
+                                object_array_type = ARRAY_OBJECT_DIFF_TYPE;
+                            }
+                        }else{
+                            object_array_type = ARRAY_OTHER_TYPE;
+                        }
+                    }
+                    array_types[cur_array_index] = object_array_type;
+                    break;
+                case TYPE_ARRAY:
+                    //This indicates that our array holds an array.
+                    
+                    check_for_nd_array(cur_process_index, cur_array_index, 
+                        array_types, child_count_array, 
+                        array_depths, child_size_stack, next_sibling_index_array,
+                        types, d1, n_children);
+                    
+// // // // //                     mexPrintf("Nested array: %d\n",cur_array_index);
+// // // // //                     
+// // // // //                     cur_child_array_index = cur_array_index + 1;
+// // // // //                     cur_child_array_type = array_types[cur_child_array_index];
+// // // // //                     
+// // // // //                     //0 indicates that the child array does not hold homogenous data
+// // // // //                     if (cur_child_array_type == 0){
+// // // // //                         break;
+// // // // //                     }
+// // // // //                     
+// // // // //                     cur_child_data_index  = cur_process_index + 1;
+// // // // //                     child_size  = child_count_array[cur_child_array_index];
+// // // // //                     child_depth = array_depths[cur_child_array_index];
+// // // // // 
+// // // // //                     
+// // // // //                     //Log the sizes of the first array
+// // // // //                     if (child_depth > 1){
+// // // // //                        cur_child_array_index2 = cur_child_array_index + 1; 
+// // // // //                        for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+// // // // //                            child_size_stack[iDepth] = child_count_array[cur_child_array_index2];
+// // // // //                            cur_child_array_index2++;
+// // // // //                        } 
+// // // // //                     }
+// // // // //                     
+// // // // //                     //Split, based on whether we need to verify deeper or not
+// // // // //                     is_nd_array = true;
+// // // // //                     if (child_depth > 1){
+// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
+// // // // //                             //Note, we are now comparing the 2nd and later children
+// // // // //                             //to the first one ...
+// // // // //                             
+// // // // //                             //TODO: Make all of these indices 0 based
+// // // // //                             //-1 is for matlab to c conversion :/
+// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
+// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                                     
+// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+// // // // //                             
+// // // // //                             //TODO: The order of these should be switched
+// // // // //                             //i.e. we should assume that everything will match
+// // // // //                             if (child_size != child_count_array[cur_child_array_index] ||
+// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
+// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }else{
+// // // // //                                 //Depth verification
+// // // // //                                 cur_child_array_index2 = cur_child_array_index + 1;
+// // // // //                                 for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
+// // // // //                                     if (child_size_stack[iDepth] != child_count_array[cur_child_array_index2]){
+// // // // //                                         is_nd_array = false;
+// // // // //                                         break;
+// // // // //                                     } 
+// // // // //                                     cur_child_array_index2++;
+// // // // //                                 }
+// // // // //                             }
+// // // // //                         }
+// // // // //                         
+// // // // //                     //Single child depth, only need to check consistency of 
+// // // // //                     //size of children, not children's children
+// // // // //                     }else{
+// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
+// // // // //                             //TODO: Remove this two step process ... 
+// // // // //                             //TODO: Make all of these indices 0 based
+// // // // //                             //-1 is for matlab to c conversion :/
+// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
+// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                             
+// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
+// // // // // 
+// // // // //                             if (child_size != child_count_array[cur_child_array_index] || 
+// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
+// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
+// // // // //                                 is_nd_array = false;
+// // // // //                                 break;
+// // // // //                             }
+// // // // //                         }
+// // // // //                     }
+// // // // //                     
+// // // // //                     if (is_nd_array){
+// // // // //                         array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
+// // // // //                         //Bump up the dimension => e.g. 1d to 2d
+// // // // //                         array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
+// // // // //                     }
+                    break;
+                case TYPE_KEY:
+                    mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, key was found as child of array in post-processing");
+                    break;
+                //---------------------------------------------------------    
+                case TYPE_STRING:
+                case TYPE_NUMBER:
+                case TYPE_NULL:
+                case TYPE_TRUE:
+                case TYPE_FALSE:
+                    if (n_children == d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1){
+                        array_types[cur_array_index] = array_type_map1[types[cur_process_index+1]];
+                    }
+                    array_depths[cur_array_index] = 1;
+                    break;
+                //---------------------------------------------------------  
+                default:
+                    mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, unrecognized type in post-processing");
+                    break;
+            }
+                    
+        }
+    }
+    
+    mxFree(process_order);
+    setStructField(array_info,array_types,"array_types",mxUINT8_CLASS,n_arrays);
     
 }
 
-
-void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
+//=========================================================================
+//=========================================================================
+void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     //
-    //  Parses string or key characters into Matlab strings
+    //  Parses string characters into Matlab strings
     //  
     //  This includes:
     //  1) Initializaton of cell arrays and string Matlab objects
     //  2) Processing of character escapes => \n to newline
     //  3) Unicode escapes
-    //
     //
     
     //Goal is to replace escape characters with their values
@@ -500,7 +918,6 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         [114] = '\r',
         [116] = '\t'};
         
-
     //Input character
     //Output, numerical value to add, unless invalid then -1
     //e.g. a => 10
@@ -514,41 +931,21 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         [97] = 10, 11, 12, 13, 14, 15, 
         [103 ... 255] = -1};
 
-        
-    
     mxArray *temp;
     unsigned char **char_p;
     int n_entries;
     int *start_indices;
     int *end_indices;
+    int *sizes;
     
-    //These need to be outside the if statement, as they include declarations
+    temp = mxGetField(plhs[0],0,"string_p");
+
+    char_p = (unsigned char **)mxGetData(temp);
+    n_entries = mxGetN(temp);
+
+    temp = mxGetField(plhs[0],0,"string_sizes");
+    sizes = (int *)mxGetData(temp);
     
-    
-    if (is_key){
-        temp = mxGetField(plhs[0],0,"key_p");
-        
-        char_p = (unsigned char **)mxGetData(temp);
-        n_entries = mxGetN(temp);
-    
-        temp = mxGetField(plhs[0],0,"key_start_indices");
-        start_indices = (int *)mxGetData(temp);
-    
-        temp = mxGetField(plhs[0],0,"key_end_indices");
-        end_indices = (int *)mxGetData(temp);
-        
-    }else{
-        temp = mxGetField(plhs[0],0,"string_p");
-        
-        char_p = (unsigned char **)mxGetData(temp);
-        n_entries = mxGetN(temp);
-    
-        temp = mxGetField(plhs[0],0,"string_start_indices");
-        start_indices = (int *)mxGetData(temp);
-    
-        temp = mxGetField(plhs[0],0,"string_end_indices");
-        end_indices = (int *)mxGetData(temp);
-    }
     
     TIC(string_memory_allocation);
     //Initial allocation of memory
@@ -559,12 +956,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
     uint16_t *cell_data;
     uint16_t **all_cells_data = mxMalloc(n_entries*sizeof(cell_data));
     
-    //TODO: Implement matching of strings to preallocated strings
-    //and use reference count updating method
-    //http://stackoverflow.com/questions/18847833/is-it-possible-return-cell-array-that-contains-one-instance-in-several-cells
     for (int i = 0; i < n_entries; i++){
-        
-        n_chars_max_in_string = end_indices[i] - start_indices[i];
+        n_chars_max_in_string = sizes[i];
         
         //String initialization
         //--------------------------------------
@@ -580,22 +973,10 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
         all_cells_data[i] = cell_data;
         
         //Put the string in the cell array
-        mxSetCell(cell_array,i,temp_mx_array);
-        
+        mxSetCell(cell_array,i,temp_mx_array); 
     } 
+    TOC(string_memory_allocation,string_memory_allocation_time);
     
-    if (is_key){
-            //TOC_AND_LOG(key_parse,key_parsing_time);
-            //mxAddField(plhs[0],"keys");
-            //mxSetField(plhs[0],0,"keys",cell_array);     
-    }else{
-        TOC_AND_LOG(string_memory_allocation,string_memory_allocation_time);
-//             mxAddField(plhs[0],"strings");
-//             mxSetField(plhs[0],0,"strings",cell_array);        
-    }
-    
-    
-    TIC(key_parse);
     TIC(string_parse);
     
     //Parsing of the string into proper UTF-8
@@ -714,11 +1095,12 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
                  
                 //3 bytes    
                 }else if((*p >> 4) == 0b1110){
-                
-                //bits
-                //1 -> 4
-                //2 -> 6
-                //3 -> 6   => 16 total, fits into 2 bytes
+                //# of bits in each byte
+                // byte     # bits
+                //  1   ->  4
+                //  2   ->  6
+                //  3    -> 6   => 16 total bites => fits into 2 bytes
+                //    
                 //This also means that anything that is 4 bytes will
                 //never be valid when stored as 2 bytes
                 //TODO: We could do all the math with uint16t
@@ -768,22 +1150,42 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], bool is_key){
             mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
             //We have an error 
         }
-        
-        
     }
 
     mxFree(all_cells_data);
     
     //Storage of the data for later
     //---------------------------------------------------
-    if (is_key){
-        TOC_AND_LOG(key_parse,key_parsing_time);
-        mxAddField(plhs[0],"keys");
-        mxSetField(plhs[0],0,"keys",cell_array);     
-    }else{
-        TOC_AND_LOG(string_parse,string_parsing_time);
-        mxAddField(plhs[0],"strings");
-        mxSetField(plhs[0],0,"strings",cell_array);        
-    }
+    TOC(string_parse,string_parsing_time);
+    ADD_STRUCT_FIELD(strings,cell_array);
 
+}
+
+void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_info){
+    
+    TIC(start_pp);
+    
+    //mexPrintf("Object flags\n");
+    TIC(object_parse);
+    populate_object_flags(json_string,plhs);
+    TOC(object_parse,object_parsing_time);
+    
+    //mexPrintf("Key chars\n");
+    parse_key_chars(json_string,plhs);
+    
+    //mexPrintf("Array parse\n");
+    TIC(array_parse);
+    populate_array_flags(json_string,plhs);
+    TOC(array_parse,array_parsing_time);
+    
+    //mexPrintf("Number parase\n");
+    TIC(number_parse);
+    parse_numbers(json_string,plhs);
+    TOC(number_parse,number_parsing_time);
+    
+    //mexPrintf("char data\n");
+    parse_char_data(json_string,plhs,timing_info);
+        
+    TOC(start_pp,elapsed_pp_time);  
+    
 }

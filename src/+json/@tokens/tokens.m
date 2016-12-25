@@ -30,39 +30,20 @@ classdef tokens < handle
     %TYPE_DEFS = {'object','array','key','string','number','null','true','false'};
     
     properties
-        file_string %string of the file as bytes (with end padding)
-        %TODO: truncate the end padding by shortening the length of the 
-        %mxArray
+        json_string %string of the file/string as bytes (without end padding)
+        
+        object_info
+        array_info
+        key_info
+        
         
         %Data entries per token
         %----------------------------------------------------------
         types 
-
-        %TODO: next_sibling_index is a better name
-        token_after_close %Only valid for objects, arrays, and keys
-        
-        value_index %index of the value into array of that data type
-        %numeric or null => 'numeric_data' property
-        %string => 'strings' property
-        %key => 'keys' property
-        %
-        %Value is not valid for other types
-        child_count
-        
-        %************ Current Definitions ************
-        %                       d1                  d2
-        %     object: 1) type  2) n_values        3) tac
-        %     array:  1) type  2) n_values        3) tac
-        %     key:    1) type  2) start_pointer   3) tac
-        %
-        %     string: 1) type  2) start_pointer   3) end of string
-        %     number: 1) type  2) start_pointer
-        %     null:   1) type  2) start_pointer
-        %     tf      1) type
+        data_indices
         
         %TODO: rename to numbers
-        numeric_data
-        keys 
+        numbers
         strings
         
         mex %structure that is populated from mex data
@@ -76,7 +57,7 @@ classdef tokens < handle
         function value = get.parse_info(obj)
            value = obj.h_parsed_info;
            if isempty(value)
-              value = json.token_info.parsing_info(obj, obj.mex, obj.toc_total_time);
+              value = json.token_info.parsing_info(obj, obj.mex);
               obj.h_parsed_info = value;
            end
         end
@@ -85,8 +66,6 @@ classdef tokens < handle
     properties (Hidden)
         toc_total_time
         h_parsed_info
-        d1
-        d2
     end
     
     methods
@@ -120,30 +99,27 @@ classdef tokens < handle
             
             obj.mex = result;
             
-            obj.file_string = result.json_string;
+            obj.json_string = result.json_string;
             
             obj.types = result.types;
-            obj.d1 = result.d1;
-            obj.d2 = result.d2;
-            
-            %Aliasing ------------------------
-            obj.token_after_close = obj.d2;
-            obj.value_index = obj.d1;
-            obj.child_count = obj.d1;
+            obj.data_indices = result.d1;
             
             
-            obj.numeric_data = result.numeric_p;            
+            obj.numbers = result.numeric_p;            
             obj.strings = result.strings;
-            %obj.keys = result.keys;
             
+        end
+        function data = getParsedData(obj)
+            %Call the mex code
+            data = json_info_to_data(0,obj.mex,1);
         end
         function root = getRootInfo(obj)
             switch obj.types(1)
                 case 1
                     %name,full_name,index,parse_object
-                    root = json.token_info.object_token_info('root','root',1,obj);
+                    root = json.token_info.object_token_info('root','root',1,obj.mex);
                 case 2
-                    root = json.token_info.array_token_info('root','root',1,obj);
+                    root = json.token_info.array_token_info('root','root',1,obj.mex);
                     %error('Not yet implemented')
                     %output = parse_array(str,j,1,numeric_data,in);
                 otherwise

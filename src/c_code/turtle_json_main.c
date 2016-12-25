@@ -1,126 +1,18 @@
 #include "turtle_json.h"
 
-//KEY PROCESSING
-//---------------
-//In order to improve processing we key TAC and parent information
-//processing in the key's value. For simple values such as numbers or
-//strings we have relatively little to do. For complex values (objects 
-//and arrays) we log the key as a parent node which will have subsequent 
-//children.
-//
-//number, string, null, true, false - store TAC, 
-//array - store parent info
-//
-//When closing, we need to call different comma processors or closers.
+/*
+ *  This file does the initial parsing of the file. After the parse_json()
+ *  function has run, we know how many objects, arrays, etc. that we have
+ *  and where they are located. This function does not translate character
+ *  arrays into numbers or proper strings/keys.
+ *
+ */
 
-
-// parent type - use pointers
-
-//TODO: Allow string input to function
-
-//TODO: store initial and final allocation sizes for each type
-//TODO: Create method for creating scalar and saving into struct - for above TODO
-
-
-//TODO: Build in if statements on keys
-
-
-//DEBUGGING
-#define ERROR_DEPTH goto S_ERROR_DEPTH;
 
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
-
+  
 //=========================================================================
-//              Data Allocation and index advancement
-//=========================================================================
-
-#define INCREMENT_DATA_INDEX \
-    ++current_data_index; \
-	if (current_data_index > data_size_index_max){ \
-        ++n_data_allocations; \
-        data_size_allocated = ceil(1.5*data_size_allocated); \
-        data_size_index_max = data_size_allocated-1; \
-        \
-        types = mxRealloc(types,data_size_allocated); \
-        d1 = mxRealloc(d1,data_size_allocated*sizeof(int)); \
-        d2 = mxRealloc(d2,data_size_allocated*sizeof(int)); \
-    }
-
-//-----------------   Key Memory Management -------------------------------    
-#define ALLOCATE_KEY_DATA \
-    unsigned char **key_p = mxMalloc(key_size_allocated * sizeof(unsigned char *)); \
-    int *key_sizes =  mxMalloc(key_size_allocated * sizeof(int));
-            
-#define INCREMENT_KEY_INDEX \
-    ++current_key_index; \
-    if (current_key_index > key_size_index_max) { \
-        ++n_key_allocations; \
-        key_size_allocated = ceil(1.5*key_size_allocated); \
-        key_size_index_max = key_size_allocated - 1; \
-        key_p = mxRealloc(key_p,key_size_allocated * sizeof(unsigned char *)); \
-        key_sizes = mxRealloc(key_sizes,key_size_allocated * sizeof(int)); \
-    }
-    
-#define TRUNCATE_KEY_DATA \
-    key_p = mxRealloc(key_p,(current_key_index + 1)*sizeof(unsigned char *)); \
-    key_sizes = mxRealloc(key_sizes,(current_key_index + 1) * sizeof(int));
-    
-//-----------------   String Memory Management ----------------------------    
-#define ALLOCATE_STRING_DATA \
-    unsigned char **string_p = mxMalloc(string_size_allocated * sizeof(unsigned char *)); \
-    int *string_end_indices = mxMalloc(string_size_allocated * sizeof(int)); \
-    int *string_start_indices = mxMalloc(string_size_allocated * sizeof(int));
-    
-#define INCREMENT_STRING_INDEX \
-    ++current_string_index; \
-    if (current_string_index > string_size_index_max) { \
-        ++n_string_allocations; \
-        string_size_allocated = ceil(1.5*string_size_allocated); \
-        string_size_index_max = string_size_allocated - 1; \
-        string_p = mxRealloc(string_p,string_size_allocated * sizeof(unsigned char *)); \
-        string_end_indices = mxRealloc(string_end_indices,string_size_allocated * sizeof(int)); \
-        string_start_indices = mxRealloc(string_start_indices,string_size_allocated * sizeof(int)); \
-    }
-    
-#define TRUNCATE_STRING_DATA \
-    string_p = mxRealloc(string_p,(current_string_index + 1)*sizeof(unsigned char *)); \
-	string_end_indices = mxRealloc(string_end_indices,(current_string_index + 1) * sizeof(int)); \
- 	string_start_indices = mxRealloc(string_start_indices,(current_string_index + 1) * sizeof(int));
-    
-//-----------------   Numeric Memory Management ---------------------------
-#define ALLOCATE_NUMERIC_DATA unsigned char **numeric_p = mxMalloc(numeric_size_allocated * sizeof(unsigned char *));  
-
-//TODO: This is named inconsistently vs strings and keys and data, choose a consistent name
-#define EXPAND_NUMERIC_CHECK \
-    ++current_numeric_index; \
-    if (current_numeric_index > numeric_size_index_max) { \
-        ++n_numeric_allocations; \
-        numeric_size_allocated = ceil(1.5*numeric_size_allocated); \
-        numeric_size_index_max = numeric_size_allocated - 1; \
-        numeric_p = mxRealloc(numeric_p,numeric_size_allocated * sizeof(unsigned char *)); \
-    }
-    
-#define TRUNCATE_NUMERIC_DATA numeric_p = mxRealloc(numeric_p,(current_numeric_index + 1)*sizeof(unsigned char *));
-
-
-//Things for opening    =====    [ { :    =================================
-#define INCREMENT_PARENT_SIZE parent_sizes[current_depth] += 1
-
-#define SET_TYPE(x) types[current_data_index] = x;            
-            
-//TODO: The size isn't needed for keys - we could call two different macros ...
-#define INITIALIZE_PARENT_INFO(x) \
-        ++current_depth; \
-        if (current_depth > 200){\
-            goto S_ERROR_DEPTH_EXCEEDED; \
-        }\
-        parent_types[current_depth] = x; \
-        parent_indices[current_depth] = current_data_index; \
-        parent_sizes[current_depth] = 0;
-            
-//=========================================================================
-//=================          Processing      ==============================
 //=========================================================================
 // The main code is essentially a state machine. States within the machine
 // have the following rough layout:
@@ -129,122 +21,190 @@
 //      2) common processing
 //      3) navigation to the next state
 //        
-//  Code below is for #2, the processing that is commen to the type
-//  regardless of whether or not it is in a key or array
+    
+//===================  Index functions  ===================================
+
+
+//===================    Opening    [ { :    ==============================
+#define INCREMENT_PARENT_SIZE \
+    parent_sizes[current_depth] += 1
+
+#define SET_TYPE(x) \
+    types[current_data_index] = x;            
+
+#define INITIALIZE_PARENT_INFO_OA(x) \
+        ++current_depth; \
+        if (current_depth > 200){\
+            goto S_ERROR_DEPTH_EXCEEDED; \
+        }\
+        parent_types[current_depth] = x; \
+        parent_indices[current_depth] = current_data_index; \
+        parent_sizes[current_depth] = 0;
+
+//TODO: Including a separate definition for key may give worse performance ...
+//key does not care about size, size = 1
+#define INITIALIZE_PARENT_INFO_KEY(x) \
+        ++current_depth; \
+        if (current_depth > 200){\
+            goto S_ERROR_DEPTH_EXCEEDED; \
+        }\
+        parent_types[current_depth] = x; \
+        parent_indices[current_depth] = current_data_index;        
         
-#define PROCESS_OPENING_OBJECT \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_OBJECT); \
-    INITIALIZE_PARENT_INFO(TYPE_OBJECT);
+#define LOG_ARRAY_DEPTH \
+        array_depths[current_array_index] = current_depth; \
+        n_arrays_at_depth[current_depth] += 1;
+        
+#define LOG_OBJECT_DEPTH \
+        object_depths[current_object_index] = current_depth; \
+        n_objects_at_depth[current_depth] += 1;          
     
-#define PROCESS_OPENING_ARRAY \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_ARRAY); \
-    INITIALIZE_PARENT_INFO(TYPE_ARRAY); \
-
-#define PROCESS_STRING \
-    INCREMENT_STRING_INDEX; \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_STRING); \
-    temp_p = CURRENT_POINTER; \
-    /* +1 to point past the opening quote */ \
-    string_p[current_string_index] = CURRENT_POINTER + 1; \
-    string_start_indices[current_string_index] = n_string_chars; \
-    /* + 1 for Matlab indexing */ \
-    d1[current_data_index] = current_string_index + 1; \
-    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
-    n_string_chars += CURRENT_POINTER - string_p[current_string_index]; \
-    string_end_indices[current_string_index] = n_string_chars;
-
-#define PROCESS_KEY \
-    INCREMENT_KEY_INDEX; \
-    INCREMENT_DATA_INDEX; \
-    /* This step is now done in some key values */ \
-    /* //INITIALIZE_PARENT_INFO(TYPE_KEY); */ \
-    SET_TYPE(TYPE_KEY); \
-    /* We want to skip the opening quotes */ \
-    key_p[current_key_index] = CURRENT_POINTER + 1; \
-    /* Index into key arrays */ \
-    d1[current_data_index]   = current_key_index + 1; \
-    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
-    /* We won't count the closing quote, but we would normally add 1 to */ \
-    /* be inclusive on a count, so they cancel out */ \
-    key_sizes[current_key_index] = CURRENT_POINTER - key_p[current_key_index]; \
-    n_key_chars += key_sizes[current_key_index];
-                
-#define PROCESS_NUMBER \
-    EXPAND_NUMERIC_CHECK; \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_NUMBER); \
-    numeric_p[current_numeric_index] = CURRENT_POINTER; \
-    /* Add 1 for Matlab indexing */ \
-    d1[current_data_index] = current_numeric_index + 1; \
-    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
+//========================      Closing     ===============================
+#define RETRIEVE_CURRENT_PARENT_INDEX \
+    current_parent_data_index = parent_indices[current_depth];
     
-#define PROCESS_NULL \
-    EXPAND_NUMERIC_CHECK; \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_NULL); \
-    numeric_p[current_numeric_index] = 0; \
-    d1[current_data_index] = current_numeric_index; \
-    /*TODO: Add null check ... */ \
-	ADVANCE_POINTER_BY_X(3)    
-           
-#define PROCESS_TRUE \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_TRUE); \
-    /*TODO: Add true check ... */ \
-	ADVANCE_POINTER_BY_X(3);
-            
-#define PROCESS_FALSE \
-    INCREMENT_DATA_INDEX; \
-    SET_TYPE(TYPE_FALSE); \
-    /*TODO: Add false check ... */ \
-	ADVANCE_POINTER_BY_X(4);
-                
-//==============      Things for closing      =============================
-//+1 to next element
-//+1 for Matlab 1 based indexing
-#define STORE_TAC_OF_OBJECT_OR_ARRAY d2[current_parent_index] = current_data_index + 2;
+//Origin of +1 => points to element after current index
+//TODO: We might want to redefine the sibling index to point to 
+//The next value at the same level -> i.e. instead of current_data_index
+// use something like cur_key_index, etc.
+// - I think this redefinition might be most useful for keys
+// - probably needs to stay this way for arrays
+#define STORE_NEXT_SIBLING_OF_OBJECT \
+    next_sibling_index_object[d1[current_parent_data_index]] = current_data_index + 1;
+
+#define STORE_NEXT_SIBLING_OF_ARRAY \
+    next_sibling_index_array[d1[current_parent_data_index]] = current_data_index + 1;
+ 
+#define STORE_NEXT_SIBLING_KEY_COMPLEX \
+    next_sibling_index_key[d1[current_parent_data_index]] = current_data_index + 1;
     
 //This is called before the simple value, so we need to advance to the simple
 //value and then do the next value (i.e the token after close)
 //Note that we're working with the current_data_index since we haven't
 //advanced it yet and don't need to rely on a parent index (which hasn't even
 //been set since the value is simple)
-#define STORE_TAC_KEY_SIMPLE d2[current_data_index] = current_data_index + 3;  
+#define STORE_NEXT_SIBLING_KEY_SIMPLE \
+    next_sibling_index_key[current_key_index] = current_data_index + 2;
+   
+#define STORE_SIZE_OBJECT \
+    child_count_object[d1[current_parent_data_index]] = parent_sizes[current_depth];
     
-#define STORE_TAC_KEY_COMPLEX d2[current_parent_index] = current_data_index + 2;    
-            
-#define STORE_SIZE d1[current_parent_index] = parent_sizes[current_depth];
-            
+#define STORE_SIZE_ARRAY \
+    child_count_array[d1[current_parent_data_index]] = parent_sizes[current_depth];    
+        
 #define MOVE_UP_PARENT_INDEX --current_depth;
 
 #define IS_NULL_PARENT_INDEX current_depth == 0     
             
-#define PARENT_TYPE parent_types[current_depth]            
+#define PARENT_TYPE parent_types[current_depth]         
+        
 //=========================================================================
+//=================          Processing      ==============================
+//=========================================================================
+#define PROCESS_OPENING_OBJECT \
+    INCREMENT_MD_INDEX; \
+    INCREMENT_OBJECT_INDEX; \
+    SET_TYPE(TYPE_OBJECT); \
+    STORE_DATA_INDEX(current_object_index); \
+    INITIALIZE_PARENT_INFO_OA(TYPE_OBJECT); \
+    LOG_OBJECT_DEPTH;
+    
+#define PROCESS_OPENING_ARRAY \
+    INCREMENT_MD_INDEX; \
+    INCREMENT_ARRAY_INDEX; \
+    SET_TYPE(TYPE_ARRAY); \
+    STORE_DATA_INDEX(current_array_index); \
+    INITIALIZE_PARENT_INFO_OA(TYPE_ARRAY); \
+    LOG_ARRAY_DEPTH;        
+
+#define PROCESS_STRING \
+    INCREMENT_STRING_INDEX; \
+    INCREMENT_MD_INDEX; \
+    SET_TYPE(TYPE_STRING); \
+    temp_p = CURRENT_POINTER; \
+    /* +1 to point past the opening quote */ \
+    string_p[current_string_index] = CURRENT_POINTER + 1; \
+    STORE_DATA_INDEX(current_string_index); \
+    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
+    string_sizes[current_string_index] = CURRENT_POINTER - string_p[current_string_index]; \
+
+#define PROCESS_KEY_NAME \
+    INCREMENT_KEY_INDEX; \
+    INCREMENT_MD_INDEX; \
+    /* Parent info initialization now done in key values */ \
+    SET_TYPE(TYPE_KEY); \
+    /* We want to skip the opening quotes so + 1 */ \
+    key_p[current_key_index] = CURRENT_POINTER + 1; \
+    STORE_DATA_INDEX(current_key_index); \
+    seek_string_end(CURRENT_POINTER,&CURRENT_POINTER); \
+    /* We won't count the closing quote, but we would normally add 1 to */ \
+    /* be inclusive on a count, so they cancel out */ \
+    key_sizes[current_key_index] = CURRENT_POINTER - key_p[current_key_index]; \
+                
+#define PROCESS_NUMBER \
+    EXPAND_NUMERIC_CHECK; \
+    INCREMENT_MD_INDEX; \
+    SET_TYPE(TYPE_NUMBER); \
+    numeric_p[current_numeric_index] = CURRENT_POINTER; \
+    STORE_DATA_INDEX(current_numeric_index); \
+    string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
+    
+#define PROCESS_NULL \
+    EXPAND_NUMERIC_CHECK; \
+    INCREMENT_MD_INDEX; \
+    SET_TYPE(TYPE_NULL); \
+    numeric_p[current_numeric_index] = 0; \
+    STORE_DATA_INDEX(current_numeric_index); \
+    /*TODO: Add null check ... */ \
+	ADVANCE_POINTER_BY_X(3)    
+           
+#define PROCESS_TRUE \
+    INCREMENT_MD_INDEX; \
+    SET_TYPE(TYPE_TRUE); \
+    STORE_DATA_INDEX(++current_logical_index); \
+    /*TODO: Add true check ... */ \
+	ADVANCE_POINTER_BY_X(3);
+            
+#define PROCESS_FALSE \
+    INCREMENT_MD_INDEX; \
+    SET_TYPE(TYPE_FALSE); \
+    STORE_DATA_INDEX(++current_logical_index); \
+    /*TODO: Add false check ... */ \
+	ADVANCE_POINTER_BY_X(4);
+                
+           
+
   
-//================      Navigation       ==================================
-//=========================================================================      
-#define CURRENT_CHAR *p
+//================       Navigation       =================================  
+#define CURRENT_CHAR    *p
 #define CURRENT_POINTER p
-#define CURRENT_INDEX p - js
+#define CURRENT_INDEX   p - js
 #define ADVANCE_POINTER_AND_GET_CHAR_VALUE *(++p)
 #define DECREMENT_POINTER --p 
 #define ADVANCE_POINTER_BY_X(x) p += x;
 #define REF_OF_CURRENT_POINTER &p;
     
+//Hex of 9,     10,     13,     32
+//      htab    \n      \r     space
 #define INIT_LOCAL_WS_CHARS \
     const __m128i whitespace_characters = _mm_set1_epi32(0x090A0D20);
 
-//TODO: Describe what this does
+//We are trying to get to the next non-whitespace character as fast as possible
+//Ideally, there are 0 or 1 whitespace characters to the next value
+//
+//With human-readable JSON code there may be many spaces for indentation
+//e.g.    
+//          {
+//                   "key1":1,
+//                   "key2":2,
+// -- whitespace --  "key3":3, etc.
+//
 #define ADVANCE_TO_NON_WHITESPACE_CHAR  \
-    /* This might fail alot on newlines :/ */ \
-    /* we might do an OR with \n => == ' ' OR = '\n' */ \
+    /* Ideally, we want to quit early with a space, and then no-whitespace */ \
     if (*(++p) == ' '){ \
         ++p; \
     } \
+    /* All whitespace are less than or equal to the space character (32) */ \
     if (*p <= ' '){ \
         chars_to_search_for_ws = _mm_loadu_si128((__m128i*)p); \
         ws_search_result = _mm_cmpistri(whitespace_characters, chars_to_search_for_ws, SIMD_SEARCH_MODE); \
@@ -260,7 +220,6 @@
 
             
 #define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
-     
 #define DO_ARRAY_JUMP goto *array_jump[CURRENT_CHAR]
                 
 #define NAVIGATE_AFTER_OPENING_OBJECT \
@@ -287,7 +246,7 @@
 	}
     
 //This is for values following a key that are simple such as:
-//number, string, null, fales, true    
+//number, string, null, false, true    
     
 #define PROCESS_END_OF_KEY_VALUE_SIMPLE \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
@@ -305,13 +264,22 @@
         default: \
             goto S_ERROR_END_OF_VALUE_IN_KEY; \
 	}          
-            
+
+#define PROCESS_END_OF_KEY_VALUE_SIMPLE_AT_COMMA \
+        ADVANCE_TO_NON_WHITESPACE_CHAR; \
+        if (CURRENT_CHAR == '"') { \
+            goto S_PARSE_KEY; \
+        } \
+        else { \
+            goto S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA; \
+        }INCREMENT_PARENT_SIZE
+    
 #define PROCESS_END_OF_KEY_VALUE_COMPLEX \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
 	switch (CURRENT_CHAR) { \
         case ',': \
-            current_parent_index = parent_indices[current_depth]; \
-            STORE_TAC_KEY_COMPLEX; \
+            RETRIEVE_CURRENT_PARENT_INDEX; \
+            STORE_NEXT_SIBLING_KEY_COMPLEX; \
             MOVE_UP_PARENT_INDEX; \
             ADVANCE_TO_NON_WHITESPACE_CHAR; \
             if (CURRENT_CHAR == '"') { \
@@ -344,51 +312,14 @@
     }    
     
 //=========================================================================
+//=========================================================================    
 const int SIMD_SEARCH_MODE = _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_NEGATIVE_POLARITY | _SIDD_BIT_MASK;
 __m128i chars_to_search_for_ws;
 int ws_search_result;            
-
-void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
-{
-    //This is a helper function for setting the field in the output struct
-    //
-    //This should be used for storing dynamically allocated memory
-    //
-    //  See Also
-    //  --------
-    //  setIntScalar
-        
-    mxArray *pm;
-    
-    pm = mxCreateNumericArray(0, 0, classid, mxREAL);
-    mxSetData(pm, pr);
-    mxSetM(pm, 1);
-    mxSetN(pm, N);
-    mxAddField(s,fieldname);
-    mxSetField(s,0,fieldname,pm);
-}
-
-void setIntScalar(mxArray *s, const char *fieldname, int value){
-
-    //This function allows us to hold onto integer scalars
-    //We need to make an allocation to grab a value off the stack
-    
-    mxArray *pm;
-    
-    int *temp_value = mxMalloc(sizeof(double));
-    
-    *temp_value = value;
-    
-    pm = mxCreateNumericArray(0, 0, mxINT32_CLASS, mxREAL);
-    mxSetData(pm, temp_value);
-    mxSetM(pm, 1);
-    mxSetN(pm, 1);
-    mxAddField(s,fieldname);
-    mxSetField(s,0,fieldname,pm);    
-    
-}
-
 //-------------------------------------------------------------------------
+
+//=========================================================================
+//=========================================================================
 void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
 
     //In this approach we look for math like characters. We parse for
@@ -414,12 +345,14 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         //TODO: I should explicitly describe the max here
         //####.#####E###
         if (digit_search_result == 16){
-        	mexErrMsgIdAndTxt("jsmn_mex:too_long_math", "too many digits when parsing a number");
+        	mexErrMsgIdAndTxt("turtle_json:too_long_math", "too many digits when parsing a number");
         }
     }
     
     *char_offset = p;    
 }
+
+//const __m256i double_quotes_32x = _mm256_set1_epi8;
 
 //-------------------------------------------------------------------------
 void seek_string_end(unsigned char *p, unsigned char **char_offset){
@@ -427,15 +360,23 @@ void seek_string_end(unsigned char *p, unsigned char **char_offset){
     //advance past initial double-quote character
     ++p;
     
+//     while (1){
+//         __m256i x = _mm_loadu_si256((__mm256i *) p);
+//         __m256i result = _mm256_cmpeq_epi8 (x,double_quotes_32x);
+//         
+//         //How to find the bit answer?????
+//         //ffsll
+//     }
+    
 STRING_SEEK:    
     //Old code - strchr apparently will check for null, but currently
     //we are padding to ensure we only need to look for '"'
     //p = strchr(p+1,'"');
     
     //TODO: We could try more complicated string instructions
-    //Ideally we could have a switch on this for:
-    //1) User options - which to use
-    //2) Keys vs string values
+    //1) SIMD
+    //2) Keys vs string values - assume keys are shorter
+    
     
     while (*p != '"'){
       ++p;    
@@ -486,23 +427,21 @@ STRING_SEEK:
         *char_offset = p+1;
     } 
 }
-
+//=========================================================================
+//=========================================================================
 //=========================================================================
 //              Parse JSON   -    Parse JSON    -    Parse JSON
 //=========================================================================
-void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Options *options) {
+//=========================================================================
+//=========================================================================
+void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
+        Options *options, mxArray *timing_info) {
     
     //TODO: Check string_byte_length - can't be zero ...
     
     //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
-    
-    //Note, this occurs after we've opened an array
-    //or a comma. In the case of opening an array, we've already verified
-    //that we aren't closing right away. We can't put this here as
-    //it wouldn't be correct following a comma:
-    //[] ok
-    //["value",]
+
     const void *array_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [34]        = &&S_PARSE_STRING_IN_ARRAY,            // "
@@ -521,7 +460,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
         [117 ... 122] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY,
         [123]         = &&S_OPEN_OBJECT_IN_ARRAY,           // {
         [124 ... 255] = &&S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY};
-        
+
     const void *key_jump[256] = {
         [0 ... 33]  = &&S_ERROR_TOKEN_AFTER_KEY,
         [34]        = &&S_PARSE_STRING_IN_KEY,      // "
@@ -545,23 +484,23 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     unsigned char *temp_p;
     
     DEFINE_TIC(parsed_data_logging);
-    
-    //clock_t parsed_data_logging;
-    
+        
     //---------------------------------------------------------------------
-    const int MAX_DEPTH = 200;
-    int parent_types[201];
-    //This needs to be indices instead of pointers because
-    //we might resize (resize types, d1, d2) and the pointers would become 
-    //invalid
-    int parent_indices[201];
-    int parent_sizes[201];
-    int current_parent_index;
+    //TODO: This should be made dynamic, with user capable modification
+    const int MAX_DEPTH = 20; //0 to N
+    int parent_types[21];
+    int parent_indices[21];
+    int parent_sizes[21];
+    int *n_arrays_at_depth = mxCalloc(21,sizeof(int));
+    int *n_objects_at_depth = mxCalloc(21,sizeof(int));
+    int current_parent_data_index;
     int current_depth = 0;
     
     //---------------------------------------------------------------------
-    int data_size_allocated;
+    int current_logical_index = -1; 
+    //---------------------------------------------------------------------
     int n_data_allocations = 1;
+    int data_size_allocated;
     //TODO: Implement chars per token
     if (options->n_tokens){
         data_size_allocated = options->n_tokens;
@@ -570,16 +509,22 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int data_size_index_max = data_size_allocated - 1;
     int current_data_index = -1;
-    
-    //TODO: Move this to a macro next to the increment
-    uint8_t *types = mxMalloc(data_size_allocated);            
-    int *d1 = mxMalloc(data_size_allocated * sizeof(int));
-    int *d2 = mxMalloc(data_size_allocated * sizeof(int));
+    INITIALIZE_MAIN_DATA;
     //---------------------------------------------------------------------
-    
+    int n_object_allocations = 1;
+    int object_size_allocated = ceil((double)string_byte_length/100);
+    int object_size_index_max = object_size_allocated - 1;
+    int current_object_index = -1;
+    INITIALIZE_OBJECT_DATA;
+    //---------------------------------------------------------------------
+    int n_array_allocations = 1;
+    int array_size_allocated = ceil((double)string_byte_length/100);
+    int array_size_index_max = array_size_allocated - 1;
+    int current_array_index = -1;
+    INITIALIZE_ARRAY_DATA;
+    //---------------------------------------------------------------------
     int n_key_chars = 0;
     int n_key_allocations  = 1; //Not yet implemented
-    
     int key_size_allocated;
     if (options->n_keys){
         key_size_allocated = options->n_keys;
@@ -588,8 +533,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int key_size_index_max = key_size_allocated-1;
     int current_key_index = -1;
-    ALLOCATE_KEY_DATA 
-    
+    INITIALIZE_KEY_DATA;
+    //---------------------------------------------------------------------
     int n_string_chars = 0;
     int n_string_allocations = 1;
     int string_size_allocated;
@@ -600,8 +545,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int string_size_index_max = string_size_allocated-1;
     int current_string_index = -1;
-    ALLOCATE_STRING_DATA
-   
+    INITIALIZE_STRING_DATA;
+    //---------------------------------------------------------------------
     int n_numeric_allocations = 1;
     int numeric_size_allocated;
     if (options->n_numbers){
@@ -611,10 +556,15 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
     }
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = -1;
-    ALLOCATE_NUMERIC_DATA
-    
-    
-//Start of the parsing ====================================================
+    INITIALIZE_NUMERIC_DATA
+    //---------------------------------------------------------------------
+//=========================================================================    
+//        ================= Start of the parsing =================
+//=========================================================================
+            
+    //We decrement so that we can use the same advance to non-whisespace
+    //code that we use everywhere else, where we assume that we've already
+    //consumed the current character, even though we may not have
     DECREMENT_POINTER;
 	ADVANCE_TO_NON_WHITESPACE_CHAR;
 
@@ -631,73 +581,91 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],Op
 
 //    [ {            ======================================================
 S_OPEN_OBJECT_IN_ARRAY:
-    
-    
     INCREMENT_PARENT_SIZE;
     PROCESS_OPENING_OBJECT;
     NAVIGATE_AFTER_OPENING_OBJECT;
-    
 
 //   "key": {        ====================================================== 
 S_OPEN_OBJECT_IN_KEY:
-    
-    INITIALIZE_PARENT_INFO(TYPE_KEY);
+    INITIALIZE_PARENT_INFO_KEY(TYPE_KEY);
     PROCESS_OPENING_OBJECT;
     NAVIGATE_AFTER_OPENING_OBJECT;
   
 //=============================================================
-S_CLOSE_KEY_COMPLEX_AND_OBJECT:    
-    //Update tac and parent
-        
-    current_parent_index = parent_indices[current_depth];    
-    STORE_TAC_KEY_COMPLEX;
+S_CLOSE_KEY_COMPLEX_AND_OBJECT:
+    //We need to close both the key, and the object
+    RETRIEVE_CURRENT_PARENT_INDEX; 
+    STORE_NEXT_SIBLING_KEY_COMPLEX;
+    
+    //Move up to the object
     MOVE_UP_PARENT_INDEX;
 
-    //Fall Through ------
+    //Fall Through --
+    //               |      !
+    //               |    \O/ 
+    //               |     |
+    //               |    / \
+    //               |
+    //               |
 S_CLOSE_OBJECT:
-    
-    current_parent_index = parent_indices[current_depth];
-    STORE_TAC_OF_OBJECT_OR_ARRAY;
-    STORE_SIZE;
+    RETRIEVE_CURRENT_PARENT_INDEX;
+    STORE_NEXT_SIBLING_OF_OBJECT;
+    STORE_SIZE_OBJECT;
     MOVE_UP_PARENT_INDEX;
-    
-    NAVIGATE_AFTER_CLOSING_COMPLEX
+    NAVIGATE_AFTER_CLOSING_COMPLEX;
     
 //=============================================================
-S_OPEN_ARRAY_IN_ARRAY:
-	
-    //mexPrintf("Opening array in array: %d\n",CURRENT_INDEX);
-    
+S_OPEN_ARRAY_IN_ARRAY:  
     INCREMENT_PARENT_SIZE;
     PROCESS_OPENING_ARRAY;   
     NAVIGATE_AFTER_OPENING_ARRAY;
     
 //=============================================================
-S_OPEN_ARRAY_IN_KEY:
-        
-    //mexPrintf("Opening array in key: %d\n",CURRENT_INDEX);
-    
-    INITIALIZE_PARENT_INFO(TYPE_KEY);
+S_OPEN_ARRAY_IN_KEY:         
+    INITIALIZE_PARENT_INFO_KEY(TYPE_KEY);
     PROCESS_OPENING_ARRAY;
 	NAVIGATE_AFTER_OPENING_ARRAY;
             
 //=============================================================
 S_CLOSE_ARRAY:
+    RETRIEVE_CURRENT_PARENT_INDEX;
+    STORE_NEXT_SIBLING_OF_ARRAY;
+    STORE_SIZE_ARRAY;
+
+    //Ideally we could avoid the check on the parent_sizes
+    //We run into a problem if we ever have an empty array
+    //d1[current_parent_data_index+1] could access out of bounds memory
+    //
+    //TODO: We need to have a merged type (e.g. number or null) (true or false)
+    //TODO: log logical types
     
-    current_parent_index = parent_indices[current_depth];
-    STORE_TAC_OF_OBJECT_OR_ARRAY;
-    STORE_SIZE;
+//     if (parent_sizes[current_depth] && \
+//             (parent_sizes[current_depth]  == (d1[current_data_index] - d1[current_parent_data_index+1] + 1))){
+//         
+//         //TODO: We may to log homogenous arrays separately, so that we only
+//         //try and post-parse non-homogenous
+//         //array_depths[RETRIEVE_DATA_INDEX(current_parent_data_index)] = array_type_map[types[current_data_index]];
+//         
+//         n_arrays_at_depth[current_parent_data_index] -= 1;
+//     }
+
     MOVE_UP_PARENT_INDEX;
-    
     NAVIGATE_AFTER_CLOSING_COMPLEX;
 
 //=============================================================
-S_PARSE_KEY:
-        
+S_PARSE_KEY:  
 	INCREMENT_PARENT_SIZE;
+    PROCESS_KEY_NAME;
     
-    PROCESS_KEY;
-    
+    //Most JSON I've seen holds the ':' character
+    //close the the key
+    //
+    //  e.g. "my_key": value
+    //
+    //  rather than:
+    //       "my_key" : value
+    //  or   "my_key"
+    //              : value
     if (ADVANCE_POINTER_AND_GET_CHAR_VALUE == ':'){
         ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_KEY_JUMP;    
@@ -716,34 +684,49 @@ S_PARSE_KEY:
 
 //=============================================================
 S_PARSE_STRING_IN_ARRAY:
-    
 	INCREMENT_PARENT_SIZE;
     PROCESS_STRING
 	PROCESS_END_OF_ARRAY_VALUE;
 
 //=============================================================
 S_PARSE_STRING_IN_KEY:
-
-    STORE_TAC_KEY_SIMPLE;
+    STORE_NEXT_SIBLING_KEY_SIMPLE;
     PROCESS_STRING;
 	PROCESS_END_OF_KEY_VALUE_SIMPLE
 
 
 //=============================================================
 S_PARSE_NUMBER_IN_KEY:
-    
-
-    STORE_TAC_KEY_SIMPLE;
-
+    STORE_NEXT_SIBLING_KEY_SIMPLE;
     PROCESS_NUMBER;
     
-    //TODO: Check for a comma?
-    DECREMENT_POINTER;
-	PROCESS_END_OF_KEY_VALUE_SIMPLE;
+    //The number parser stops 1 past the last number
+    //1.2345,
+    //      ^
+    if (CURRENT_CHAR == ',') {
+       PROCESS_END_OF_KEY_VALUE_SIMPLE_AT_COMMA;
+    }else{
+        //Most processing starts from having consumed the current character
+        //which we have not, so we backtrack to allow consumption
+        //
+        //This comes in where we do: 
+        //  if (*(++p) == ' ')
+        //      instead of:
+        //  if (*(p) == ' ')
+        //      for ADVANCE_TO_NON_WHITESPACE_CHAR
+        //
+        //TODO: We could rewrite the nav code so that everything else
+        //manually advances, then use if(*(p)
+        //e.g. for strings, null, true, false, just advance
+        //DECREMENT_POINTER is wasted processing, since we just increment
+        //it again
+        DECREMENT_POINTER;
+        PROCESS_END_OF_KEY_VALUE_SIMPLE;
+    }
+	
 
 //=============================================================
-S_PARSE_NUMBER_IN_ARRAY:
-    
+S_PARSE_NUMBER_IN_ARRAY:    
 	INCREMENT_PARENT_SIZE;
     PROCESS_NUMBER;
    
@@ -752,72 +735,53 @@ S_PARSE_NUMBER_IN_ARRAY:
         ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_ARRAY_JUMP;
     }else{
+        //See
         DECREMENT_POINTER;
         PROCESS_END_OF_ARRAY_VALUE;
     }
 
 //=============================================================
 S_PARSE_NULL_IN_KEY:
-    
-    STORE_TAC_KEY_SIMPLE;
-
+    STORE_NEXT_SIBLING_KEY_SIMPLE;
     PROCESS_NULL;
-    
 	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 //=============================================================
 S_PARSE_NULL_IN_ARRAY:
-
 	INCREMENT_PARENT_SIZE;
-    
-    PROCESS_NULL
-    
+    PROCESS_NULL;
 	PROCESS_END_OF_ARRAY_VALUE;
 
 //=============================================================
 S_PARSE_TRUE_IN_KEY:
-    
-    STORE_TAC_KEY_SIMPLE;
-    
-    PROCESS_TRUE
-    
-	PROCESS_END_OF_KEY_VALUE_SIMPLE
-
+    STORE_NEXT_SIBLING_KEY_SIMPLE;
+    PROCESS_TRUE;
+	PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 S_PARSE_TRUE_IN_ARRAY:
-    
 	INCREMENT_PARENT_SIZE;
-    
     PROCESS_TRUE;
-    
     PROCESS_END_OF_ARRAY_VALUE;
 
-    
 S_PARSE_FALSE_IN_KEY:
-    
-    STORE_TAC_KEY_SIMPLE;
-    
-    PROCESS_FALSE
-    
+    STORE_NEXT_SIBLING_KEY_SIMPLE;
+    PROCESS_FALSE;
     PROCESS_END_OF_KEY_VALUE_SIMPLE;
 
 S_PARSE_FALSE_IN_ARRAY:
-    
 	INCREMENT_PARENT_SIZE;
-    
-    PROCESS_FALSE
-    
+    PROCESS_FALSE;
 	PROCESS_END_OF_ARRAY_VALUE;
 
 	//=============================================================
 S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
-
-		if (!(CURRENT_CHAR == '\0')) {
-			mexErrMsgIdAndTxt("turtle_json:invalid_end", "non-whitespace characters found after end of root token close");
-		}
-
-	goto finish_main;
+    if (!(CURRENT_CHAR == '\0')) {
+        mexPrintf("Current char: %d",CURRENT_CHAR);
+        mexErrMsgIdAndTxt("turtle_json:invalid_end", 
+                "non-whitespace characters found after end of root token close");
+    }
+	goto S_FINISH_GOOD;
 
 
 //===============       ERRORS   ==========================================
@@ -834,6 +798,9 @@ S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("turtle_json:depth_exceeded", "Max depth was exceeded");
+
+S_ERROR_DEPTH:
+    mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");    
     
 S_ERROR_OPEN_OBJECT:
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "S_ERROR_OPEN_OBJECT");
@@ -864,59 +831,97 @@ S_ERROR_END_OF_VALUE_IN_ARRAY:
 	mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
-S_ERROR_DEPTH:
-    mexErrMsgIdAndTxt("turtle_json:depth_limit","Max depth exceeded");
+
     
 S_ERROR_DEBUG:
     mexErrMsgIdAndTxt("turtle_json:debug_error","Debug error");
+   
+S_FINISH_GOOD:
     
-finish_main:
-    
-    //The end ...
-    //parsed_data_logging = clock();
-    
+    //The normal TIC() approach was not working, so we iniitialize earlier
+    //and start the TIC here.
+    //TIC(parsed_data_logging);
     START_TIC(parsed_data_logging);
     
-    //This wasn't working for some reason ...     
-    //TIC(parsed_data_logging);
-    types = mxRealloc(types,(current_data_index + 1));
-    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
+    mxArray *allocation_info = mxCreateStructMatrix(1, 1, 0, 0);
     
-    d1 = mxRealloc(d1,((current_data_index + 1)*sizeof(int)));
-    setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
-    
-    d2 = mxRealloc(d2,((current_data_index + 1)*sizeof(int)));
-    setStructField(plhs[0],d2,"d2",mxINT32_CLASS,current_data_index + 1);
-     
     //Meta data storage
     //--------------------
-    setIntScalar(plhs[0],"n_key_chars",n_key_chars);
-    setIntScalar(plhs[0],"n_string_chars",n_string_chars);
     //This information can be used to tell how efficient we were
     //relative to the allocation
-    setIntScalar(plhs[0],"n_tokens_allocated",data_size_allocated);
-    setIntScalar(plhs[0],"n_key_allocations",key_size_allocated);
-    setIntScalar(plhs[0],"n_string_allocations",string_size_allocated);
-    setIntScalar(plhs[0],"n_numeric_allocations",numeric_size_allocated);
+    setIntScalar(allocation_info,"n_tokens_allocated",data_size_allocated);
+    setIntScalar(allocation_info,"n_objects_allocated",object_size_allocated);
+    setIntScalar(allocation_info,"n_arrays_allocated",array_size_allocated);
+    setIntScalar(allocation_info,"n_keys_allocated",key_size_allocated);
+    setIntScalar(allocation_info,"n_strings_allocated",string_size_allocated);
+    setIntScalar(allocation_info,"n_numbers_allocated",numeric_size_allocated);
+    
+    setIntScalar(allocation_info,"n_data_allocations",n_data_allocations);
+    setIntScalar(allocation_info,"n_object_allocations",n_object_allocations);
+    setIntScalar(allocation_info,"n_array_allocations",n_array_allocations);
+    setIntScalar(allocation_info,"n_key_allocations",n_key_allocations);
+    setIntScalar(allocation_info,"n_string_allocations",n_string_allocations);
+    setIntScalar(allocation_info,"n_numeric_allocations",n_numeric_allocations);
+    ADD_STRUCT_FIELD(allocation_info,allocation_info);
+    
+    //------------------------    Main Data   -----------------------------
     
     
-    //TODO: This is only correct on 64 bit systems ...
+    
+    TRUNCATE_MAIN_DATA
+    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
+    setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
+    
+    TRUNCATE_OBJECT_DATA
+    mxArray *object_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(object_info,child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
+    setStructField(object_info,next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
+    setStructField(object_info,object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
+    setStructField(object_info,n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    ADD_STRUCT_FIELD(object_info,object_info);
+
+    TRUNCATE_ARRAY_DATA
+    mxArray *array_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(array_info,n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    setStructField(array_info,child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
+    setStructField(array_info,next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
+    setStructField(array_info,array_depths,"array_depths",mxUINT8_CLASS,current_array_index + 1);
+    ADD_STRUCT_FIELD(array_info,array_info);
+
     TRUNCATE_KEY_DATA
-    setStructField(plhs[0],key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
-    setStructField(plhs[0],key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
+   	mxArray *key_info = mxCreateStructMatrix(1, 1, 0, 0);
+    setStructField(key_info,key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
+    setStructField(key_info,key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
+    setStructField(key_info,next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_key_index + 1);
+    ADD_STRUCT_FIELD(key_info,key_info);
     
     TRUNCATE_STRING_DATA
     setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
-    setStructField(plhs[0],string_end_indices,"string_end_indices",mxINT32_CLASS,current_string_index + 1);
-    setStructField(plhs[0],string_start_indices,"string_start_indices",mxINT32_CLASS,current_string_index + 1);
+    setStructField(plhs[0],string_sizes,"string_sizes",mxINT32_CLASS,current_string_index + 1);
     
     TRUNCATE_NUMERIC_DATA
     //Note, it seems the class type may only be needed for viewing in Matlab
     //Internally it is just bytes (assuming sizeof is the same)
     setStructField(plhs[0],numeric_p,"numeric_p",mxDOUBLE_CLASS,current_numeric_index + 1);
 
-    TOC_AND_LOG(parsed_data_logging,parsed_data_logging_time);
+    TOC(parsed_data_logging,parsed_data_logging_time);
 
 	return;
     
 }
+
+// //https://mischasan.wordpress.com/2011/06/22/what-the-is-sse2-good-for-char-search-in-long-strings/
+// char const *ssechr(char const *s, char ch)
+// {
+//     __m128i zero = _mm_setzero_si128();
+//     __m128i cx16 = _mm_set1_epi8(ch); // (ch) replicated 16 times.
+//     while (1) {
+//         __m128i  x = _mm_loadu_si128((__m128i const *)s);
+//         unsigned u = _mm_movemask_epi8(_mm_cmpeq_epi8(zero, x));
+//         unsigned v = _mm_movemask_epi8(_mm_cmpeq_epi8(cx16, x))
+//                         & ~u & (u - 1);
+//         if (v) return s + ffs(v) - 1;
+//         if (u) return  NULL;
+//         s += 16;
+//     }
+// }
