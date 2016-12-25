@@ -955,12 +955,12 @@ void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, cons
     uint8_t *types = get_u8_field_safe(mex_input,"types");
         
     int array_md_index = ((int)mxGetScalar(prhs[2]))-1;
-    int cur_array_data_index = index_safely(d1,n_values,array_md_index);   
+    int array_data_index = index_safely(d1,n_values,array_md_index);   
     
     const mxArray *array_info = mxGetField(mex_input,0,"array_info");    
     uint8_t *array_types = get_u8_field_safe(array_info,"array_types");
-    //int *child_count_array = get_int_field_safe(array_info,"child_count_array");
-    //int *next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
+    int *child_count_array = get_int_field_safe(array_info,"child_count_array");
+    int *next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
     uint8_t *array_depths = get_u8_field_safe(array_info,"array_depths");
     
     
@@ -973,6 +973,35 @@ void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, cons
     }
     
     //Now, loop through the array and grab, need to verify type ...
+    //If ARRAY_ND_NUMERIC with depth 2, then we wouldn't need to check
+    int array_size = child_count_array[array_data_index];
+    
+    mxArray *output = mxCreateCellMatrix(1,array_size);
+    
+    double *numeric_data = (double *)mxGetData(mxGetField(mex_input,0,"numeric_p"));
+    
+    mxArray *temp;
+    int cur_array_md_index = array_md_index + 1;
+    int cur_array_data_index;
+    int cur_array_size;
+    for (int iArray = 0; iArray < array_size; iArray++){
+        cur_array_data_index = d1[cur_array_md_index];
+        
+        //TODO: Build in check on an empty array type
+        if (types[cur_array_md_index] != TYPE_ARRAY){
+            mexErrMsgIdAndTxt("turtle_json:invalid_type",
+                    "Requested array of 1d arrays, but one of the children of the arrays is not an array");
+        }else if(array_types[cur_array_data_index] != ARRAY_NUMERIC_TYPE){
+              mexErrMsgIdAndTxt("turtle_json:invalid_type",
+                "Requested array of 1d arrays, but one of the children of the arrays is not a numeric array");          
+        }
+        
+        cur_array_size = child_count_array[cur_array_data_index];
+        temp = parse_1d_array(d1, numeric_data, cur_array_size, cur_array_md_index);
+        mxSetCell(output,iArray,temp);
+        cur_array_md_index = next_sibling_index_array[cur_array_data_index];
+    }
+    plhs[0] = output;
     
 }
 
@@ -1029,6 +1058,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             break;
         case 4:
             f4__get_nd_array(nlhs,plhs,nrhs,prhs);
+            break;
+        case 5:
+            f5__get_cell_of_1d_numeric_arrays(nlhs,plhs,nrhs,prhs);
             break;
         default:
             mexErrMsgIdAndTxt("turtle_json:invalid_input","Function option not recognized");

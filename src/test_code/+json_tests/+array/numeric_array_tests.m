@@ -14,6 +14,11 @@ js = mexEncodeJSON(data3);
 data = 1:10;
 js = mexEncodeJSON(data);
 
+data = {1:5 2:6 1:5 2:3};
+js = mexEncodeJSON(data);
+wtf = json.stringToTokens(js)
+wtf2 = json_info_to_data(5,wtf.mex,1);
+
 %JSON writers
 %------------
 
