@@ -12,7 +12,7 @@ function data = parse(json_string)
 %   json.load  %json.load(file_path)
 %   json.
 
-tokens = json.stringToTokens(json_string);
+tokens = json.tokens.parse(json_string);
 
 data = tokens.getParsedData();
 

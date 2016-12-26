@@ -1,6 +1,12 @@
 function mixed_array_tests()
+%
+%   json_tests.toData.mixed_array_tests
 
-%Tried nan, but this gets written as NaN :/
+%{
+    json_tests.toData.mixed_array_tests
+%}
+
+%Tried nan, but this gets written as NaN by mexEncodeJSON
 data = {'superstar' true false 15.3 ...
     1:10 {'asdf' 'anna' 'cbs'} [true false true false], ... %1d
     rand(5,2),{{'8 years','exactly'},{'Debbie','politics'}},false(10,2) ... %2d
@@ -12,18 +18,11 @@ expected_types = [-1 -1 -1 -1 ...
     0 1 2 ... %2d
     0 1 2];
 
-
-% 
-
 for iData = 1:length(data)
     data2 = data(1:iData);
-    js = mexEncodeJSON(data2);
+    js = tjSave(data2);
     %s = json.stringToTokens(js);
-    wtf = json.parse(js);
-    
-    if expected_types(iData) > -1
-        
-    end  
+    temp = json.parse(js);
 end
 
 

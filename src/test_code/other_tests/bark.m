@@ -28,7 +28,7 @@ for i = 1:N
         jt = loadjson(file_path);
     else
         
-        jt = json.tokens(file_path,'chars_per_token',5);
+        jt = json.tokens.load(file_path,'chars_per_token',5);
         d1_all(i) = jt.parse_info.timing_info.non_read_time;
     end
     %sobj = jt.get_parsed_data();

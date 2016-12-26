@@ -1,7 +1,7 @@
 classdef parsing_info
     %
     %   Class:
-    %   json.token_info.parsing_info
+    %   json.objs.token.parsing_info
     
     properties
        ns_per_char
@@ -26,7 +26,7 @@ classdef parsing_info
     end
     
     methods
-        function obj = parsing_info(parent_obj, result)
+        function obj = parsing_info(result)
             
             
             %Elapsed time
