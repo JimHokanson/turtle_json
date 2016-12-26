@@ -1,12 +1,26 @@
-This code parses JSON files/strings. Writing is not yet supported.
-
-#Status
-I am currently working on rewriting the parser so that array properties are such as homogeneity and dimension are extracted. As well, the goal is to extract homogeneity of object structures, as this speeds up memory allocation in Matlab (e.g. faster to have a structure array vs a cell array of structures)
+This code parses JSON files/strings using C/mex code. Writing is not yet supported.
 
 #Why This Code?
 
-This parser was written to have high performance relative to other Matlab JSON parsers. 
+I needed JSON parsing for another project. Loading JSON files using existing parsers was painfully slow. This slowness was due to 1) JSON parsing being done in Matlab or 2) parsing using C/C++ or Java, but with inefficient memory structures. This code started off by wrapping an already written C JSON tokenizer, and then post-processing in Matlab. After some nit-picking here and there, I found myself writing an entire parser in C, from scratch.
 
+#Advantages and Disadvantages
+
+## Advantages
+* C parser written for Matlab, rather than wrapping an existing parser
+* multi-step parsing option (tokens, then data) for finer control over output format
+* just like every other "fast" JSON parser, this one is fast as well
+
+## Disadvantages
+* I used a non-native compiler for both Windows and Mac (GCC)
+* Currently favors speed over memory (this can be improved)
+* Currently requires newer computers due to use of SIMD (TODO: Insert year), this will also be changed ...
+
+#Status
+
+* Parser design is stable.
+* Needs more unit tests (in progress).
+* Lots of small issues, although nothing critical.
 
 # Usage
 
@@ -14,22 +28,19 @@ Parsing can be done in one of two ways. Parsing can either be done to a set of t
 
 ## Parsing to Tokens
 
-TODO: Not thrilled with the token name, abstract syntax tree?
+Tokens include objects, arrays, numbers, etc. in the file. The first step is to parse to tokens. The actual data can be requested from these tokens.
 
 ```matlab
 %This returns a tokenized representation of all of the data
-tokens = json.fileToTokens(file_path);
+root = json.tokens.load(file_path);
 %OR
-tokens = json.stringToTokens(json_string);
-
-%Returns information on the root array or object
-root = tokens.getRootInfo(); 
+root = json.tokens.parse(json_string);
 
 %Let's assume we got an object root, let's get the 'x_data' property.
 x_data_token = root.getToken('x_data');
 
 %Let's assume 'x_data' is an array, then 'x_data_token' contains information
-%about that array, but it does not contain a Matlab representation of the data
+%about that array, but it does not contain the actual data.
 
 %Assuming 'x_data' should contain a cell array of 1d arrays
 %e.g. x_data = {[1,2,3],[4],[5,6,7,8,9]}
@@ -53,16 +64,9 @@ data = json.load(file_path);
 data = json.parse(json_string);
 ```
 
+# Contributing
 
-# What's a token?
+Feel free to send me an email if you have an idea or want to discuss contributing. Please also open issues for questions, comments, or suggestions.
 
-A token is a character that has special meaning. Tokens in JSON include (not exhaustive): '{' , '"', ':', '}', '[', and ']'
 
-Consider the following JSON:
-
-``` JSON
-{"test":3,"key":[1,3,4]}
-```
-
-The '{' character specifies that an object starts. The '"' character specifies the start (or end) of a key/string unless it is escaped in a string. Once you know the location of these special characters, it becomes much easier to parse a JSON file.
 
