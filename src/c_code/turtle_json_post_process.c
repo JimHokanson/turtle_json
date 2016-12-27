@@ -302,6 +302,11 @@ void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_
     //  valid characters at the end would be:
     //  space } ] , 
     //  comma is probably the most likely
+    // 
+    //  Actually, we just need a lookup on # values
+    //  in particular non-numeric parts of the number
+    //  (so '.' , '-', 'e', and 'E') (numbers would just be parsed)
+    //
     
     *value_p = value;
 }
