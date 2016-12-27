@@ -103,6 +103,12 @@ extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
     mxAddField(plhs[0],#name); \
     mxSetField(plhs[0],0,#name,pointer);    
     
+//Number Parsing
+//-------------------------------------------------------------------------
+void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_value);
+
+void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *error_value);
+
 //Main parsing
 //-------------------------------------------------------------------------
 void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options, mxArray *timing_info);

@@ -55,7 +55,7 @@ clipboard('copy',['const bool is_number_array[256] = {' sl.cellstr.join(temp,'d'
  
  values = 1:9;
  %   1.json had 20 :/
- n_entries = 20;
+ n_entries = 30;
  str = cell(1,n_entries);
  for i = 1:n_entries
  temp = cell(1,58);

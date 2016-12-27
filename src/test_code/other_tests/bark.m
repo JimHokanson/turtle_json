@@ -14,6 +14,9 @@ else
     file_root = 'C:\Users\RNEL\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
     if ~exist(file_root)
         file_root = 'C:\Users\Jim\Google Drive\OpenWorm\OpenWorm Public\Movement Analysis\example_data\WCON\';
+        if ~exist(file_root)
+           file_root = 'C:\D\data'; 
+        end
     end
 end
 file_name = 'testfile_new.wcon';

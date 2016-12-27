@@ -1,11 +1,10 @@
 #include "turtle_json.h"
 
-/*
-
-*/
+//  This is the entry function 
 
 #define N_PADDING 17
 
+//TODO: Clean these two up ... I don't think both are needed
 //                      1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
 #define BUFFER_STRING "\0\\\"\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
         
@@ -361,6 +360,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 //         "object_depths","n_objects_at_depth","object_ids","object_indices"}
     
     TIC(start_mex);
+    
+    //TODO: Detect the supported features of the processor
+    //http://stackoverflow.com/questions/6121792/how-to-check-if-a-cpu-supports-the-sse3-instruction-set
+    //https://github.com/JimHokanson/turtle_json/issues/13
     
     size_t string_byte_length;
     unsigned char *json_string = NULL;
