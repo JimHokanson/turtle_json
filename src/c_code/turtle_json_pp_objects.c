@@ -35,7 +35,7 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
     }
     
     int *child_count_object = get_int_field(object_info,"child_count_object");    
-    int *unique_object_first_data_indices = get_int_field(object_info,"unique_object_first_data_indices");
+    int *unique_object_first_md_indices = get_int_field(object_info,"unique_object_first_md_indices");
     int *max_keys_in_object = get_int_field(object_info,"max_keys_in_object");
     int *object_ids = get_int_field(object_info,"object_ids");
     
@@ -54,26 +54,28 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
     mxArray *s;
     
     unsigned char *cur_key_p;
+    int cur_key_md_index;
     int cur_key_data_index;
-    int cur_key_key_index;
     int cur_key_size;
     int temp_key_index;
     
+    int cur_object_md_index;
     int cur_object_data_index;
-    int cur_object_object_index;
     int n_keys_in_object;
-    for (int iObj = 0; iObj < *n_unique_objects; iObj++){        
-        cur_object_data_index = unique_object_first_data_indices[iObj];
-        cur_object_object_index = RETRIEVE_DATA_INDEX(cur_object_data_index); 
-        
-        n_keys_in_object = child_count_object[cur_object_object_index];
+    for (int iObj = 0; iObj < *n_unique_objects; iObj++){   
+        cur_object_md_index = unique_object_first_md_indices[iObj];
+        cur_object_data_index = d1[cur_object_md_index]; 
+        n_keys_in_object = child_count_object[cur_object_data_index];
 
-        cur_key_data_index = cur_object_data_index + 1;
-        cur_key_key_index = RETRIEVE_DATA_INDEX(cur_key_data_index);
+        cur_key_md_index = cur_object_md_index + 1;
+        cur_key_data_index = d1[cur_key_md_index];
                 
         for (int iKey = 0; iKey < n_keys_in_object; iKey++){
-            cur_key_p = key_p[cur_key_key_index];
-            cur_key_size = key_sizes[cur_key_key_index];
+            
+
+            
+            cur_key_p = key_p[cur_key_data_index];
+            cur_key_size = key_sizes[cur_key_data_index];
             
             //TODO: This needs to be processed ...
             //At a minimum, we'll zero out the key to specify length
@@ -81,7 +83,8 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
             
             fieldnames[iKey] = cur_key_p;
             
-            cur_key_key_index = NEXT_KEY__KEY_INDEX(cur_key_key_index);
+            cur_key_md_index = next_sibling_index_key[cur_key_data_index];
+            cur_key_data_index = d1[cur_key_md_index];            
         }
         
         //We'll initialize as empty here, because we don't get much of 
@@ -197,7 +200,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     int n_unique_allocated = 10;
      //We need this so that later we can go back and parse the keys
     //TODO: We could technically parse the keys right away ...
-    int *unique_object_first_data_indices = mxMalloc(n_unique_allocated*sizeof(int));
+    int *unique_object_first_md_indices = mxMalloc(n_unique_allocated*sizeof(int));
     //---------------------------------------------------------------------
     
     //Variables for the loop 
@@ -237,14 +240,14 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
         //Technically we could post-process this bit ...
         //i.e. after assigning all objects unique ids, run through
         //and populate unique_object_first_data_indices
-        if (cur_object_id > n_unique_allocated){
+        if (cur_object_id >= n_unique_allocated){
             n_unique_allocated = 2*n_unique_allocated;
             if (n_unique_allocated > n_objects){
                 n_unique_allocated = n_objects;
             }
-            unique_object_first_data_indices = mxRealloc(unique_object_first_data_indices,n_unique_allocated*sizeof(int));
+            unique_object_first_md_indices = mxRealloc(unique_object_first_md_indices,n_unique_allocated*sizeof(int));
         }
-        unique_object_first_data_indices[cur_object_id] = cur_object_md_index; 
+        unique_object_first_md_indices[cur_object_id] = cur_object_md_index; 
         //-----------------------------------------------------------------
         
         //Store key information for comparison to other objects ...
@@ -315,7 +318,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     mxFree(process_order);
     
     //TODO: We could truncate these ...
-    setStructField(object_info,unique_object_first_data_indices,"unique_object_first_data_indices",mxINT32_CLASS,cur_object_id+1);    
+    setStructField(object_info,unique_object_first_md_indices,"unique_object_first_md_indices",mxINT32_CLASS,cur_object_id+1);    
     setStructField(object_info,object_ids,"object_ids",mxINT32_CLASS,n_objects); 
     setIntScalar(object_info,"n_unique_objects",cur_object_id+1);
 }

@@ -847,6 +847,16 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                 mxSetN(mxGetCell(cell_array,i),cur_index+1);
             }
         }else{
+// //             switch (parse_status){
+// //                 case 2:
+// //                     break;
+// //                 case 3:
+// //                     break;
+// //                 case 11:
+// //                     break;
+// //                 case 12:
+// //                     break;
+// //             }
             //TODO: This needs to be flushed out with parse_status values
             mexPrintf("error parse status: %d\n",parse_status);
             mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
@@ -861,6 +871,93 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     TOC(string_parse,string_parsing_time);
     ADD_STRUCT_FIELD(strings,cell_array);
 
+}
+
+uint16_t parse_utf8_char(unsigned char *p, int *parse_status){
+    
+    //JAH: This is a work in progress
+    //refactoring code from above function
+    
+    //Inspect first byte to get # of bytes
+    //2 bytes 110...   >> 5 == 6 - switch to 0b110
+    //3 bytes 1110.... >> 4 == 14
+    //4 bytes 11110... >> 3 == 30
+    //are 5 & 6 valid?
+    //
+    //errors (parse status # listed)
+    //- 10 - invalid first byte (currently no distinction
+    //       between 5 & 6 bytes, or other alternatives:
+    //       10... or 11111110 or 11111111
+    //        
+    //- 11 - invalid # of continuation bytes (given first byte)
+    //       continuation byte is 10...
+    //- 12 - not 2 byte compatible - TODO: Allow warning or 
+    //       error, on warning, write value as whatever the
+    //       unicode value is for not-representable or whatever
+    //       the proper terminology is ..
+
+    //TODO: technically we should check for null values
+    //in each of the bytes, as this is not valid utf-8 
+    //(overlong encoding)
+
+    
+    //2 bytes
+    if ((*p >> 5) == 0b110){ 
+
+        utf8_value = *p & 0b11111;
+        ++p;
+
+        if (IS_CONTINUATION_BYTE){
+            utf8_value = (utf8_value << 6) + (*p & 0b111111);
+            //mexPrintf("2 byte result: %d\n",utf8_value);
+            output_data[++cur_index] = (uint16_t) utf8_value;
+        }else{
+            *parse_status = 11;
+        }
+
+    //3 bytes    
+    }else if((*p >> 4) == 0b1110){
+    //# of bits in each byte
+    // byte     # bits
+    //  1   ->  4
+    //  2   ->  6
+    //  3    -> 6   => 16 total bites => fits into 2 bytes
+    //    
+    //This also means that anything that is 4 bytes will
+    //never be valid when stored as 2 bytes
+    //TODO: We could do all the math with uint16t
+
+        utf8_value = *p & 0b1111;
+        ++p;
+
+        if (IS_CONTINUATION_BYTE){
+            utf8_value = (utf8_value << 6) + (*p & 0b111111);
+            ++p;
+            if (IS_CONTINUATION_BYTE){
+                utf8_value = (utf8_value << 6) + (*p & 0b111111);
+                //mexPrintf("2 byte result: %d\n",utf8_value);
+                output_data[++cur_index] = (uint16_t) utf8_value;
+            }else{
+                parse_status = 11;
+            }
+        }else{
+            parse_status = 11;
+        }
+
+    //4 bytes     
+    }else if((*p >> 3) == 0b11110){
+        //not 2 byte compatible
+        parse_status = 12;
+    }else{
+        //invalid first byte
+        parse_status = 10;
+    }
+
+}
+
+void allocate_string_memory(){
+    
+    
 }
 
 void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_info){

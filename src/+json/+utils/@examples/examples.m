@@ -8,6 +8,11 @@ classdef examples
     properties (Constant)
         FILE_LIST = {
             'big.json' %1
+            'canada.json' %2
+            'citm_catalog.json' %3
+            'twitter.json' %4
+            'utf8_01.json' %5
+            'wcon_testfile_new.json' %6
             };
         DRIVE_PATH = 'https://drive.google.com/drive/folders/0B7to9gBdZEyGMExwTFA0ZWh1OTA?usp=sharing';
         
@@ -38,7 +43,7 @@ classdef examples
             
             root_path = fileparts(json.sl.stack.getPackageRoot());
 
-            bin_path = fullfile(root_path,'bin'); 
+            bin_path = fullfile(root_path,'examples'); 
         end
 %         function downloadFile(file_name)
 %             
