@@ -134,6 +134,8 @@ mwSize get_field_length2(mxArray *p,const char *fieldname);
 
 //Post-processing related
 //-------------------------------------------------------------------------
+uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status);
+
 void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, uint8_t type_to_match, int *n_values_at_depth, int n_depths, uint8_t *value_depths);
 
 void post_process(unsigned char *js,mxArray *plhs[], mxArray *timing_info);

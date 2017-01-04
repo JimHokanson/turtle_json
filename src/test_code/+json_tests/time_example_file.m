@@ -8,6 +8,7 @@ classdef time_example_file
     properties
        average_elapsed_time
        method
+       file_name
     end
     
     methods (Static)
@@ -25,6 +26,7 @@ classdef time_example_file
                 fprintf('Running example %d of %d: %s\n',iFile,n_files,file_names{iFile});
                 all_results{iFile} = json_tests.time_example_file(file_names{iFile});
             end
+            all_results = [all_results{:}];
         end
     end
     
@@ -46,6 +48,8 @@ classdef time_example_file
             in = json.sl.in.processVarargin(in,varargin);
             
             file_path = json.utils.examples.getFilePath(name_or_index);
+            
+            [~,obj.file_name] = fileparts(file_path);
             
             n_runs = in.n_runs;
             if in.method == 1

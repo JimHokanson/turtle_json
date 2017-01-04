@@ -1,7 +1,18 @@
 #include "turtle_json.h"
 
+
+//UTF-8 parsing related
 //TODO: Document what this is ...
 #define IS_CONTINUATION_BYTE *p >> 6 == 0b10
+
+#define ADD_CONTINUATION_BYTE_VALUE utf8_value = (utf8_value << 6) + (*p & 0b111111)
+
+//https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+//Matlab uses DE0B - invalid character :/ native2unicode()
+#define UNREPRESENTABLE_UTF8_CHAR 0xFFFD
+
+//Not sure if we would ever want to change this ...
+#define ERROR_UTF_CHAR 0
 
 //-------------------------------------------------------------------------
 
@@ -691,7 +702,14 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     int parse_status;
     int hex_numerical_value; //TODO: This could be uint8_t
     uint16_t unicode_char_value;
+    
+    
+    
+    //utf_8 parsing
     uint32_t utf8_value;
+    
+    
+    
     int escape_value;
     int hex_multipliers[4] = {4096, 256, 16, 1};
     uint16_t escape_char;
@@ -759,79 +777,83 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                 }
             }else if(*p > 127){
                 shrink_string = true;
-                //Inspect first byte to get # of bytes
-                //2 bytes 110...   >> 5 == 6 - switch to 0b110
-                //3 bytes 1110.... >> 4 == 14
-                //4 bytes 11110... >> 3 == 30
-                //are 5 & 6 valid?
-                //
-                //errors (parse status # listed)
-                //- 10 - invalid first byte (currently no distinction
-                //       between 5 & 6 bytes, or other alternatives:
-                //       10... or 11111110 or 11111111
-                //        
-                //- 11 - invalid # of continuation bytes (given first byte)
-                //       continuation byte is 10...
-                //- 12 - not 2 byte compatible - TODO: Allow warning or 
-                //       error, on warning, write value as whatever the
-                //       unicode value is for not-representable or whatever
-                //       the proper terminology is ..
                 
-                //TODO: technically we should check for null values
-                //in each of the bytes, as this is not valid utf-8 
-                //(overlong encoding)
+                output_data[++cur_index] = parse_utf8_char(&p,p,&parse_status);
                 
-                //2 bytes
-                if ((*p >> 5) == 0b110){ 
-                    
-                    utf8_value = *p & 0b11111;
-                    ++p;
-                    
-                    if (IS_CONTINUATION_BYTE){
-                        utf8_value = (utf8_value << 6) + (*p & 0b111111);
-                        //mexPrintf("2 byte result: %d\n",utf8_value);
-                        output_data[++cur_index] = (uint16_t) utf8_value;
-                    }else{
-                        parse_status = 11;
-                    }
-                 
-                //3 bytes    
-                }else if((*p >> 4) == 0b1110){
-                //# of bits in each byte
-                // byte     # bits
-                //  1   ->  4
-                //  2   ->  6
-                //  3    -> 6   => 16 total bites => fits into 2 bytes
-                //    
-                //This also means that anything that is 4 bytes will
-                //never be valid when stored as 2 bytes
-                //TODO: We could do all the math with uint16t
-                    
-                    utf8_value = *p & 0b1111;
-                    ++p;
-                    
-                    if (IS_CONTINUATION_BYTE){
-                        utf8_value = (utf8_value << 6) + (*p & 0b111111);
-                        ++p;
-                        if (IS_CONTINUATION_BYTE){
-                            utf8_value = (utf8_value << 6) + (*p & 0b111111);
-                            //mexPrintf("2 byte result: %d\n",utf8_value);
-                            output_data[++cur_index] = (uint16_t) utf8_value;
-                        }else{
-                            parse_status = 11;
-                        }
-                    }else{
-                        parse_status = 11;
-                    }
-                    
-                //4 bytes     
-                }else if((*p >> 3) == 0b11110){
-                    //not 2 byte compatible
-                    parse_status = 12;
-                }else{
-                    //invalid first byte
-                    parse_status = 10;
-                }
+                
+// // // // // // //                 //Inspect first byte to get # of bytes
+// // // // // // //                 //2 bytes 110...   >> 5 == 6 - switch to 0b110
+// // // // // // //                 //3 bytes 1110.... >> 4 == 14
+// // // // // // //                 //4 bytes 11110... >> 3 == 30
+// // // // // // //                 //are 5 & 6 valid?
+// // // // // // //                 //
+// // // // // // //                 //errors (parse status # listed)
+// // // // // // //                 //- 10 - invalid first byte (currently no distinction
+// // // // // // //                 //       between 5 & 6 bytes, or other alternatives:
+// // // // // // //                 //       10... or 11111110 or 11111111
+// // // // // // //                 //        
+// // // // // // //                 //- 11 - invalid # of continuation bytes (given first byte)
+// // // // // // //                 //       continuation byte is 10...
+// // // // // // //                 //- 12 - not 2 byte compatible - TODO: Allow warning or 
+// // // // // // //                 //       error, on warning, write value as whatever the
+// // // // // // //                 //       unicode value is for not-representable or whatever
+// // // // // // //                 //       the proper terminology is ..
+// // // // // // //                 
+// // // // // // //                 //TODO: technically we should check for null values
+// // // // // // //                 //in each of the bytes, as this is not valid utf-8 
+// // // // // // //                 //(overlong encoding)
+// // // // // // //                 
+// // // // // // //                 //2 bytes
+// // // // // // //                 if ((*p >> 5) == 0b110){ 
+// // // // // // //                     
+// // // // // // //                     utf8_value = *p & 0b11111;
+// // // // // // //                     ++p;
+// // // // // // //                     
+// // // // // // //                     if (IS_CONTINUATION_BYTE){
+// // // // // // //                         utf8_value = (utf8_value << 6) + (*p & 0b111111);
+// // // // // // //                         //mexPrintf("2 byte result: %d\n",utf8_value);
+// // // // // // //                         output_data[++cur_index] = (uint16_t) utf8_value;
+// // // // // // //                     }else{
+// // // // // // //                         parse_status = 11;
+// // // // // // //                     }
+// // // // // // //                  
+// // // // // // //                 //3 bytes    
+// // // // // // //                 }else if((*p >> 4) == 0b1110){
+// // // // // // //                 //# of bits in each byte
+// // // // // // //                 // byte     # bits
+// // // // // // //                 //  1   ->  4
+// // // // // // //                 //  2   ->  6
+// // // // // // //                 //  3    -> 6   => 16 total bites => fits into 2 bytes
+// // // // // // //                 //    
+// // // // // // //                 //This also means that anything that is 4 bytes will
+// // // // // // //                 //never be valid when stored as 2 bytes
+// // // // // // //                 //TODO: We could do all the math with uint16t
+// // // // // // //                     
+// // // // // // //                     utf8_value = *p & 0b1111;
+// // // // // // //                     ++p;
+// // // // // // //                     
+// // // // // // //                     if (IS_CONTINUATION_BYTE){
+// // // // // // //                         utf8_value = (utf8_value << 6) + (*p & 0b111111);
+// // // // // // //                         ++p;
+// // // // // // //                         if (IS_CONTINUATION_BYTE){
+// // // // // // //                             utf8_value = (utf8_value << 6) + (*p & 0b111111);
+// // // // // // //                             //mexPrintf("2 byte result: %d\n",utf8_value);
+// // // // // // //                             output_data[++cur_index] = (uint16_t) utf8_value;
+// // // // // // //                         }else{
+// // // // // // //                             parse_status = 11;
+// // // // // // //                         }
+// // // // // // //                     }else{
+// // // // // // //                         parse_status = 11;
+// // // // // // //                     }
+// // // // // // //                     
+// // // // // // //                 //4 bytes     
+// // // // // // //                 }else if((*p >> 3) == 0b11110){
+// // // // // // //                     //not 2 byte compatible
+// // // // // // //                     parse_status = 12;
+// // // // // // //                 }else{
+// // // // // // //                     //invalid first byte
+// // // // // // //                     parse_status = 10;
+// // // // // // //                 }
                 
             //Just a regular old character to store    
             }else{
@@ -858,6 +880,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
 // //                     break;
 // //             }
             //TODO: This needs to be flushed out with parse_status values
+            mexPrintf("diff %d\n",p-js);
             mexPrintf("error parse status: %d\n",parse_status);
             mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
             //We have an error 
@@ -873,7 +896,13 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
 
 }
 
-uint16_t parse_utf8_char(unsigned char *p, int *parse_status){
+uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status){
+    //
+    //
+    //  This should be encapsulated by:
+    //  if(*p > 127) - i.e. this should only be run if the ascii value is above 127
+    //
+    
     
     //JAH: This is a work in progress
     //refactoring code from above function
@@ -900,19 +929,29 @@ uint16_t parse_utf8_char(unsigned char *p, int *parse_status){
     //in each of the bytes, as this is not valid utf-8 
     //(overlong encoding)
 
+    uint32_t utf8_value;
     
     //2 bytes
     if ((*p >> 5) == 0b110){ 
+        //# of bits in each byte
+        //
+        //  byte   # bits
+        //  1      5
+        //  2      6  => 11 total bits
 
+        //With 3 byte utf-8, keep 5 bits
         utf8_value = *p & 0b11111;
         ++p;
 
         if (IS_CONTINUATION_BYTE){
-            utf8_value = (utf8_value << 6) + (*p & 0b111111);
+            ADD_CONTINUATION_BYTE_VALUE;
             //mexPrintf("2 byte result: %d\n",utf8_value);
-            output_data[++cur_index] = (uint16_t) utf8_value;
+            *pp = p;
+             return (uint16_t) utf8_value;
         }else{
+            //TODO: Make this a macro
             *parse_status = 11;
+            return ERROR_UTF_CHAR;
         }
 
     //3 bytes    
@@ -921,36 +960,53 @@ uint16_t parse_utf8_char(unsigned char *p, int *parse_status){
     // byte     # bits
     //  1   ->  4
     //  2   ->  6
-    //  3    -> 6   => 16 total bites => fits into 2 bytes
+    //  3    -> 6   => 16 total bits => fits into 2 bytes
     //    
     //This also means that anything that is 4 bytes will
     //never be valid when stored as 2 bytes
-    //TODO: We could do all the math with uint16t
 
+        //With 3 byte utf-8, keep 4 bits
         utf8_value = *p & 0b1111;
         ++p;
 
         if (IS_CONTINUATION_BYTE){
-            utf8_value = (utf8_value << 6) + (*p & 0b111111);
+            ADD_CONTINUATION_BYTE_VALUE;
             ++p;
             if (IS_CONTINUATION_BYTE){
-                utf8_value = (utf8_value << 6) + (*p & 0b111111);
-                //mexPrintf("2 byte result: %d\n",utf8_value);
-                output_data[++cur_index] = (uint16_t) utf8_value;
+                ADD_CONTINUATION_BYTE_VALUE;
+                *pp = p;
+                return (uint16_t) utf8_value;
             }else{
-                parse_status = 11;
+                *parse_status = 11;
+                return ERROR_UTF_CHAR;
             }
         }else{
-            parse_status = 11;
+            *parse_status = 11;
+            return ERROR_UTF_CHAR;
         }
 
     //4 bytes     
     }else if((*p >> 3) == 0b11110){
         //not 2 byte compatible
-        parse_status = 12;
+        //TODO: Need to verify that we have 3 continuation bytes ...
+        p+=3;
+        *pp = p;
+        return UNREPRESENTABLE_UTF8_CHAR;
+        //return ERROR_UTF_CHAR;
+        //parse_status = 12;
+        
+    
+    //TODO: We should explicitly check for 5 & 6 bytes
+    //This is not utf-8, but it would help anyone that has
+    //tried to use these high encoding values ...
+    }else if((*p >> 2) == 0b111110){   
+        *parse_status = 13;
+        return ERROR_UTF_CHAR;
     }else{
+        mexPrintf("first byte: %d\n",*p);
         //invalid first byte
-        parse_status = 10;
+        *parse_status = 10;
+        return ERROR_UTF_CHAR;
     }
 
 }
