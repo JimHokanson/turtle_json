@@ -1,6 +1,6 @@
 function string_tests()
 %
-%   json_tests.string_tests
+%   json_tests.toTokens.string_tests
 %
 %   See Also
 %   --------
@@ -11,6 +11,7 @@ function string_tests()
 %   1) string
 %   2) empty string to pass,
 %   3) notes on reason for error or thing being tested
+%   4) expected answer
 
 fh = @(x) char(org.apache.commons.lang.StringEscapeUtils.unescapeJava(x));
 
@@ -30,7 +31,7 @@ tests(end+1,:) = {'["This \" is a test"]','', 'Escape of " character',{sprintf('
 tests(end+1,:) = {'["This \n is a test"]','', 'Escape of \n character',{sprintf('This \n is a test')}};
 tests(end+1,:) = {'["15\u00f8C 3\u0111"]','', 'Escape of unicode characters',{fh('15\u00f8C 3\u0111')}};
 
-%TODO: Add on UTF-8 check
+%TODO: Add on UTF-8 check - need sprintf
 
 
 

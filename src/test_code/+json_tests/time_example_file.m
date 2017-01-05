@@ -12,7 +12,7 @@ classdef time_example_file
     end
     
     methods (Static)
-        function all_results = testAll()
+        function all_results = testAll(varargin)
             %
             %   all_results = json_tests.time_example_file.testAll
             %   
@@ -24,7 +24,7 @@ classdef time_example_file
             all_results = cell(1,n_files);
             for iFile = 1:n_files
                 fprintf('Running example %d of %d: %s\n',iFile,n_files,file_names{iFile});
-                all_results{iFile} = json_tests.time_example_file(file_names{iFile});
+                all_results{iFile} = json_tests.time_example_file(file_names{iFile},varargin{:});
             end
             all_results = [all_results{:}];
         end
@@ -41,6 +41,9 @@ classdef time_example_file
             %   ---------------
             %   n_runs: scalar
             %       # of times to run the code
+            %   method: scalar (default 1)
+            %       1 - turtle_json
+            %       2 - Matlab mex
             %
             
             in.n_runs = 10;

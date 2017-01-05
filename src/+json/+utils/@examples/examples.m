@@ -2,17 +2,20 @@ classdef examples
     %
     %   Class:
     %   json.utils.examples
-    
-    %TODO: Move all of the example path manipulation into here
-    
+
+    %TODO: Get the 1.json file into here
     properties (Constant)
         FILE_LIST = {
             'big.json' %1
             'canada.json' %2
             'citm_catalog.json' %3
-            'twitter.json' %4
-            'utf8_01.json' %5
-            'wcon_testfile_new.json' %6
+            'large-dict.json' %4
+            'medium-dict.json' %5
+            'small-dict.json' %6
+            'twitter.json' %7
+            'utf8_01.json' %8
+            'wcon_testfile_new.json' %9
+            'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.json' %10
             };
         DRIVE_PATH = 'https://drive.google.com/drive/folders/0B7to9gBdZEyGMExwTFA0ZWh1OTA?usp=sharing';
         
