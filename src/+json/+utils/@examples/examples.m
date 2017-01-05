@@ -6,16 +6,18 @@ classdef examples
     %TODO: Get the 1.json file into here
     properties (Constant)
         FILE_LIST = {
-            'big.json' %1
-            'canada.json' %2
-            'citm_catalog.json' %3
-            'large-dict.json' %4
-            'medium-dict.json' %5
-            'small-dict.json' %6
-            'twitter.json' %7
-            'utf8_01.json' %8
-            'wcon_testfile_new.json' %9
-            'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.json' %10
+            '1.json'        
+            'big.json'          
+            'canada.json'       
+            'citm_catalog.json' 
+            'citylots.json'      
+            'large-dict.json'   
+            'medium-dict.json' 
+            'small-dict.json' 
+            'twitter.json' 
+            'utf8_01.json' 
+            'wcon_testfile_new.json' 
+            'XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.json'
             };
         DRIVE_PATH = 'https://drive.google.com/drive/folders/0B7to9gBdZEyGMExwTFA0ZWh1OTA?usp=sharing';
         
@@ -31,6 +33,8 @@ classdef examples
         function file_path = getFilePath(file_name_or_index)
             %
             %   json.utils.examples.getFilePath()
+            %
+            %   TODO: allow regex if strcmp fails
             
             root_path = json.utils.examples.getExamplesRoot();
             if ischar(file_name_or_index)

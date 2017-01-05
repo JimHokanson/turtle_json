@@ -356,15 +356,17 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
     }
     
     number_start = p;
-    while (isdigit(*p++)){
+    while (isdigit(*p)){
         value = 10*value + (double)(*p-'0');
+        ++p;
     }
     
     if (*p == '.') {
         fraction = 0.1;
-      	while (isdigit(*p++)){
+      	while (isdigit(*p)){
             value = value + fraction * (*p-'0');
             fraction *= 0.1;
+            ++p;
         }
     }
     
@@ -387,8 +389,9 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
         
         number_start = p;
         exponent_value = 0;
-        while (isdigit(*p++)) {
+        while (isdigit(*p)) {
             exponent_value = 10*exponent_value + (double)(*p-'0');
+            ++p;
         }
         if (negate){
             exponent_value = -exponent_value;

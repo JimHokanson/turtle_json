@@ -36,7 +36,21 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
     
     int *child_count_object = get_int_field(object_info,"child_count_object");    
     int *unique_object_first_md_indices = get_int_field(object_info,"unique_object_first_md_indices");
+    //TODO: I'd like to clean this stuff up, my retrieval of fields is a mess
+    //TODO: We should also support retrieval of scalars, instead of just pointers
     int *max_keys_in_object = get_int_field(object_info,"max_keys_in_object");
+    
+    if (*max_keys_in_object == 0){
+        //We have at least one objects, but none of the objects have keys
+        //Create a single unique object with no fields ...
+        mxArray *all_objects = mxCreateCellMatrix(1, 1);
+        mxArray *s = mxCreateStructMatrix(1,0,0,0);
+        mxSetCell(all_objects, 0, s);
+        mxAddField(object_info,"objects");
+        mxSetField(object_info,0,"objects",all_objects);
+        return;
+    }
+    
     int *object_ids = get_int_field(object_info,"object_ids");
     
     mxArray *key_info = mxGetField(plhs[0],0,"key_info");
@@ -168,12 +182,7 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     int *n_objects_at_depth = get_int_field(object_info,"n_objects_at_depth");
     mwSize n_depths = get_field_length2(object_info,"n_objects_at_depth");
     
-    //Key related
-    mxArray *key_info = mxGetField(plhs[0],0,"key_info");
-    mxArray *temp_key_p = mxGetField(key_info,0,"key_p");
-    unsigned char **key_p = (unsigned char **)mxGetData(temp_key_p);
-    int *key_sizes = get_int_field(key_info,"key_sizes");
-    int *next_sibling_index_key = get_int_field(key_info,"next_sibling_index_key");
+
     
     
     //Some initial - meta setup
@@ -189,6 +198,31 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
         }
     }
     setIntScalar(object_info,"max_keys_in_object",max_children);
+    
+    if (max_children == 0){
+        //So we only have an empty object
+        int *unique_object_first_md_indices = mxMalloc(1*sizeof(int));
+        unique_object_first_md_indices[0] = process_order[0];
+        int *object_ids = mxCalloc(n_objects,sizeof(int));
+        
+    	setStructField(object_info,unique_object_first_md_indices,"unique_object_first_md_indices",mxINT32_CLASS,1);
+        setStructField(object_info,object_ids,"object_ids",mxINT32_CLASS,n_objects); 
+        setIntScalar(object_info,"n_unique_objects",1);
+        return;
+        
+    }
+    
+    
+    //Key related
+    mxArray *key_info = mxGetField(plhs[0],0,"key_info");
+    mxArray *temp_key_p = mxGetField(key_info,0,"key_p");
+    unsigned char **key_p = (unsigned char **)mxGetData(temp_key_p);
+    int *key_sizes = get_int_field(key_info,"key_sizes");
+    int *next_sibling_index_key = get_int_field(key_info,"next_sibling_index_key");
+    
+    
+    
+    
 
     //These are our outputs
     //---------------------------------------------------------------------

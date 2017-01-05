@@ -6,4 +6,8 @@ function all_examples()
 
 wtf = json_tests.time_example_file.testAll();
 
+%{
+
+%}
+
 end
