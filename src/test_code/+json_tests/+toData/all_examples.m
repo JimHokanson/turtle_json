@@ -4,7 +4,7 @@ function all_examples()
 %
 %   Tries to parse all example files
 
-wtf = json_tests.time_example_file.testAll();
+wtf = json_tests.utils.time_example_file.testAll();
 
 %{
 

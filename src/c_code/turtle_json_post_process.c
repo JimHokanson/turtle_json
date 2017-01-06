@@ -18,111 +18,7 @@
 
 
 
-//=========================================================================
-//=========================================================================
-void parse_numbers(unsigned char *js,mxArray *plhs[]) {
-    //
-    //  numeric_p - this array starts as a set of pointers
-    //  to locations in the json_string that contain numbers.
-    //  For example, we might have numeric_p[0] point to the following
-    //  location:
-    //
-    //      {"my_value": 1.2345}
-    //                   ^   
-    //
-    //  Some of these pointers may be null, indicating that a "null"
-    //  JSON value occurred at that index in the array.
-    //
-    //  I am currently assuming that a pointer is 64 bits, which means
-    //  that I recycle the memory to store the array of doubles
-    
-    mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
-    
-    //Casting for input handling
-    unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
-    
-    //Casting for output handling (recycling of memory)
-    double *numeric_p_double = (double *)mxGetData(temp);
-    
-    int n_numbers = mxGetN(temp);
-    
-    int *error_locations;
-    int *error_values;
-    
-    int n_threads = omp_get_max_threads();
-    
-    error_locations = mxMalloc(n_threads*sizeof(int));
-    error_values    = mxMalloc(n_threads*sizeof(int));
-    
-    const double MX_NAN = mxGetNaN();
-    
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        int error_location = 0;
-        int error_value;
 
-        #pragma omp for
-        for (int i = 0; i < n_numbers; i++){
-            if (numeric_p[i]){
-                string_to_double_v2(&numeric_p_double[i],numeric_p[i],i,&error_location,&error_value);
-            }else{
-                numeric_p_double[i] = MX_NAN;
-            }
-        }  
-        
-        *(error_locations + tid) = error_location;
-        *(error_values + tid) = error_value;
-    }
-    
-    //Error processing
-    //--------------------------------------
-    for (int i = 0; i < n_threads; i++){
-        if (*error_locations){
-            int error_index = *error_locations - 1;
-            //Note that we hold onto the pointer in cases of an error
-            //It is not overidden with a double
-            unsigned char *first_char_of_bad_number = numeric_p[error_index];
-            // p - js
-            //
-            // numeric_p[**=
-            
-            //TODO: This is a bit confusing since this pointer doesn't
-            //move but the other one does ...
-            //TODO: Ideally we would pass these error messages into
-            //a handler that would handle the last bit of formatting
-            //and also provide context in the string
-            //We would need the string length ...
-            switch (*(error_values + i))
-            {
-                case 0:
-                    //I don't think this can run based on how our parser works ...
-                    //TODO: Change this to a code error?
-                    mexErrMsgIdAndTxt("turtle_json:no_integer_component", \
-                            "No integer component was found for a number (#%d in the file, at position %d)", \
-                            error_index+1,first_char_of_bad_number-js+1);
-                    break;
-                case 1:
-                    mexErrMsgIdAndTxt("turtle_json:integer_component_too_large",
-                            "The integer component of the number had too many digits (#%d in the file, at position %d)",
-                            error_index+1,first_char_of_bad_number-js+1);
-                    break;
-                case 2:
-                    mexErrMsgIdAndTxt("turtle_json:no_fractional_numbers","A number had a period, followed by no numbers (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
-                case 3:
-                    mexErrMsgIdAndTxt("turtle_json:fractional_component_too_large","The fractional component of a number had too many digits");
-                case 4:
-                    mexErrMsgIdAndTxt("turtle_json:no_exponent_numbers","A number had an exponent symbol (e or E) followed by no digits");
-                case 5:
-                    mexErrMsgIdAndTxt("turtle_json:exponent_component_too_large","The fractional component of the number had too many digits");
-                default:
-                    mexErrMsgIdAndTxt("turtle_json:internal_code_error","Internal code error");   
-            }
-        }
-        ++error_locations;
-    } 
-}
-//=====================   END OF NUMBER PARSING  ==========================
 
 //=========================================================================
 //=========================================================================
@@ -265,9 +161,6 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     //  length(x[1][0]) == length(x[1][1]) == length(x[1][2]) etc.
     //  Thus, checking length(x[1][1]) == length(x[0][0]) is 
     //  redudndant if we know length(x[1][0]) == length(x[0][0])
-
-    
-//     mexPrintf("3\n");
     
     for (int iChild = 1; iChild < n_children; iChild++){
 
@@ -275,23 +168,11 @@ void check_for_nd_array(int array_md_index, int array_data_index,
 
         child_data_index = d1[child_md_index];
         
-//         if (child_data_index < 30){
-//             mexPrintf("child_md_index  %d\n",child_md_index);
-//             mexPrintf("child_data_index  %d\n",child_data_index);
-//         }
-        
         //This is a data type check, not an array type check ...
         if (types[child_md_index] != TYPE_ARRAY){
             is_nd_array = false;
             break;
         }
-
-//         First child: 5
-// child_md_index  15197
-// 1:size  11:5057
-// 2:depth 1:1
-// 3:type  1:1
-// child_md_index  5063
         
         if (first_child_size == child_count_array[child_data_index] &&
                 first_child_depth == array_depths[child_data_index] &&
@@ -307,17 +188,10 @@ void check_for_nd_array(int array_md_index, int array_data_index,
                 moving_child_data_index++;
             }
         }else{
-//             if (child_data_index < 7){
-//                 mexPrintf("1:size  %d:%d\n",first_child_size,child_count_array[child_data_index]);
-//                 mexPrintf("2:depth %d:%d\n",first_child_depth,array_depths[child_data_index]);
-//                 mexPrintf("3:type  %d:%d\n",first_child_array_type,array_types[child_data_index]);
-//             }
             is_nd_array = false;
         }
     }
-    
-//     mexPrintf("4\n");
-    
+        
     if (is_nd_array){
         array_types[array_data_index]  = array_type_map2[array_types[child_data_index]];
         //Bump up the dimension => e.g. 1d to 2d
@@ -337,7 +211,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
 //
 //  Populates
 //  ---------
-//  array_depths
+//  array_depths - actually, it just redefines it
 //  array_types
     
     //TODO: I need to go through and rename things 
@@ -347,6 +221,8 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     mwSize n_arrays = get_field_length2(array_info,"next_sibling_index_array");
     
     if (n_arrays == 0){
+        //uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
+        setStructField(array_info,0,"array_types",mxUINT8_CLASS,0);
         return;
     }
     uint8_t *array_depths = get_u8_field(array_info,"array_depths");
@@ -486,97 +362,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                         array_types, child_count_array, 
                         array_depths, child_size_stack, next_sibling_index_array,
                         types, d1, n_children);
-                    
-// // // // //                     mexPrintf("Nested array: %d\n",cur_array_index);
-// // // // //                     
-// // // // //                     cur_child_array_index = cur_array_index + 1;
-// // // // //                     cur_child_array_type = array_types[cur_child_array_index];
-// // // // //                     
-// // // // //                     //0 indicates that the child array does not hold homogenous data
-// // // // //                     if (cur_child_array_type == 0){
-// // // // //                         break;
-// // // // //                     }
-// // // // //                     
-// // // // //                     cur_child_data_index  = cur_process_index + 1;
-// // // // //                     child_size  = child_count_array[cur_child_array_index];
-// // // // //                     child_depth = array_depths[cur_child_array_index];
-// // // // // 
-// // // // //                     
-// // // // //                     //Log the sizes of the first array
-// // // // //                     if (child_depth > 1){
-// // // // //                        cur_child_array_index2 = cur_child_array_index + 1; 
-// // // // //                        for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
-// // // // //                            child_size_stack[iDepth] = child_count_array[cur_child_array_index2];
-// // // // //                            cur_child_array_index2++;
-// // // // //                        } 
-// // // // //                     }
-// // // // //                     
-// // // // //                     //Split, based on whether we need to verify deeper or not
-// // // // //                     is_nd_array = true;
-// // // // //                     if (child_depth > 1){
-// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
-// // // // //                             //Note, we are now comparing the 2nd and later children
-// // // // //                             //to the first one ...
-// // // // //                             
-// // // // //                             //TODO: Make all of these indices 0 based
-// // // // //                             //-1 is for matlab to c conversion :/
-// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
-// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
-// // // // //                                 is_nd_array = false;
-// // // // //                                 break;
-// // // // //                             }
-// // // // //                                     
-// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
-// // // // //                             
-// // // // //                             //TODO: The order of these should be switched
-// // // // //                             //i.e. we should assume that everything will match
-// // // // //                             if (child_size != child_count_array[cur_child_array_index] ||
-// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
-// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
-// // // // //                                 is_nd_array = false;
-// // // // //                                 break;
-// // // // //                             }else{
-// // // // //                                 //Depth verification
-// // // // //                                 cur_child_array_index2 = cur_child_array_index + 1;
-// // // // //                                 for (int iDepth = child_depth-1; iDepth > 0; iDepth--){
-// // // // //                                     if (child_size_stack[iDepth] != child_count_array[cur_child_array_index2]){
-// // // // //                                         is_nd_array = false;
-// // // // //                                         break;
-// // // // //                                     } 
-// // // // //                                     cur_child_array_index2++;
-// // // // //                                 }
-// // // // //                             }
-// // // // //                         }
-// // // // //                         
-// // // // //                     //Single child depth, only need to check consistency of 
-// // // // //                     //size of children, not children's children
-// // // // //                     }else{
-// // // // //                         for (int iChild = 1; iChild < n_children; iChild++){
-// // // // //                             //TODO: Remove this two step process ... 
-// // // // //                             //TODO: Make all of these indices 0 based
-// // // // //                             //-1 is for matlab to c conversion :/
-// // // // //                             cur_child_data_index = next_sibling_index_array[cur_child_array_index];
-// // // // //                             if (types[cur_child_data_index] != TYPE_ARRAY){
-// // // // //                                 is_nd_array = false;
-// // // // //                                 break;
-// // // // //                             }
-// // // // //                             
-// // // // //                             cur_child_array_index = RETRIEVE_DATA_INDEX(cur_child_data_index);
-// // // // // 
-// // // // //                             if (child_size != child_count_array[cur_child_array_index] || 
-// // // // //                                     child_depth != array_depths[cur_child_array_index] ||
-// // // // //                                     cur_child_array_type != array_types[cur_child_array_index]){
-// // // // //                                 is_nd_array = false;
-// // // // //                                 break;
-// // // // //                             }
-// // // // //                         }
-// // // // //                     }
-// // // // //                     
-// // // // //                     if (is_nd_array){
-// // // // //                         array_types[cur_array_index]  = array_type_map2[array_types[cur_child_array_index]];
-// // // // //                         //Bump up the dimension => e.g. 1d to 2d
-// // // // //                         array_depths[cur_array_index] = array_depths[cur_child_array_index] + 1;
-// // // // //                     }
+
                     break;
                 case TYPE_KEY:
                     mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, key was found as child of array in post-processing");
@@ -745,6 +531,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
             }else if(*p == '\\'){
                 ++p; //Move onto the next character that is escaped
                 
+                //TODO: Make this a function
                 //Process a unicode escape value e.g. \u00C8 => È
                 if (*p == 'u'){
                     shrink_string = true;
@@ -779,82 +566,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                 shrink_string = true;
                 
                 output_data[++cur_index] = parse_utf8_char(&p,p,&parse_status);
-                
-                
-// // // // // // //                 //Inspect first byte to get # of bytes
-// // // // // // //                 //2 bytes 110...   >> 5 == 6 - switch to 0b110
-// // // // // // //                 //3 bytes 1110.... >> 4 == 14
-// // // // // // //                 //4 bytes 11110... >> 3 == 30
-// // // // // // //                 //are 5 & 6 valid?
-// // // // // // //                 //
-// // // // // // //                 //errors (parse status # listed)
-// // // // // // //                 //- 10 - invalid first byte (currently no distinction
-// // // // // // //                 //       between 5 & 6 bytes, or other alternatives:
-// // // // // // //                 //       10... or 11111110 or 11111111
-// // // // // // //                 //        
-// // // // // // //                 //- 11 - invalid # of continuation bytes (given first byte)
-// // // // // // //                 //       continuation byte is 10...
-// // // // // // //                 //- 12 - not 2 byte compatible - TODO: Allow warning or 
-// // // // // // //                 //       error, on warning, write value as whatever the
-// // // // // // //                 //       unicode value is for not-representable or whatever
-// // // // // // //                 //       the proper terminology is ..
-// // // // // // //                 
-// // // // // // //                 //TODO: technically we should check for null values
-// // // // // // //                 //in each of the bytes, as this is not valid utf-8 
-// // // // // // //                 //(overlong encoding)
-// // // // // // //                 
-// // // // // // //                 //2 bytes
-// // // // // // //                 if ((*p >> 5) == 0b110){ 
-// // // // // // //                     
-// // // // // // //                     utf8_value = *p & 0b11111;
-// // // // // // //                     ++p;
-// // // // // // //                     
-// // // // // // //                     if (IS_CONTINUATION_BYTE){
-// // // // // // //                         utf8_value = (utf8_value << 6) + (*p & 0b111111);
-// // // // // // //                         //mexPrintf("2 byte result: %d\n",utf8_value);
-// // // // // // //                         output_data[++cur_index] = (uint16_t) utf8_value;
-// // // // // // //                     }else{
-// // // // // // //                         parse_status = 11;
-// // // // // // //                     }
-// // // // // // //                  
-// // // // // // //                 //3 bytes    
-// // // // // // //                 }else if((*p >> 4) == 0b1110){
-// // // // // // //                 //# of bits in each byte
-// // // // // // //                 // byte     # bits
-// // // // // // //                 //  1   ->  4
-// // // // // // //                 //  2   ->  6
-// // // // // // //                 //  3    -> 6   => 16 total bites => fits into 2 bytes
-// // // // // // //                 //    
-// // // // // // //                 //This also means that anything that is 4 bytes will
-// // // // // // //                 //never be valid when stored as 2 bytes
-// // // // // // //                 //TODO: We could do all the math with uint16t
-// // // // // // //                     
-// // // // // // //                     utf8_value = *p & 0b1111;
-// // // // // // //                     ++p;
-// // // // // // //                     
-// // // // // // //                     if (IS_CONTINUATION_BYTE){
-// // // // // // //                         utf8_value = (utf8_value << 6) + (*p & 0b111111);
-// // // // // // //                         ++p;
-// // // // // // //                         if (IS_CONTINUATION_BYTE){
-// // // // // // //                             utf8_value = (utf8_value << 6) + (*p & 0b111111);
-// // // // // // //                             //mexPrintf("2 byte result: %d\n",utf8_value);
-// // // // // // //                             output_data[++cur_index] = (uint16_t) utf8_value;
-// // // // // // //                         }else{
-// // // // // // //                             parse_status = 11;
-// // // // // // //                         }
-// // // // // // //                     }else{
-// // // // // // //                         parse_status = 11;
-// // // // // // //                     }
-// // // // // // //                     
-// // // // // // //                 //4 bytes     
-// // // // // // //                 }else if((*p >> 3) == 0b11110){
-// // // // // // //                     //not 2 byte compatible
-// // // // // // //                     parse_status = 12;
-// // // // // // //                 }else{
-// // // // // // //                     //invalid first byte
-// // // // // // //                     parse_status = 10;
-// // // // // // //                 }
-                
+ 
             //Just a regular old character to store    
             }else{
                 output_data[++cur_index] = *p;    
@@ -1011,11 +723,6 @@ uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status
 
 }
 
-void allocate_string_memory(){
-    
-    
-}
-
 void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_info){
     
     TIC(start_pp);
@@ -1026,7 +733,7 @@ void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_in
     TOC(object_parse,object_parsing_time);
     
     //mexPrintf("Key chars\n");
-    parse_key_chars(json_string,plhs);
+    initialize_unique_objects(json_string,plhs);
     
     //mexPrintf("Array parse\n");
     TIC(array_parse);

@@ -340,13 +340,37 @@ void string_to_double(double *value_p, char *p, int i, int *error_p, int *error_
 
 void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *error_value) {
 
+    //errors
+    //1 - no lead number
+
+//                case 0:
+//                     //I don't think this can run based on how our parser works ...
+//                     //TODO: Change this to a code error?
+//                     mexErrMsgIdAndTxt("turtle_json:no_integer_component", \
+//                             "No integer component was found for a number (#%d in the file, at position %d)", \
+//                             error_index+1,first_char_of_bad_number-js+1);
+//                     break;
+//                 case 1:
+//                     mexErrMsgIdAndTxt("turtle_json:integer_component_too_large",
+//                             "The integer component of the number had too many digits (#%d in the file, at position %d)",
+//                             error_index+1,first_char_of_bad_number-js+1);
+//                     break;
+//                 case 2:
+//                     mexErrMsgIdAndTxt("turtle_json:no_fractional_numbers","A number had a period, followed by no numbers (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
+//                 case 3:
+//                     mexErrMsgIdAndTxt("turtle_json:fractional_component_too_large","The fractional component of a number had too many digits");
+//                 case 4:
+//                     mexErrMsgIdAndTxt("turtle_json:no_exponent_numbers","A number had an exponent symbol (e or E) followed by no digits");
+//                 case 5:
+//                     mexErrMsgIdAndTxt("turtle_json:exponent_component_too_large","The fractional component of the number had too many digits");
+//                 default:
+//                     mexErrMsgIdAndTxt("turtle_json:internal_code_error","Internal code error"); 
+    
     
     double value = 0;
     double fraction = 0;
     double exponent_value;
     bool negate;
-    int64_t n_numeric_chars_plus_1;
-    char *number_start;
     
     if (*p == '-'){
         ++p;
@@ -355,14 +379,36 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
         negate = false;
     }
     
-    number_start = p;
+    //Verify at least one number - technically we could put this in the '-'
+    //case above, as otherwise this was triggered based on observing a #
+    if (isdigit(*p)){
+        value = 10*value + (double)(*p-'0');
+        ++p;
+    }else{
+    	*error_p = i+1;
+        *error_value = 0;
+        return;
+    }
+    
     while (isdigit(*p)){
         value = 10*value + (double)(*p-'0');
         ++p;
     }
     
+    //Fraction
+    //--------------------------------------------------------
     if (*p == '.') {
-        fraction = 0.1;
+        ++p;
+        if (isdigit(*p)){
+            value = value + 0.1*(*p-'0');
+            fraction = 0.01;
+            ++p;
+        }else{
+            *error_p = i+1;
+            *error_value = 2;
+            return;
+        }
+        
       	while (isdigit(*p)){
             value = value + fraction * (*p-'0');
             fraction *= 0.1;
@@ -374,6 +420,8 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
         value = -1*value;
     }
     
+    //Exponent
+    //----------------------
     if (*p == 'E' || *p == 'e') {
         ++p;
         switch (*p){
@@ -387,7 +435,6 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
                 negate = false;
         }
         
-        number_start = p;
         exponent_value = 0;
         while (isdigit(*p)) {
             exponent_value = 10*exponent_value + (double)(*p-'0');
@@ -398,7 +445,118 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
         }
         value *= pow(10.0, exponent_value);
     }
+    
+    //TODO: We could still have:
+    //(so '.' , '-', 'e', and 'E') (numbers would just be parsed)
+    //- note, with no e or E, we only need to check '.' and '-'
+    
 
     *value_p = value;
     
 }
+
+//=========================================================================
+//=========================================================================
+void parse_numbers(unsigned char *js,mxArray *plhs[]) {
+    //
+    //  numeric_p - this array starts as a set of pointers
+    //  to locations in the json_string that contain numbers.
+    //  For example, we might have numeric_p[0] point to the following
+    //  location:
+    //
+    //      {"my_value": 1.2345}
+    //                   ^   
+    //
+    //  Some of these pointers may be null, indicating that a "null"
+    //  JSON value occurred at that index in the array.
+    //
+    //  I am currently assuming that a pointer is 64 bits, which means
+    //  that I recycle the memory to store the array of doubles
+    
+    mxArray *temp = mxGetField(plhs[0],0,"numeric_p");
+    
+    //Casting for input handling
+    unsigned char **numeric_p = (unsigned char **)mxGetData(temp);
+    
+    //Casting for output handling (recycling of memory)
+    double *numeric_p_double = (double *)mxGetData(temp);
+    
+    int n_numbers = mxGetN(temp);
+    
+    int *error_locations;
+    int *error_values;
+    
+    int n_threads = omp_get_max_threads();
+    
+    error_locations = mxMalloc(n_threads*sizeof(int));
+    error_values    = mxMalloc(n_threads*sizeof(int));
+    
+    const double MX_NAN = mxGetNaN();
+    
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int error_location = 0;
+        int error_value;
+
+        #pragma omp for
+        for (int i = 0; i < n_numbers; i++){
+            if (numeric_p[i]){
+                string_to_double_v2(&numeric_p_double[i],numeric_p[i],i,&error_location,&error_value);
+            }else{
+                numeric_p_double[i] = MX_NAN;
+            }
+        }  
+        
+        *(error_locations + tid) = error_location;
+        *(error_values + tid) = error_value;
+    }
+    
+    //Error processing
+    //--------------------------------------
+    for (int i = 0; i < n_threads; i++){
+        if (*error_locations){
+            int error_index = *error_locations - 1;
+            //Note that we hold onto the pointer in cases of an error
+            //It is not overidden with a double
+            unsigned char *first_char_of_bad_number = numeric_p[error_index];
+            // p - js
+            //
+            // numeric_p[**=
+            
+            //TODO: This is a bit confusing since this pointer doesn't
+            //move but the other one does ...
+            //TODO: Ideally we would pass these error messages into
+            //a handler that would handle the last bit of formatting
+            //and also provide context in the string
+            //We would need the string length ...
+            switch (*(error_values + i))
+            {
+                case 0:
+                    //I don't think this can run based on how our parser works ...
+                    //TODO: Change this to a code error?
+                    mexErrMsgIdAndTxt("turtle_json:no_integer_component", \
+                            "No integer component was found for a number (#%d in the file, at position %d)", \
+                            error_index+1,first_char_of_bad_number-js+1);
+                    break;
+                case 1:
+                    mexErrMsgIdAndTxt("turtle_json:integer_component_too_large",
+                            "The integer component of the number had too many digits (#%d in the file, at position %d)",
+                            error_index+1,first_char_of_bad_number-js+1);
+                    break;
+                case 2:
+                    mexErrMsgIdAndTxt("turtle_json:no_fractional_numbers","A number had a period, followed by no numbers (#%d in the file, at position %d)",error_index+1,first_char_of_bad_number-js+1);
+                case 3:
+                    mexErrMsgIdAndTxt("turtle_json:fractional_component_too_large","The fractional component of a number had too many digits");
+                case 4:
+                    mexErrMsgIdAndTxt("turtle_json:no_exponent_numbers","A number had an exponent symbol (e or E) followed by no digits");
+                case 5:
+                    mexErrMsgIdAndTxt("turtle_json:exponent_component_too_large","The fractional component of the number had too many digits");
+                default:
+                    mexErrMsgIdAndTxt("turtle_json:internal_code_error","Internal code error");   
+            }
+        }
+        ++error_locations;
+    } 
+}
+//=====================   END OF NUMBER PARSING  ==========================

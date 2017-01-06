@@ -12,6 +12,11 @@ function number_tests()
 
 fh2 = @json_tests.utils.runTest;
 fh2(1,'[1]','','single number in array',1);
+%TODO: We could make this error more specific in the c code
+fh2(0,'[+1]','turtle_json:invalid_token','''+'' is not ok to lead a number','');
+fh2(0,'[1.]','turtle_json:no_fractional_numbers','''.'' needs to be followed by a numeric value','');
+fh2(0,'[1.3]','','',1.3);
+fh2(0,'[-1.3]','','',-1.3);
 
 % tests(1,:) = {['[12312312,1231,12,' ...
 %     '123123123123123123123123123123,123123]'],...
@@ -19,8 +24,7 @@ fh2(1,'[1]','','single number in array',1);
 % tests(end+1,:) = {'[1.]','turtle_json:no_fractional_numbers','Number with a period had no fractional numbers that followed'};
 % tests(end+1,:) = {'[+1]','turtle_json:invalid_token','Can''t lead with a positive'};
 
-% tests(1,:) = 
-% tests(2,:) = {'[+1.]',0,'''.'' needs to be followed by a numeric value'}; %
+
 % tests(3,:) = {'[1.3]',1.3,''};
 % tests(4,:) = {'[-1.3]',-1.3,''};
 % tests(5,:) = {'[-1.3e1]',-1.3e1,''};

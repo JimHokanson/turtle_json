@@ -1,4 +1,4 @@
-function runTest(input_test_number,cur_test_string,error_id,memo,expected_value)
+function [output_test_number,tokens,data] = runTest(input_test_number,cur_test_string,error_id,memo,expected_value)
 %
 %   json_tests.utils.runTest(input_test_number,cur_test_string,error_id,memo,expected_value)
 %
@@ -14,10 +14,13 @@ persistent test_number
         test_number = test_number + 1;
     end
 
+    output_test_number = test_number;
+    
     should_pass = isempty(error_id);
 
     try
-        t = json.parse(cur_test_string);
+        tokens = json.tokens.parse(cur_test_string);
+        data = tokens.getParsedData();
         passed = true;
     catch ME
         passed = false;
@@ -36,10 +39,14 @@ persistent test_number
         error('Test #%d should have thrown an error but didn''t',test_number);
     elseif passed
         
-        if ~isempty(expected_value) && ~isequal(t,expected_value)
+        if ~isempty(expected_value) && ~isequal(data,expected_value)
             error('Test #%d failed because the parsed data did not match the expected value',test_number)
         else
-            fprintf('Test %d passed as expected\n',test_number);
+            if nargout
+                %do nothing
+            else
+                fprintf('Test %d passed as expected\n',test_number);
+            end
         end
     end
 

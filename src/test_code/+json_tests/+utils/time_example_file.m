@@ -24,7 +24,7 @@ classdef time_example_file
             all_results = cell(1,n_files);
             for iFile = 1:n_files
                 fprintf('Running example %d of %d: %s\n',iFile,n_files,file_names{iFile});
-                all_results{iFile} = json_tests.time_example_file(file_names{iFile},varargin{:});
+                all_results{iFile} = json_tests.utils.time_example_file(file_names{iFile},varargin{:});
             end
             all_results = [all_results{:}];
         end
@@ -33,9 +33,9 @@ classdef time_example_file
     methods
         function obj = time_example_file(name_or_index,varargin)
             %
-            %   result = json_tests.time_example_file(name_or_index)
+            %   result = json_tests.utils.time_example_file(name_or_index)
             %
-            %   result = json_tests.time_example_file('big.json','n_runs',1)
+            %   result = json_tests.utils.time_example_file('big.json','n_runs',1)
             %
             %   Optional Inputs
             %   ---------------
@@ -79,8 +79,17 @@ classdef time_example_file
                 end
                 
                 t3 = toc(t0)/n_runs;
+            elseif in.method == 3
+                t0 = tic;
+
+                for iRun = 1:n_runs
+                    temp = fileread(file_path);
+                    data = jsondecode(temp);
+                end
+
                 
-                
+                t3 = toc(t0)/n_runs;
+
             end
             
             obj.method = in.method;

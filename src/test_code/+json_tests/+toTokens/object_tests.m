@@ -29,4 +29,18 @@ s = struct;
 s.a = 1;
 fh2(0,'[{},{"a":1}]','','empty and non-empty objects',{struct,s});
 
+%TODO: test aspects of the parsing, like same objects
+data = {struct('ab',1,'ac',2),struct('ab',2,'ad',3)};
+%TODO: Move the encoding to part of the test utils
+[test_number,root] = fh2(0,tjSave(data),'','2 different structs',data);
+%We could potentially pass in a function handle to the above function
+%We would also need to pass in the error string
+%@()s.root.mex.... = 2
+if root.mex.object_info.n_unique_objects == 2
+    fprintf('Test %d passed as expected\n',test_number);
+else
+    error('Test #%d failed because the # of unique objects should have been 2',test_number)
+end
+
+
 end

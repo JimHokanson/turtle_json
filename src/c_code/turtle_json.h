@@ -140,13 +140,15 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
 
 void post_process(unsigned char *js,mxArray *plhs[], mxArray *timing_info);
 
+//turtle_json_pp_objects.c
 void populate_object_flags(unsigned char *js,mxArray *plhs[]);
+
+void initialize_unique_objects(unsigned char *js,mxArray *plhs[]);
 
 void populate_array_flags(unsigned char *js,mxArray *plhs[]);
 
 void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info);
 
-void parse_key_chars(unsigned char *js,mxArray *plhs[]);
-    
+//turtle_json_number_parsing.c
 void parse_numbers(unsigned char *js, mxArray *plhs[]);
 

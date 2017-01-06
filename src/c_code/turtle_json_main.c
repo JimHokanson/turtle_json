@@ -817,7 +817,7 @@ S_ERROR_END_OF_VALUE_IN_KEY:
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
     mexPrintf("Current character: %c\n",CURRENT_CHAR);
     mexPrintf("Current position in string: %d\n",CURRENT_INDEX);
-	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Invalid token found after a comma in an array");
+	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Invalid token found after opening of array or after a comma in an array");
 	//mexErrMsgIdAndTxt("turtle_json:no_primitive","Primitive value was not found after the comma");
    
 //TODO: Open array points here now too

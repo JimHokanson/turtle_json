@@ -1,4 +1,9 @@
 #include "turtle_json.h"
+//
+//  Entry functions:
+//  1) populate_object_flags()
+//  2) initialize_unique_objects()
+//
 
 //I might eventually replace with a SIMD check ...
 bool same_keys(unsigned char *key1, unsigned char *key2, int key_length){
@@ -18,10 +23,10 @@ bool same_keys(unsigned char *key1, unsigned char *key2, int key_length){
 
 //=========================================================================
 //=========================================================================
-void parse_key_chars(unsigned char *js,mxArray *plhs[]){
+void initialize_unique_objects(unsigned char *js,mxArray *plhs[]){
     //
-    //  This code will populate the keys for each object, based on already
-    //  having identified unique objects earlier.
+    //  This code will initialize unique objects (structures) with keys, 
+    //  based on already having identified unique objects earlier.
     //
     
     int *d1 = (int *)get_field(plhs,"d1");
@@ -85,9 +90,6 @@ void parse_key_chars(unsigned char *js,mxArray *plhs[]){
         cur_key_data_index = d1[cur_key_md_index];
                 
         for (int iKey = 0; iKey < n_keys_in_object; iKey++){
-            
-
-            
             cur_key_p = key_p[cur_key_data_index];
             cur_key_size = key_sizes[cur_key_data_index];
             
@@ -182,9 +184,6 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     int *n_objects_at_depth = get_int_field(object_info,"n_objects_at_depth");
     mwSize n_depths = get_field_length2(object_info,"n_objects_at_depth");
     
-
-    
-    
     //Some initial - meta setup
     //---------------------------------------------------------------------
     int *process_order = mxMalloc(n_objects*sizeof(int));
@@ -211,17 +210,15 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
         return;
         
     }
-    
-    
+
     //Key related
+    //---------------------------------
+    //Moved this to being after the max_children check
     mxArray *key_info = mxGetField(plhs[0],0,"key_info");
     mxArray *temp_key_p = mxGetField(key_info,0,"key_p");
     unsigned char **key_p = (unsigned char **)mxGetData(temp_key_p);
     int *key_sizes = get_int_field(key_info,"key_sizes");
     int *next_sibling_index_key = get_int_field(key_info,"next_sibling_index_key");
-    
-    
-    
     
 
     //These are our outputs
