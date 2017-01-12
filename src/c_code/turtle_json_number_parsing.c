@@ -1,5 +1,11 @@
 #include "turtle_json.h"
 
+//This file contains code for parsing strings to numbers. There are 
+//currently two different approaches implemented, but only 1 is used.
+//
+//Eventually I wanted to have explicit speed testing that compared various 
+//approaches.
+
 //Place to put various # parsing algorithms ...
 //https://github.com/miloyip/rapidjson/blob/03a73910498d784a3a9429202a90d2fb67be910b/include/rapidjson/reader.h#L1118
 

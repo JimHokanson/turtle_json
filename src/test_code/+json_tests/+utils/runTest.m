@@ -1,14 +1,33 @@
-function [output_test_number,tokens,data] = runTest(input_test_number,cur_test_string,error_id,memo,expected_value)
+function [output_test_number,root,data] = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, post_test, post_test_error_msg)
 %
-%   json_tests.utils.runTest(input_test_number,cur_test_string,error_id,memo,expected_value)
+%   Call Forms
+%   ----------
+%   [output_test_number,root,data] = json_tests.utils.runTest(reset_test_number,cur_test_string,error_id,memo,expected_value)
+%
+%   ... = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, post_test, post_test_error_msg)
+%
+%   ... = TODO: might provide file testing option ...
 %
 %   Inputs
 %   ------
-%   
+%   reset_test_number: logical
+%       If true, resets the internal test counter
+%   cur_test_string: string
+%       json string to parse
+%   error_id: string
+%       If not empty, an error is expected.
+%   memo: string
+%       Not used, this is just a note to self.
+%   expected_value: anything
+%       Value to compare the returned to.
+%   post_test: function handle
+%       Should take in the result, and return true if the test passed
+%   post_test_error_msg: string
+%       The error message that should be displayed if the post_test fails.
 
 persistent test_number
 
-    if input_test_number == 1
+    if reset_test_number
         test_number = 1;
     else
         test_number = test_number + 1;
@@ -19,8 +38,10 @@ persistent test_number
     should_pass = isempty(error_id);
 
     try
-        tokens = json.tokens.parse(cur_test_string);
-        data = tokens.getParsedData();
+        root = json.tokens.parse(cur_test_string);
+        data = root.getParsedData();
+        s.root = root;
+        s.data = data;
         passed = true;
     catch ME
         passed = false;
@@ -42,8 +63,12 @@ persistent test_number
         if ~isempty(expected_value) && ~isequal(data,expected_value)
             error('Test #%d failed because the parsed data did not match the expected value',test_number)
         else
-            if nargout
-                %do nothing
+            if exist('post_test','var')
+                if post_test(s)
+                   fprintf('Test %d passed as expected\n',test_number);
+                else
+                   error('Test %d failed: %s',test_number, post_test_error_msg);
+                end
             else
                 fprintf('Test %d passed as expected\n',test_number);
             end

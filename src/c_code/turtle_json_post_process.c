@@ -2,7 +2,10 @@
 
 
 //UTF-8 parsing related
-//TODO: Document what this is ...
+//-------------------------------------------------------------------------
+//https://en.wikipedia.org/wiki/UTF-8#Description
+//The 1st utf8 byte specifies how many bytes belong to a single character
+//subsequent bytes are identified by a leading 10 bit pattern
 #define IS_CONTINUATION_BYTE *p >> 6 == 0b10
 
 #define ADD_CONTINUATION_BYTE_VALUE utf8_value = (utf8_value << 6) + (*p & 0b111111)

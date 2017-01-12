@@ -967,7 +967,7 @@ void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, cons
     //Checks
     //1) array
     //2) depth is 2 - NO, only needs to hold types of numeric array ARRAY_NUMERIC_TYPE
-    //3) array type is numeric 2d array - NO, again, 
+    //3) array type is numeric 2d array - NO, again, regularity of size is not required
     if ((types[array_md_index] != TYPE_ARRAY)){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","Requested array of 1d arrays, but index did not point to an array");
     }
