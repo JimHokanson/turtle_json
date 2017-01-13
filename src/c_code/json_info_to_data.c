@@ -1005,6 +1005,51 @@ void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, cons
     
 }
 
+void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+    //
+    // 1) 6
+    // 2) mex
+    // 3) object_md_index
+    // 4) keys_not_to_parse
+    // 5) include_non_parsed_keys
+    
+    bool 
+    
+    if (nrhs != 5){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f6 requires 5 inputs");
+    }else if (!mxIsClass(prhs[1],"struct")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f6 needs to be a structure");
+    }else if (!mxIsClass(prhs[2],"double")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f6 needs to be a double");
+    }else if (!mxIsClass(prhs[3],"cell")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","4th input to json_info_to_data.f6 needs to be a cell");
+    }else if (!mxIsClass(prhs[4],"logical")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","5th input to json_info_to_data.f6 needs to be a logical");
+    }
+    
+    if (nlhs != 2){
+    	mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f6 requires 2 outputs");
+    }
+    
+    //Algorithm get object_info
+    //Check # of keys
+    //Walk along keys until specified value
+    //Return results
+    int n_values;
+    const mxArray *mex_input = prhs[1];
+    int *d1 = get_int_field_and_length(mex_input,"d1",&n_values);
+      
+    int object_md_index = ((int)mxGetScalar(prhs[2]))-1;
+    int object_data_index = index_safely(d1,n_values,object_md_index);
+    
+    
+    
+    uint8_t *types = get_u8_field_safe(mex_input,"types");
+    
+    
+    
+}
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     
@@ -1012,21 +1057,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //  ----------------------------------------------
     //  0: full parsing
     //      data = json_info_to_data(0,mex_struct,start_index)
+    //
     //  1: object key name to key_index (in struct)
     //      index_1b = json_info_to_data(1,mex_struct,obj_md_index,key_name)
+    //
     //  2: key_index to (type,md_index_1b)
     //      [type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b)
     //
     //  3: Retrieve cellstr
     //      cellstr = json_info_to_data(3,mex_struct,array_md_index)
+    //
     //  4: Retrieve nd-array
     //      nd_arrray = json_info_to_data(4,mex_struct,array_md_index,expected_array_type)
     //      expected_array_type:
     //          0 - numeric
     //          1 - string
     //          2 - logical
+    //
     //  5: Retrieve cell of 1d numeric arrays
     //      cell_output = json_info_to_data(5,mex_struct,array_md_index);
+    //
+    //  6: Retrieve partial object
+    //      [struct,keys_present] = json_info_to_data(6,mex_struct,object_md_index,keys_not_parse,include_non_parsed_keys);
     //
     //  json_info_to_data(mex_struct)
     //
@@ -1061,6 +1113,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             break;
         case 5:
             f5__get_cell_of_1d_numeric_arrays(nlhs,plhs,nrhs,prhs);
+            break;
+        case 6:
+            f6__partial_object_parsing(nlhs,plhs,nrhs,prhs);
             break;
         default:
             mexErrMsgIdAndTxt("turtle_json:invalid_input","Function option not recognized");
