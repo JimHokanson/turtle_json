@@ -13,6 +13,7 @@
 typedef struct {
     uint8_t *types;
     int *d1;
+    int n_md_values;
     
     //This is for arrays
     mwSize *dims;
@@ -210,13 +211,37 @@ void populateDims(Data data, int array_data_index, int md_index, int array_depth
     }
 }
 
-void populate_dims2(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int array_depth){
-      
-    dims[0] = child_count_array[array_data_index];
-    for (int iDim = 1; iDim < array_depth; iDim++){
+void populate_dims2(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int n_dimensions){
+    //
+    //  This function populates the output array dimension size. It should
+    //  only be called for ND arrays (i.e. arrays that contain arrays which
+    //  are all of the same size).
+    //
+    //  Inputs
+    //  ------
+    //  dims: 
+    //      Array of size values. The size should already be verified to
+    //      be sufficiently large.
+    //  d1:
+    //      Pointer to information about each level of the array.
+    //  child_count_array:
+    //  array_data_index:
+    //  array_md_index:
+    //  array_depth:
+    //      2
+    
+    dims[n_dimensions-1] = child_count_array[array_data_index];
+    
+    for (int iDim = n_dimensions-2; iDim >= 0; iDim--){
         array_data_index = d1[++array_md_index];
         dims[iDim] = child_count_array[array_data_index];
-    }     
+    }
+    
+//     dims[0] = child_count_array[array_data_index];
+//     for (int iDim = 1; iDim < array_depth; iDim++){
+//         array_data_index = d1[++array_md_index];
+//         dims[iDim] = child_count_array[array_data_index];
+//     }     
 }
 
 mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_md_index){
@@ -271,7 +296,7 @@ mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_m
     return output;
 }
 
-void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index){
+void parse_object(Data data, mxArray *obj, int ouput_struct_index, int object_md_index){
     //
     //  Inputs
     //  ------
@@ -280,23 +305,21 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index)
     //  md_index: TODO: rename to md_index
     //
     
-    int object_data_index = RETRIEVE_DATA_INDEX2(md_index);
+    int object_data_index = data.d1[object_md_index];
     int n_keys = data.child_count_object[object_data_index];
         
     mxArray *temp_mxArray;
-    int     temp_data_index;
     
     const int *next_sibling_index_key = data.next_sibling_index_key;
     const uint8_t *types = data.types;
     
-    int cur_key_md_index = md_index + 1;
-    int cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
+    int cur_key_md_index = object_md_index + 1;
+    int cur_key_data_index = data.d1[cur_key_md_index];
     for (int iKey = 0; iKey < n_keys; iKey++){
         int cur_key_value_md_index = cur_key_md_index + 1;
         switch (types[cur_key_value_md_index]){
             case TYPE_OBJECT:
-                temp_data_index = RETRIEVE_DATA_INDEX2(cur_key_value_md_index);
-                temp_mxArray = getStruct(data,temp_data_index,1);
+                temp_mxArray = getStruct(data,data.d1[cur_key_value_md_index],1);
                 parse_object(data,temp_mxArray,0,cur_key_value_md_index);
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,temp_mxArray);
                 break;
@@ -324,7 +347,7 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index)
                 break;
         }
         cur_key_md_index = next_sibling_index_key[cur_key_data_index];
-        cur_key_data_index = RETRIEVE_DATA_INDEX2(cur_key_md_index);
+        cur_key_data_index = data.d1[cur_key_md_index];
     }
 }
 
@@ -361,9 +384,9 @@ mxArray* parse_nd_numeric_array(int *d1, mwSize *dims, int *child_count_array,
     int array_data_index = d1[array_md_index];
     int array_depth = array_depths[array_data_index];
     
-    //TODO: We could avoid this if we allocated based on the max
+    //TODO: We could avoid this check if we allocated 'dims' based on the max
     //TODO: Alternatively, we could allocate this permanently for mex
-    //and recycle ...
+    //and recycle between mex calls
     
     if (array_depth > MAX_ARRAY_DIMS){
         mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
@@ -472,13 +495,25 @@ mxArray* parse_logical_nd_array(int *d1, uint8_t *types, mwSize *dims,
     return output;    
 }
 
-
+//TODO: This nomenclature is a bit off. We aren't really parsing anything
+//as much as going from our parsed data into a Matlab data structure.
 mxArray *parse_array(Data data, int md_index){
+    //
+    //  This code handles parsing of a heterogenous array. It doesn't
+    //  actual
+    //
+    //  See Also
+    //  --------
+    //  parse_non_homogenous_array
+    //  parse_1d_array
+    //  parse_cellstr
+    //  parse_logical_array
+    //  parse_nd_numeric_array
+    //  parse_nd_string_array
+    //  parse_logical_nd_array
     
     int cur_array_data_index = data.d1[md_index];
     mxArray *output;
-    
-    
     
     int temp_count;
     int temp_data_index;
@@ -556,35 +591,17 @@ mxArray *parse_array(Data data, int md_index){
 //=========================================================================
 //=========================================================================
 
-//0 =======================================================================
-void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
-    //
-    //  data = json_info_to_data(0,mex_struct,start_index)
-    //
-    //  TODO: We could add on options here eventually
-    //
-    
-    if (nrhs != 3){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f0 requires 3 inputs");
-    }else if (!mxIsClass(prhs[1],"struct")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f0 needs to be a structure");
-    }else if (!mxIsClass(prhs[2],"double")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f0 needs to be a double");
-    }
-    
-    if (nlhs != 1){
-    	mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f0 requires 1 output");
-    }
-    
-    const mxArray *s = prhs[1];
-    int md_index = ((int) mxGetScalar(prhs[2]))-1;
-    
+
+
+Data populate_data(mxArray *s){
+
     Data data;
     
     //Main Data -----------------------------------------------------------
     int n_md_values;
     data.types = get_u8_field_safe(s, "types");
     data.d1 = get_int_field_and_length(s,"d1",&n_md_values);
+    data.n_md_values = n_md_values;
     
     //Object Data  --------------------------------------------------------
     const mxArray *object_info = mxGetField(s,0,"object_info");
@@ -614,8 +631,38 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //Numeric Data -------------------------
     data.numeric_data = (double *)mxGetData(mxGetField(s,0,"numeric_p"));
     
-    if (md_index < 0 || md_index >= n_md_values){
-        mexErrMsgIdAndTxt("turtle_json:invalid_output","md_index out of range for f0");
+    return data;
+    
+}
+
+//0 =======================================================================
+void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+    //
+    //  data = json_info_to_data(0,mex_struct,start_index)
+    //
+    //  TODO: We could add on options here eventually
+    //
+    
+    if (nrhs != 3){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f0 requires 3 inputs");
+    }else if (!mxIsClass(prhs[1],"struct")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f0 needs to be a structure");
+    }else if (!mxIsClass(prhs[2],"double")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f0 needs to be a double");
+    }
+    
+    if (nlhs != 1){
+    	mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f0 requires 1 output");
+    }
+    
+    const mxArray *s = prhs[1];
+    int md_index = ((int) mxGetScalar(prhs[2]))-1;
+    
+    Data data;
+    data = populate_data(s);
+    
+    if (md_index < 0 || md_index >= data.n_md_values){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f0");
     }
     
     if (data.types[md_index] == TYPE_KEY){
@@ -656,9 +703,16 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
 }
 
 //=========================================================================
-void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){ 
     //
     //  index_1b = json_info_to_data(1,mex_struct,obj_md_index,key_name)
+    //
+    //  Inputs: object, key name
+    //  Returns: the index of the key in the object
+    //
+    //      Note, this function also tests that the key exists. If it 
+    //      doesn't it throws an error.
+    //       
     //
     //  Given an object and a key name, get the key index. We also check
     //  that the key exists.
@@ -698,10 +752,15 @@ void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]
 //=========================================================================
 void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //
-    //   [type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b
+    //   [key_value_type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b
     //
-    //   2: key_index to (type,md_index_1b)
+    //   Given an object and key index, return:
+    //   1) the type of the key value, e.g. string, number, array, etc.
+    //   2) the unique md_index (1 based) for the key value
     //
+    //   See Also
+    //  ----------
+    //   
     
     if (nrhs != 4){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f2 requires 4 inputs");
@@ -1007,13 +1066,15 @@ void f5__get_cell_of_1d_numeric_arrays(int nlhs, mxArray *plhs[], int nrhs, cons
 
 void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //
-    // 1) 6
-    // 2) mex
-    // 3) object_md_index
-    // 4) keys_not_to_parse
-    // 5) include_non_parsed_keys
-    
-    bool 
+    // 0) 6
+    // 1) mex
+    // 2) object_md_index
+    // 3) keys_not_to_parse
+    // 4) include_non_parsed_keys
+    //
+    //  Outputs
+    //  0) struct
+    //  1) key_location (1 based)
     
     if (nrhs != 5){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f6 requires 5 inputs");
@@ -1035,19 +1096,108 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
     //Check # of keys
     //Walk along keys until specified value
     //Return results
-    int n_values;
-    const mxArray *mex_input = prhs[1];
-    int *d1 = get_int_field_and_length(mex_input,"d1",&n_values);
-      
+    const mxArray *s = prhs[1];
+    
+    Data data;
+    data = populate_data(s);
+    
     int object_md_index = ((int)mxGetScalar(prhs[2]))-1;
-    int object_data_index = index_safely(d1,n_values,object_md_index);
     
+    if (object_md_index < 0 || object_md_index >= data.n_md_values){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f6");
+    }else if (data.types[object_md_index] != TYPE_OBJECT){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index does not point to an object");
+    }
     
+    int object_data_index = data.d1[object_md_index];
+    int object_id = data.object_ids[object_data_index];
+    int n_keys = data.child_count_object[object_data_index];
     
-    uint8_t *types = get_u8_field_safe(mex_input,"types");
+    //Default false (i.e. parse)
+    bool *dont_parse = mxCalloc(n_keys,1);
     
+    mxArray *example_object = mxGetCell(data.objects,object_id);
     
+    mxArray *keys_to_ignore = prhs[3];
+    size_t n_keys_to_ignore = mxGetNumberOfElements(keys_to_ignore);
     
+    double *key_locations = mxMalloc(n_keys*sizeof(double));
+    
+    int field_number;
+    char *field_name;
+    for (int iKey = 0; iKey < n_keys_to_ignore; iKey++){
+        field_name = mxArrayToString(mxGetCell(keys_to_ignore,iKey));
+        field_number = mxGetFieldNumber(example_object,field_name);
+        key_locations[iKey] = (double)(field_number+1);
+        if (field_number >= 0){
+            dont_parse[field_number] = 1;
+        }
+    }
+    
+    plhs[1] = mxCreateNumericMatrix(1,0,mxDOUBLE_CLASS,0);
+    mxSetN(plhs[1],n_keys_to_ignore);
+    mxSetData(plhs[1],key_locations);
+    
+    plhs[0] = getStruct(data,data.d1[object_md_index],1);
+    mxArray *obj = plhs[0];
+    
+    mxArray *temp_mxArray;
+    
+    const int *next_sibling_index_key = data.next_sibling_index_key;
+    const uint8_t *types = data.types;
+    
+    int cur_key_md_index = object_md_index + 1;
+    int cur_key_data_index = data.d1[cur_key_md_index];
+    for (int iKey = 0; iKey < n_keys; iKey++){
+        if (!dont_parse[iKey]){
+            int cur_key_value_md_index = cur_key_md_index + 1;
+            switch (types[cur_key_value_md_index]){
+                case TYPE_OBJECT:
+                    temp_mxArray = getStruct(data,data.d1[cur_key_value_md_index],1);
+                    parse_object(data,temp_mxArray,0,cur_key_value_md_index);
+                    mxSetFieldByNumber(obj,0,iKey,temp_mxArray);
+                    break;
+                case TYPE_ARRAY:
+                    mxSetFieldByNumber(obj,0,iKey,
+                            parse_array(data,cur_key_value_md_index));
+                    break;
+                case TYPE_KEY:
+                    mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
+                    break;
+                case TYPE_STRING:
+                    mxSetFieldByNumber(obj,0,iKey,getString(data.d1,data.strings,cur_key_value_md_index));
+                    break;
+                case TYPE_NUMBER:
+                    mxSetFieldByNumber(obj,0,iKey,getNumber(data,cur_key_value_md_index));
+                    break;
+                case TYPE_NULL:
+                    mxSetFieldByNumber(obj,0,iKey,getNull(data,cur_key_value_md_index));
+                    break;
+                case TYPE_TRUE:
+                    mxSetFieldByNumber(obj,0,iKey,getTrue(data,cur_key_value_md_index));
+                    break;
+                case TYPE_FALSE:
+                    mxSetFieldByNumber(obj,0,iKey,getFalse(data,cur_key_value_md_index));
+                    break;
+            }
+        }
+        cur_key_md_index = next_sibling_index_key[cur_key_data_index];
+        cur_key_data_index = data.d1[cur_key_md_index];
+    }
+    
+    bool *keep_keys = mxGetData(prhs[4]);
+    if (!(*keep_keys)){
+    // - need to remove these fields 
+        for (int iKey = n_keys - 1; iKey >= 0; iKey--){
+            if (dont_parse[iKey]){
+                mxRemoveField(obj, iKey);
+            }
+        }
+    }
+    
+    //prhs[4]
+    //=> logical
+    //JAH: Should be all done, just need to test ...
 }
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
@@ -1078,7 +1228,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //      cell_output = json_info_to_data(5,mex_struct,array_md_index);
     //
     //  6: Retrieve partial object
-    //      [struct,keys_present] = json_info_to_data(6,mex_struct,object_md_index,keys_not_parse,include_non_parsed_keys);
+    //      [struct,key_locations] = json_info_to_data(6,mex_struct,object_md_index,keys_not_parse,include_non_parsed_keys);
     //
     //  json_info_to_data(mex_struct)
     //

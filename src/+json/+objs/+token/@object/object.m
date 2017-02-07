@@ -43,8 +43,35 @@ classdef object < json.objs.token
             obj.md_index = md_index;
             obj.mex = parse_object;
         end
+        function [data,key_locations] = parseExcept(obj,keys_to_not_parse,keep_keys)
+            %
+            %   
+            %   [data,key_locations] = parseExcept(obj,keys_to_not_parse,*keep_keys)
+            %
+            %   Inputs
+            %   ------
+            %   keys_to_not_parse:
+            %   keep_keys:
+            %
+            %   Outputs
+            %   -------
+            %   data: 
+            %   key_locations:
+            %
+            
+            if nargin == 2
+                keep_keys = true;
+            else
+                keep_keys = logical(keep_keys);
+            end
+            if ischar(keys_to_not_parse)
+                keys_to_not_parse = {keys_to_not_parse};
+            end
+            [data,key_locations] = json_info_to_data(6,obj.mex,obj.md_index,keys_to_not_parse,keep_keys);
+        end
         function nd_arrray = getNumericArray(obj,name)
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
+            %json_info_to_data(4,mex_struct,array_md_index,expected_array_type)
             nd_arrray = json_info_to_data(4,obj.mex,key_value_md_index,0);
         end
         function output = getToken(obj,name)
@@ -53,7 +80,7 @@ classdef object < json.objs.token
             %
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             lp = obj.mex;
-
+            
             switch key_value_type
                 case 1
                     local_full_name = [obj.full_name '.' name];
@@ -80,14 +107,15 @@ classdef object < json.objs.token
         end
         function output = getParsedToken(obj,name)
             %v3
-        	[~,key_value_md_index] = h__getKeyValueInfo(obj,name);
+            [~,key_value_md_index] = h__getKeyValueInfo(obj,name);
             output = json_info_to_data(0,s.mex,key_value_md_index);
         end
+        %function output = getPartialToken(obj,name
         function output = getArrayToken(obj,name)
             %v3
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             if key_value_type ~= 2
-               error('Requested key: "%s" is not an array',name); 
+                error('Requested key: "%s" is not an array',name);
             end
             local_full_name = [obj.full_name '.' name];
             output = json.token_info.array_token_info(name,local_full_name,key_value_md_index,obj.mex);
@@ -96,7 +124,7 @@ classdef object < json.objs.token
             %v3
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             if ~(key_value_type == 5 || key_value_type == 6)
-               error('Requested key: "%s" is not a number',name); 
+                error('Requested key: "%s" is not a number',name);
             end
             output = obj.mex.numeric_p(key_value_md_index);
         end
@@ -105,7 +133,7 @@ classdef object < json.objs.token
             %    Use this to retrieve a string token.
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             if key_value_type ~= 4
-               error('Requested key: "%s" is not a string',name); 
+                error('Requested key: "%s" is not a string',name);
             end
             output = obj.mex.strings{key_value_md_index};
         end

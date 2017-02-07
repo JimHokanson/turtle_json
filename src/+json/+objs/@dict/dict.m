@@ -114,6 +114,7 @@ classdef dict < handle
                     end
                 end
             else  % '()' or '{}'
+                %return obj;
                 error('not supported');
             end
         end

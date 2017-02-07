@@ -16,6 +16,12 @@ fh2(1,'[1,2,3]','','numeric array test',1:3);
 fh2(0,'[1,2,]','turtle_json:invalid_token','trailing comma');
 fh2(0,'[1,,2,3]','turtle_json:invalid_token','comma with no value');
 
+%Numeric Arrays
+%--------------------------------------------------------------------------
+%This is essentially:
+%reshape(1:6,[2,3])
+%I just haven't written the proper encoder
+fh2(0,'[[1,2],[3,4],[5,6]]','','numeric array test',[[1;2],[3;4],[5;6]]);
 
 % % fh2(1,'{"key":1,3}','turtle_json:no_key','3 should be a key, not a numeric','');
 % % fh2(0,'{:3}','turtle_json:invalid_token','Missing key');
