@@ -1200,6 +1200,71 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
     //JAH: Should be all done, just need to test ...
 }
 
+void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+    //
+    //  data = json_info_to_data(7,mex_struct,start_index,options)
+    //
+    //  
+    
+    if (nrhs != 3){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f0 requires 3 inputs");
+    }else if (!mxIsClass(prhs[1],"struct")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f0 needs to be a structure");
+    }else if (!mxIsClass(prhs[2],"double")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f0 needs to be a double");
+    }
+    
+    if (nlhs != 1){
+    	mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f0 requires 1 output");
+    }
+    
+    const mxArray *s = prhs[1];
+    int md_index = ((int) mxGetScalar(prhs[2]))-1;
+    
+    Data data;
+    data = populate_data(s);
+    
+    if (md_index < 0 || md_index >= data.n_md_values){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f0");
+    }
+    
+    if (data.types[md_index] == TYPE_KEY){
+        //We'll return what the key points to
+        ++md_index;
+    }
+    
+    int data_index;
+    switch (data.types[md_index]){
+        case TYPE_OBJECT:
+            data_index = RETRIEVE_DATA_INDEX2(md_index);
+            plhs[0] = getStruct(data, data_index,1);
+            parse_object(data, plhs[0], 0, md_index);
+            break;
+        case TYPE_ARRAY:
+            plhs[0] = parse_array(data, md_index);
+            break;
+        case TYPE_KEY:
+            //We should already check against this ...
+            mexErrMsgIdAndTxt("turtle_json:code_error","key child of key found, code error made somewhere");
+            break;
+        case TYPE_STRING:
+            plhs[0] = getString(data.d1,data.strings,md_index);
+            break;
+        case TYPE_NUMBER:
+            plhs[0] = getNumber(data,md_index);
+            break;
+        case TYPE_NULL:
+            plhs[0] = getNull(data,md_index);
+            break;
+        case TYPE_TRUE:
+            plhs[0] = getTrue(data,md_index);
+            break;
+        case TYPE_FALSE:
+            plhs[0] = getFalse(data,md_index);
+            break;
+    }
+}
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     
@@ -1266,6 +1331,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             break;
         case 6:
             f6__partial_object_parsing(nlhs,plhs,nrhs,prhs);
+            break;
+        case 7:
+            f7__full_options_parse(nlhs,plhs,nrhs,prhs);
             break;
         default:
             mexErrMsgIdAndTxt("turtle_json:invalid_input","Function option not recognized");
