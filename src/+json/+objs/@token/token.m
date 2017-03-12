@@ -8,6 +8,14 @@ classdef token < handle
     %   json.objs.token.array
     %   json.objs.token.object
     
+    %{
+        //2d array - TODO: Move this to a test
+        s = '[[1,2,3],[4,5,6]]';
+        r = json.tokens.parse(s);
+        wtf1 = r.getParsedDataWithOptions('stripe_array_low',true)
+        wtf2 = r.getParsedDataWithOptions('stripe_array_low',false)
+    %}
+    
     properties
         md_index %Main Data Index
         mex %strucure returned from mex parsing
@@ -29,8 +37,19 @@ classdef token < handle
     end
     
     methods
-        function data = getParsedData(obj)
-            data = json_info_to_data(0,obj.mex,obj.md_index);
+        function data = getParsedData(obj,varargin)
+            
+            if isempty(varargin)
+                data = json_info_to_data(0,obj.mex,obj.md_index);
+            else
+                in.max_numeric_collapse_depth = [];
+                in.max_string_collape_depth = [];
+                in.max_bool_collapse_depth = [];
+                in.stripe_array_low = [];
+                in.collapse_objects = [];
+                in = json.sl.in.processVarargin(in,varargin);
+                data = json_info_to_data(7,obj.mex,obj.md_index,in);
+            end
         end
     end
     

@@ -50,14 +50,47 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index)
 
 //Actual Functions
 //-------------------------------------------------
-double get_option_field(mxArray *s,const char *field_name, double default_value){
+double get_double_option_field(mxArray *s,const char *field_name, double default_value){
+    //
+    //  This function retrieves a double scalar from a structure, and if
+    //  the field is missing or contains an empty array, returns the
+    //  default value.
+    
     mxArray *field = mxGetField(s,0,field_name);
     if (field != NULL){
-        if (mxIsClass,field,"double"){
-            //TODO: Check if empty - then use default
+        if (mxIsClass(field,"double")){
+            if (mxIsEmpty(field)){
+                return default_value;
+            }else{
+                return mxGetScalar(field);
+            }
         }else{
-            //TODO: Show the field that failed
         	mexErrMsgIdAndTxt("turtle_json:invalid_input","Invalid type (non-double) for optional field");
+        }
+    }
+    else{
+        return default_value;
+    }
+}
+
+bool get_bool_option_field(mxArray *s,const char *field_name, bool default_value){
+    //
+    //
+    //
+    
+    mxArray *field = mxGetField(s,0,field_name);
+    if (field != NULL){
+     	if (mxIsEmpty(field)){
+            return default_value;
+      	}else if (mxIsClass(field,"double")){
+            return (bool) mxGetScalar(field);
+        }else if (mxIsClass(field,"logical")){
+            bool *data  = mxGetLogicals(field);
+//             mexPrintf("wtf: %d\n",data);
+//             mexPrintf("wtf2: %d\n",*data);
+            return *data;
+        }else{
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input","Invalid type (non-logical or non-double) for optional field");
         }
     }
     else{
@@ -69,53 +102,23 @@ FullParseOptions populate_parse_options(mxArray *s){
 
     FullParseOptions options;
     
-    mxArray *field
-    //s => structure, check field and types
+//     typedef struct {
+//     int max_numeric_collapse_depth;
+//     int max_string_collape_depth;
+//     int max_bool_collapse_depth;
+//     bool stripe_array_low;
+//     bool collapse_objects;
+// } FullParseOptions;
+//     
     
-    field = mxGetField(s,0,"max_numeric_collapse_depth");
-    if (field != NULL){
-        if (mxIsClass,field,"double"){
-            
-        }else{
-        	mexErrMsgIdAndTxt("turtle_json:invalid_input","4th input to json_info_to_data.f7 needs to be a structure");
-        }
-        //TODO: Should check that the logical value is true ...
-        if (mxIsClass(prhs[0],"char")){
-            options->has_raw_string = true;
-        }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
-            //Note, we'll allow bytes for a "raw_string"
-            options->has_raw_bytes = true;
-        }else{
-            //TODO: I also got this when the first input was not a string => e.g. (data,'raw_string',true)
-            //TODO: This error message looks wrong 
-            mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
-        }
-    }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
-        options->has_raw_bytes = true;
-    }
+    options.max_numeric_collapse_depth = (int)get_double_option_field(s,"max_numeric_collapse_depth",-1);
+    options.max_string_collape_depth = (int)get_double_option_field(s,"max_string_collape_depth",-1);
+    options.max_bool_collapse_depth = (int)get_double_option_field(s,"max_bool_collapse_depth",-1);
+    options.stripe_array_low = get_bool_option_field(s,"stripe_array_low",1);
+    options.collapse_objects = get_bool_option_field(s,"collapse_objects",1);
     
+    return options;
     
-    
-    
-    
-    //Main Data -----------------------------------------------------------
-    int n_md_values;
-    data.types = get_u8_field_safe(s, "types");
-    data.d1 = get_int_field_and_length(s,"d1",&n_md_values);
-    data.n_md_values = n_md_values;
-    
-    //Object Data  --------------------------------------------------------
-    const mxArray *object_info = mxGetField(s,0,"object_info");
-    int n_objects;
-    data.object_ids = get_int_field_and_length(object_info,"object_ids",&n_objects);
-    
-    if (n_objects){
-        data.child_count_object = get_int_field_safe(object_info,"child_count_object");
-        data.next_sibling_index_object = get_int_field_safe(object_info,"next_sibling_index_object");
-        data.objects = getMXField(object_info,"objects");
-        const mxArray *key_info = mxGetField(s,0,"key_info");
-        data.next_sibling_index_key = get_int_field_safe(key_info,"next_sibling_index_key");
-    }
 }
 
 
@@ -277,19 +280,24 @@ mxArray *get_object_ref_from_md_index(const mxArray *mex_input,int md_index){
         
     return mxGetCell(objects,object_id);
 }
-
-void populateDims(Data data, int array_data_index, int md_index, int array_depth){
+ 
+void populate_dims(mwSize *dims, int *d1, int *child_count_array, int array_data_index, int array_md_index, int n_dimensions){    
+    //
+    //  TODO: Rename to populate_dims_stripe_high
+    //
+    //  This is for row-major ordering - i.e. highest dimension
+    //  changes quickest
+    //
+    //  e.g. [[5,4],[2,3],[7,8]] -> size => [3,2]
+    //
+    //  5 4
+    //  2 3
+    //  7 8
     
-    //TODO: We need to populate the dimensions in reverse
-    //Start with highest depth and go to 0 (JAH 12/21 Not sure what I meant)
-    
-    int temp_data_index;
-    mwSize *dims = data.dims;
-    dims[0] = data.child_count_array[array_data_index];
-    for (int iDim = 1; iDim < array_depth; iDim++){
-        md_index++;
-        temp_data_index = RETRIEVE_DATA_INDEX2(md_index);
-        dims[iDim] = data.child_count_array[temp_data_index];
+    dims[0] = child_count_array[array_data_index];
+    for (int iDim = 1; iDim < n_dimensions; iDim++){
+        array_data_index = d1[++array_md_index];
+        dims[iDim] = child_count_array[array_data_index];
     }
 }
 
@@ -298,6 +306,8 @@ void populate_dims2(mwSize *dims, int *d1, int *child_count_array, int array_dat
     //  This function populates the output array dimension size. It should
     //  only be called for ND arrays (i.e. arrays that contain arrays which
     //  are all of the same size).
+    //
+    //  This is for column-major ordering
     //
     //  Inputs
     //  ------
@@ -459,6 +469,91 @@ mxArray* parse_1d_array(int *d1, double *numeric_data, int array_size, int array
     return output;
 }
 
+mxArray* parse_nd_numeric_array_high(int *d1, mwSize *dims, int *child_count_array, 
+        double *numeric_data, int array_md_index, 
+        uint8_t *array_depths, int *next_sibling_index_array){
+    
+    int array_data_index = d1[array_md_index];
+    int array_depth = array_depths[array_data_index];
+    
+    //TODO: We could avoid this check if we allocated 'dims' based on the max
+    //TODO: Alternatively, we could allocate this permanently for mex
+    //and recycle between mex calls
+    
+    if (array_depth > MAX_ARRAY_DIMS){
+        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+    }
+    
+    //The -1 is for previous value before the next sibling
+    // "my_data": [[1,2],[3,4],[5,6]], "next_data": ...
+    //            s                    n   (s start, n next)
+    //                            ^ => (n - 1)
+    int last_numeric_md_index  = next_sibling_index_array[array_data_index]-1;
+    //
+    // [ [ [ 23, 15 ], [ ...
+    // s   
+    // 0 1 2 3  <= indices
+    // 3 2 1    <= array depths
+    //       ^ => (s + array_depth[s])
+    int first_numeric_md_index = array_md_index + array_depth;
+    int first_numeric_data_index = d1[first_numeric_md_index];
+    
+    int n_numbers = d1[last_numeric_md_index] - first_numeric_data_index + 1;
+    
+    double *data = mxMalloc(n_numbers*sizeof(double));
+    double *data_start = data;
+    
+    populate_dims(dims, d1, child_count_array, array_data_index, array_md_index, array_depth);
+        
+    int n_rows;
+    int n_columns;
+    int n_pages;
+    
+    double *source_data = &numeric_data[first_numeric_data_index];
+    //Looping offsets
+    // - let's say we have an array of size [5 7 6]
+    switch (array_depth) {
+        case 0:
+            //How well is this handled???
+            mexErrMsgIdAndTxt("turtle_json:code_error","0 dimensional array not yet handled");
+            break;  
+        case 1:
+            memcpy(data,source_data,n_numbers*sizeof(double));
+            break;
+        case 2:
+            n_rows = dims[0];
+            n_columns = dims[1];
+            for (int col = 0; col < n_columns; col++){
+                for (int row = 0; row < n_rows; row++){
+                    *data = source_data[col + row*n_columns];
+                    data++;
+                }
+            }
+            break;
+        case 3:
+            n_rows = dims[0];
+            n_columns = dims[1];
+            n_pages = dims[2];
+            for (int page = 0; page < n_pages; page++){
+                for (int col = 0; col < n_columns; col++){
+                    for (int row = 0; row < n_rows; row++){
+                        *data = source_data[page + col*n_pages + row*n_columns*n_pages];
+                        data++;
+                    }
+                }
+            }
+            break;
+        default:
+            mexErrMsgIdAndTxt("turtle_json:code_error","greater than 3d array not yet handled");
+        //TODO: Call Matlab's permute ...
+    }
+            
+    mxArray *output = mxCreateNumericArray(0,0,mxDOUBLE_CLASS,0);
+    mxSetData(output,data_start);
+    mxSetDimensions(output,dims,array_depth);
+    return output;
+}
+
 mxArray* parse_nd_numeric_array(int *d1, mwSize *dims, int *child_count_array, 
         double *numeric_data, int array_md_index, 
         uint8_t *array_depths, int *next_sibling_index_array){
@@ -474,7 +569,7 @@ mxArray* parse_nd_numeric_array(int *d1, mwSize *dims, int *child_count_array,
         mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
     }
     
-    //-1 for previous value before the next sibling
+    //The -1 is for previous value before the next sibling
     // "my_data": [[1,2],[3,4],[5,6]], "next_data": ...
     //            s                    n   (s start, n next)
     //                            ^ => (n - 1)
@@ -654,6 +749,106 @@ mxArray *parse_array(Data data, int md_index){
             output = parse_nd_numeric_array(data.d1, data.dims, 
                     data.child_count_array, data.numeric_data, md_index, 
                     data.array_depths, data.next_sibling_index_array);
+            break;
+        case ARRAY_ND_STRING:
+            output = parse_nd_string_array(data.d1, data.dims, 
+                        data.child_count_array, md_index, data.array_depths,
+                        data.next_sibling_index_array, data.strings);
+            break;
+        case ARRAY_ND_LOGICAL:
+            output = parse_logical_nd_array(data.d1, data.types, data.dims, 
+                    data.child_count_array, md_index, data.array_depths, 
+                    data.next_sibling_index_array);
+            break;
+            
+    }
+    return output;
+}
+
+//TODO: This nomenclature is a bit off. We aren't really parsing anything
+//as much as going from our parsed data into a Matlab data structure.
+mxArray *parse_array_with_options(Data data, int md_index, FullParseOptions *options){
+    //
+    //  This code handles parsing of a heterogenous array. It doesn't
+    //  actual
+    //
+    //  See Also
+    //  --------
+    //  parse_non_homogenous_array
+    //  parse_1d_array
+    //  parse_cellstr
+    //  parse_logical_array
+    //  parse_nd_numeric_array
+    //  parse_nd_string_array
+    //  parse_logical_nd_array
+    
+    int cur_array_data_index = data.d1[md_index];
+    mxArray *output;
+    
+    int temp_count;
+    int temp_data_index;
+    int temp_md_index;
+    int temp_array_depth;
+    mwSize *dims;
+    double *temp_value;
+    
+    mxArray *temp_obj;
+    
+    switch (data.array_types[cur_array_data_index]){
+        case ARRAY_OTHER_TYPE:
+            //  [1,false,"apples"]
+            output = parse_non_homogenous_array(data, cur_array_data_index, md_index);     
+            break;
+        case ARRAY_NUMERIC_TYPE:
+            //  [1,2,3,4]
+            output = parse_1d_array(data.d1,data.numeric_data,
+                    data.child_count_array[cur_array_data_index],md_index);
+            break;
+        case ARRAY_STRING_TYPE:
+            //  ['cheese','crow']
+            output = parse_cellstr(data.d1,
+                    data.child_count_array[cur_array_data_index],
+                    md_index,data.strings);
+            break;
+        case ARRAY_LOGICAL_TYPE:
+            //  [true, false, true]
+            output = parse_logical_array(data.d1, data.types, 
+                    data.child_count_array[cur_array_data_index], md_index);
+            break;
+        case ARRAY_OBJECT_SAME_TYPE:
+            temp_md_index = md_index + 1;
+            temp_data_index = data.d1[temp_md_index];
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = getStruct(data,temp_data_index,temp_count);
+            for (int iObj = 0; iObj < temp_count; iObj++){
+                parse_object(data, output, iObj, temp_md_index);
+                temp_md_index = data.next_sibling_index_object[temp_data_index];
+                temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+            }
+            break;
+        case ARRAY_OBJECT_DIFF_TYPE:
+            temp_count = data.child_count_array[cur_array_data_index];
+            output = mxCreateCellMatrix(1,temp_count);
+            temp_md_index = md_index + 1;
+            for (int iData = 0; iData < temp_count; iData++){
+                temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+                temp_obj = getStruct(data,temp_data_index,1);
+                parse_object(data, temp_obj, 0, temp_md_index);
+                mxSetCell(output,iData,temp_obj);
+                temp_md_index = data.next_sibling_index_object[temp_data_index];
+            }
+            break;
+        case ARRAY_ND_NUMERIC:
+            //TODO: This depends on the collapse dimension size ...
+            if (options->stripe_array_low){
+                output = parse_nd_numeric_array(data.d1, data.dims, 
+                        data.child_count_array, data.numeric_data, md_index, 
+                        data.array_depths, data.next_sibling_index_array);
+            }else{
+                output = parse_nd_numeric_array_high(data.d1, data.dims, 
+                    data.child_count_array, data.numeric_data, md_index, 
+                    data.array_depths, data.next_sibling_index_array);
+            }
             break;
         case ARRAY_ND_STRING:
             output = parse_nd_string_array(data.d1, data.dims, 
@@ -1305,12 +1500,9 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
     const mxArray *s = prhs[1];
     int md_index = ((int) mxGetScalar(prhs[2]))-1;
     
-    Data data;
-    data = populate_data(s);
+    Data data = populate_data(s);
     
-    //TODO: Get the options structure
-    
-    
+    FullParseOptions options = populate_parse_options(prhs[3]);
     
     if (md_index < 0 || md_index >= data.n_md_values){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f0");
@@ -1329,7 +1521,7 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
             parse_object(data, plhs[0], 0, md_index);
             break;
         case TYPE_ARRAY:
-            plhs[0] = parse_array(data, md_index);
+            plhs[0] = parse_array_with_options(data, md_index, &options);
             break;
         case TYPE_KEY:
             //We should already check against this ...
