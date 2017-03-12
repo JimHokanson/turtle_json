@@ -35,8 +35,90 @@ typedef struct {
     double *numeric_data;
 } Data;
 
+typedef struct {
+    int max_numeric_collapse_depth;
+    int max_string_collape_depth;
+    int max_bool_collapse_depth;
+    bool stripe_array_low;
+    bool collapse_objects;
+} FullParseOptions;
+
+//Function declarations
+//-----------------------------------------------
 mxArray *parse_array(Data data, int md_index);
 void parse_object(Data data, mxArray *obj, int ouput_struct_index, int md_index);
+
+//Actual Functions
+//-------------------------------------------------
+double get_option_field(mxArray *s,const char *field_name, double default_value){
+    mxArray *field = mxGetField(s,0,field_name);
+    if (field != NULL){
+        if (mxIsClass,field,"double"){
+            //TODO: Check if empty - then use default
+        }else{
+            //TODO: Show the field that failed
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input","Invalid type (non-double) for optional field");
+        }
+    }
+    else{
+        return default_value;
+    }
+}
+
+FullParseOptions populate_parse_options(mxArray *s){
+
+    FullParseOptions options;
+    
+    mxArray *field
+    //s => structure, check field and types
+    
+    field = mxGetField(s,0,"max_numeric_collapse_depth");
+    if (field != NULL){
+        if (mxIsClass,field,"double"){
+            
+        }else{
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input","4th input to json_info_to_data.f7 needs to be a structure");
+        }
+        //TODO: Should check that the logical value is true ...
+        if (mxIsClass(prhs[0],"char")){
+            options->has_raw_string = true;
+        }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+            //Note, we'll allow bytes for a "raw_string"
+            options->has_raw_bytes = true;
+        }else{
+            //TODO: I also got this when the first input was not a string => e.g. (data,'raw_string',true)
+            //TODO: This error message looks wrong 
+            mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
+        }
+    }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+        options->has_raw_bytes = true;
+    }
+    
+    
+    
+    
+    
+    //Main Data -----------------------------------------------------------
+    int n_md_values;
+    data.types = get_u8_field_safe(s, "types");
+    data.d1 = get_int_field_and_length(s,"d1",&n_md_values);
+    data.n_md_values = n_md_values;
+    
+    //Object Data  --------------------------------------------------------
+    const mxArray *object_info = mxGetField(s,0,"object_info");
+    int n_objects;
+    data.object_ids = get_int_field_and_length(object_info,"object_ids",&n_objects);
+    
+    if (n_objects){
+        data.child_count_object = get_int_field_safe(object_info,"child_count_object");
+        data.next_sibling_index_object = get_int_field_safe(object_info,"next_sibling_index_object");
+        data.objects = getMXField(object_info,"objects");
+        const mxArray *key_info = mxGetField(s,0,"key_info");
+        data.next_sibling_index_key = get_int_field_safe(key_info,"next_sibling_index_key");
+    }
+}
+
+
 
 void set_double_output(mxArray **s, double value){
     mxArray *temp = mxCreateDoubleMatrix(1,1,0);
@@ -1206,12 +1288,14 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
     //
     //  
     
-    if (nrhs != 3){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f0 requires 3 inputs");
+    if (nrhs != 4){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f7 requires 4 inputs");
     }else if (!mxIsClass(prhs[1],"struct")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f0 needs to be a structure");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f7 needs to be a structure");
     }else if (!mxIsClass(prhs[2],"double")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f0 needs to be a double");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f7 needs to be a double");
+    }else if (!mxIsClass(prhs[3],"struct")){
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","4th input to json_info_to_data.f7 needs to be a structure");
     }
     
     if (nlhs != 1){
@@ -1223,6 +1307,10 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
     
     Data data;
     data = populate_data(s);
+    
+    //TODO: Get the options structure
+    
+    
     
     if (md_index < 0 || md_index >= data.n_md_values){
         mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f0");
