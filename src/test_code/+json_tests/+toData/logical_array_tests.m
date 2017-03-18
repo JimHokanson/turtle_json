@@ -1,15 +1,19 @@
 function logical_array_tests()
 
-%1d array testing
+%   json_tests.toData.logical_array_tests
+
+fh2 = @json_tests.utils.runTest;
+encode = @json_tests.utils.encodeJSON;
+
+
 data = 1:10 > 3;
-js = mexEncodeJSON(data);
+fh2(1,encode(data),'','1d logical array testing',data);
 
-wtf = json.parse(js);
 
-%nd-array testing
 data = reshape(data,5,2);
-js = mexEncodeJSON(data);
-wtf = json.parse(js);
+%Note, the transpose is due to differences in default array ordering
+%behavior between the writer and the reader
+fh2(1,encode(data),'','1d logical array testing',data');
 
 
 

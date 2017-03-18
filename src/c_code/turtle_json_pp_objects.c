@@ -28,6 +28,9 @@ void initialize_unique_objects(unsigned char *js,mxArray *plhs[]){
     //  This code will initialize unique objects (structures) with keys, 
     //  based on already having identified unique objects earlier.
     //
+    //  This function populates
+    //  -----------------------
+    //  objects
     
     int *d1 = (int *)get_field(plhs,"d1");
     
@@ -128,19 +131,14 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     //
     //  Populates (into object_info structure)
     //  ---------------------------------------
+    //  max_keys_in_object
     //  n_uniqe_objects: scalar 
     //  object_ids: array
-    //  unique_object_first_data_indices: array
+    //  unique_object_first_md_indices: array
     //
     
     mxArray *object_info = mxGetField(plhs[0],0,"object_info");
     int n_objects = get_field_length2(object_info,"next_sibling_index_object");
-
-    
-// // // //         mxArray *object_info = mxGetField(plhs[0],0,"object_info");
-// // // //     int *object_ids = get_int_field(object_info,"object_ids");    
-// // // //     int *next_sibling_index_object = get_int_field(object_info,"next_sibling_index_object");
-    
     
     if (n_objects == 0){
         setStructField(object_info,0,"object_ids",mxINT32_CLASS,0); 
@@ -149,32 +147,11 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
     }
     
     //Main data info
+    //-------------------------------------
     uint8_t *types = (uint8_t *)get_field(plhs,"types");
     int *d1 = (int *)get_field(plhs,"d1");
     mwSize n_entries = get_field_length(plhs,"d1");
-    
-    //TODO: This is almost done, just need to finish max children
-    //-------------------------------------------------------------------
-// //     if (n_objects == 1){
-// //         int *object_ids = mxMalloc(1*sizeof(int));
-// //         *object_ids = 0;
-// //         int *unique_object_first_data_indices = mxMalloc(1*sizeof(int));
-// //         //Crap, we need that index
-// //         uint8_t *types_start = types;
-// //         while(*types != TYPE_OBJECT){
-// //             types++;
-// //         }
-// //         *unique_object_first_data_indices = types - types_start;
-// //         
-// //         int object_data_index = RETRIEVE_DATA_INDEX(*unique_object_first_data_indices);
-// //         int max_children = 
-// //         setIntScalar(object_info,"max_keys_in_object",max_children);
-// //         
-// //         setStructField(object_info,unique_object_first_data_indices,"unique_object_first_data_indices",mxINT32_CLASS,1);    
-// //         setStructField(object_info, object_ids, "object_ids", mxINT32_CLASS, 1);
-// //         setIntScalar(object_info,"n_unique_objects",1);
-// //     }
-    
+
     //Information needed for this processing
     //---------------------------------------------------------------------
     //Object related

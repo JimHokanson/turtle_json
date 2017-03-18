@@ -32,7 +32,7 @@ classdef examples
     methods (Static)
         function file_path = getFilePath(file_name_or_index)
             %
-            %   json.utils.examples.getFilePath()
+            %   file_path = json.utils.examples.getFilePath(file_name_or_index)
             %
             %   TODO: allow regex if strcmp fails
             

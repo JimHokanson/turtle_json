@@ -15,6 +15,7 @@ encode = @json_tests.utils.encodeJSON;
 fh2(1,'[1,2,3]','','numeric array test',1:3);
 fh2(0,'[1,2,]','turtle_json:invalid_token','trailing comma');
 fh2(0,'[1,,2,3]','turtle_json:invalid_token','comma with no value');
+fh2(0,'[]','turtle_json:invalid_token','comma with no value');
 
 %Numeric Arrays
 %--------------------------------------------------------------------------

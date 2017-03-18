@@ -161,6 +161,9 @@
 #define PROCESS_TRUE \
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_TRUE); \
+    /* Note, this storage is not critical */ \
+    /* The main function here is to count the # of logical values */ \
+    /* For later assessing array homogeneity */ \
     STORE_DATA_INDEX(++current_logical_index); \
     /*TODO: Add true check ... */ \
 	ADVANCE_POINTER_BY_X(3);

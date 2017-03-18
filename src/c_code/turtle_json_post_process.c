@@ -85,6 +85,7 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
     //  arrray to process based on its depth
     for (int iData = 0; iData < n_entries; iData ++){
         //TODO: We could do both arrays and objects at the same time ...
+        //i.e. if not an array, it might be an object - low priority
         if (types[iData] == type_to_match){
             cur_process_index = cur_depth_index[value_depths[cur_value_index]]++;
             process_order[cur_process_index] = iData;
@@ -102,8 +103,12 @@ void check_for_nd_array(int array_md_index, int array_data_index,
         uint8_t *types, int *d1, int n_children){
     //
     //Populates array_types[array_data_index]
+    //
+    //  An ND array is an array that contains arrays of the same type
+    //  and shape
     
-//     mexPrintf("1\n");
+    
+    //mexPrintf("Running check_for_nd_array\n");
     
     //- Input is the type of processed array
     //- Output is the new type of processed array
@@ -211,10 +216,11 @@ void check_for_nd_array(int array_md_index, int array_data_index,
 //=========================================================================
 void populate_array_flags(unsigned char *js,mxArray *plhs[]){
 //
-//
-//  Populates
-//  ---------
+//  This function populates:
+//  --------------------------------------------
 //  array_depths - actually, it just redefines it
+//      - input definition: level of nesting in the JSON structure
+//      - output definition: dimensionality of the array
 //  array_types
     
     //TODO: I need to go through and rename things 
@@ -224,7 +230,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     mwSize n_arrays = get_field_length2(array_info,"next_sibling_index_array");
     
     if (n_arrays == 0){
-        //uint8_t *array_types = mxCalloc(n_arrays,sizeof(uint8_t));
         setStructField(array_info,0,"array_types",mxUINT8_CLASS,0);
         return;
     }
@@ -244,7 +249,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     mwSize n_depths = get_field_length2(array_info,"n_arrays_at_depth");
     
     //---- object info ------
-    
     mxArray *object_info = mxGetField(plhs[0],0,"object_info");
     int n_objects = get_field_length2(object_info,"next_sibling_index_object");
     
@@ -253,7 +257,8 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     if (n_objects != 0){
         //object_ids could be null, which is fine
         //but we are running a check to make sure it is not null so
-        //that we don't run into problems later on (from trying to use a null field)
+        //that we don't run into problems later on (from trying to use a 
+        //null field)
         //
         //  i.e. we can't distinguish between a null pointer and
         //  a missing call to mxGetField
@@ -263,7 +268,11 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     }
         
     //Determining the order to process arrays
-    //---------------------------------------------------------------------    
+    //---------------------------------------------------------------------
+    //We process arrays from deepest in the JSON structure to shallowest
+    //This allows us to make claims about the parent array type
+    //with a bit less hassle since the child array types have already
+    //been processed (since they are deeper structures)
     int *process_order = mxMalloc(n_arrays*sizeof(int));
     populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, n_arrays_at_depth, n_depths, array_depths);
 
@@ -274,7 +283,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     //Map the input types of an array to more generic mixed types
     //e.g. true and false to logical
     uint8_t array_type_map1[9] = { 
-        ARRAY_OTHER_TYPE,    //Nothing
+        ARRAY_OTHER_TYPE,    //Nothing - i.e. not specified
         ARRAY_OTHER_TYPE,    //Object
         ARRAY_OTHER_TYPE,    //Array
         ARRAY_OTHER_TYPE,    //Key

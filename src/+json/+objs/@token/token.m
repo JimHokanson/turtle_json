@@ -12,8 +12,9 @@ classdef token < handle
         //2d array - TODO: Move this to a test
         s = '[[1,2,3],[4,5,6]]';
         r = json.tokens.parse(s);
-        wtf1 = r.getParsedDataWithOptions('stripe_array_low',true)
-        wtf2 = r.getParsedDataWithOptions('stripe_array_low',false)
+        wtf1 = r.getParsedData('stripe_array_low',true)
+        wtf2 = r.getParsedData('stripe_array_low',false)
+        wtf3 = r.getParsedData('stripe_array_low',false,'max_numeric_collapse_depth',1)
     %}
     
     properties

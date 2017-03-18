@@ -1,9 +1,9 @@
-function all_token_tests()
+function all_tests()
 %
 %   
-%   json_tests.toTokens.all_token_tests()
+%   json_tests.toTokens.all_tests()
 %{
-    json_tests.toTokens.all_token_tests()
+    json_tests.toTokens.all_tests()
 %}
 
 fprintf('Running toTokens.array_tests()\n')

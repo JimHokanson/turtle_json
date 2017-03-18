@@ -1,23 +1,31 @@
 function numeric_array_tests()
+%
+%   json_tests.toData.numeric_array_tests
+%
+%   Some of these tests currently fail ...
 
 %Order?????
 %http://stackoverflow.com/questions/40833647/proper-translation-of-multi-dimensional-array-to-json-and-back/
 
+fh2 = @json_tests.utils.runTest;
+encode = @json_tests.utils.encodeJSON;
+p = @json_tests.utils.permuter;
+
+data = 1:30;
+fh2(1,encode(data),'','1d numeric array testing',p(data));
+%-----------------
+data = reshape(1:20,[5 4]);
+fh2(0,encode(data),'','2d numeric array testing',p(data));
+%-----------------
 data = reshape(1:24,[4,3,2]);
-js = mexEncodeJSON(data);
-
-data2 = zeros(4,1,2);
-data3 = {data data2};
-js = mexEncodeJSON(data3);
-
-
-data = 1:10;
-js = mexEncodeJSON(data);
-
+fh2(0,encode(data),'','3d numeric array testing',p(data));
+%-----------------
+data = reshape(1:20,[5 1 4]);
+fh2(0,encode(data),'','3d numeric array with scalar middle',p(data));
+%-----------------
 data = {1:5 2:6 1:5 2:3};
-js = mexEncodeJSON(data);
-wtf = json.stringToTokens(js)
-wtf2 = json_info_to_data(5,wtf.mex,1);
+fh2(0,encode(data),'','cell of numbers',data);
+%-----------------
 
 %JSON writers
 %------------

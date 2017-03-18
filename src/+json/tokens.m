@@ -28,6 +28,9 @@ classdef tokens
             %
             %   obj = json.tokens(file_path,varargin)
             %
+            %   Optional Inputs
+            %   ---------------
+            %
             %   See Also:
             %   ---------
             %   json.stringToTokens
@@ -41,10 +44,13 @@ classdef tokens
             in.n_keys = json.sl.in.NULL;
             in.n_numbers = json.sl.in.NULL;
             in.raw_string = json.sl.in.NULL;
-            in.raw_is_padded = false;
             in = json.sl.in.processVarargin(in,varargin,'remove_null',true);
             
             %The main call
+            
+            %TODO: Starting token needs to be an opening object or array
+            %If this happens, we might have a file path
+            %encounerted with json.parse(file_path) which is incorrect
             mex_result = turtle_json_mex(file_path__or__string,in);
             
             if mex_result.types(1) == 1

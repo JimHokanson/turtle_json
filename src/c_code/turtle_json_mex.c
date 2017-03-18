@@ -370,8 +370,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     bool is_file_path = true;
 
     Options options;
-
-    mxLogical raw_is_padded;
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);

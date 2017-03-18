@@ -1,14 +1,14 @@
-This code parses JSON files/strings using C/mex code. Writing is not yet supported.
+This code parses JSON files/strings using C (mex) code. Writing is not yet supported.
 
 #Why This Code?
 
-I needed JSON parsing for another project. Loading JSON files using existing parsers was painfully slow. This slowness was due to 1) JSON parsing being done in Matlab or 2) parsing using C/C++ or Java, but with inefficient memory structures. This code started off by wrapping an already written C JSON tokenizer, and then post-processing in Matlab. After some nit-picking here and there, I found myself writing an entire parser in C, from scratch.
+I needed JSON parsing for a project. Loading JSON files using existing parsers was painfully slow. This slowness was due to 1) JSON parsing being done in Matlab or 2) parsing using C/C++ or Java, but with inefficient memory structures. This code started off by wrapping an already written C JSON tokenizer, and then post-processing in Matlab. After some nit-picking here and there, I found myself writing an entire parser in C, from scratch.
 
 #Advantages and Disadvantages
 
 ## Advantages
-* C parser written for Matlab, rather than wrapping an existing parser
-* multi-step parsing option (tokens, then data) for finer control over output format
+* C parser written specifically for Matlab, rather than wrapping an existing parser
+* multi-step parsing option (tokens, then data) for finer (complete?) control over output format
 * just like every other "fast" JSON parser, this one is fast as well
 
 ## Disadvantages

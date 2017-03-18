@@ -387,7 +387,8 @@ mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_m
     
     return output;
 }
-
+//=========================================================================
+//=========================================================================
 void parse_object(Data data, mxArray *obj, int ouput_struct_index, int object_md_index){
     //
     //  Inputs
@@ -442,7 +443,64 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int object_md
         cur_key_data_index = data.d1[cur_key_md_index];
     }
 }
-
+//=========================================================================
+//=========================================================================
+void parse_object_with_options(Data data, mxArray *obj, int ouput_struct_index, int object_md_index){
+    //
+    //  Inputs
+    //  ------
+    //  obj : the structure or structure array to populate
+    //  ouput_struct_index : index in that structure
+    //  md_index: TODO: rename to md_index
+    //
+    
+    int object_data_index = data.d1[object_md_index];
+    int n_keys = data.child_count_object[object_data_index];
+        
+    mxArray *temp_mxArray;
+    
+    const int *next_sibling_index_key = data.next_sibling_index_key;
+    const uint8_t *types = data.types;
+    
+    int cur_key_md_index = object_md_index + 1;
+    int cur_key_data_index = data.d1[cur_key_md_index];
+    for (int iKey = 0; iKey < n_keys; iKey++){
+        int cur_key_value_md_index = cur_key_md_index + 1;
+        switch (types[cur_key_value_md_index]){
+            case TYPE_OBJECT:
+                temp_mxArray = getStruct(data,data.d1[cur_key_value_md_index],1);
+                parse_object(data,temp_mxArray,0,cur_key_value_md_index);
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,temp_mxArray);
+                break;
+            case TYPE_ARRAY:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,
+                        parse_array(data,cur_key_value_md_index));
+                break;
+            case TYPE_KEY:
+                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
+                break;
+            case TYPE_STRING:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,getString(data.d1,data.strings,cur_key_value_md_index));
+                break;
+            case TYPE_NUMBER:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,getNumber(data,cur_key_value_md_index));
+                break;
+            case TYPE_NULL:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,getNull(data,cur_key_value_md_index));
+                break;
+            case TYPE_TRUE:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,getTrue(data,cur_key_value_md_index));
+                break;
+            case TYPE_FALSE:
+                mxSetFieldByNumber(obj,ouput_struct_index,iKey,getFalse(data,cur_key_value_md_index));
+                break;
+        }
+        cur_key_md_index = next_sibling_index_key[cur_key_data_index];
+        cur_key_data_index = data.d1[cur_key_md_index];
+    }
+}
+//=========================================================================
+//=========================================================================
 mxArray* parse_cellstr(int *d1, int array_size, int array_md_index, mxArray *strings){
     mxArray *output = mxCreateCellMatrix(1,array_size);
     int string_md_index = array_md_index + 1;
@@ -453,7 +511,8 @@ mxArray* parse_cellstr(int *d1, int array_size, int array_md_index, mxArray *str
     }
     return output;
 }
-
+//=========================================================================
+//=========================================================================
 mxArray* parse_1d_array(int *d1, double *numeric_data, int array_size, int array_md_index){
     
     int first_numeric_md_index = array_md_index + 1;
@@ -468,7 +527,8 @@ mxArray* parse_1d_array(int *d1, double *numeric_data, int array_size, int array
     
     return output;
 }
-
+//=========================================================================
+//=========================================================================
 mxArray* parse_nd_numeric_array_high(int *d1, mwSize *dims, int *child_count_array, 
         double *numeric_data, int array_md_index, 
         uint8_t *array_depths, int *next_sibling_index_array){
@@ -476,9 +536,9 @@ mxArray* parse_nd_numeric_array_high(int *d1, mwSize *dims, int *child_count_arr
     int array_data_index = d1[array_md_index];
     int array_depth = array_depths[array_data_index];
     
-    //TODO: We could avoid this check if we allocated 'dims' based on the max
+    //TODO: We could avoid the check below if we allocated 'dims' based on the max
     //TODO: Alternatively, we could allocate this permanently for mex
-    //and recycle between mex calls
+    //and recycle between mex calls - I think this is the better option ...
     
     if (array_depth > MAX_ARRAY_DIMS){
         mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
@@ -515,9 +575,11 @@ mxArray* parse_nd_numeric_array_high(int *d1, mwSize *dims, int *child_count_arr
     switch (array_depth) {
         case 0:
             //How well is this handled???
+            //This should not happen ...
             mexErrMsgIdAndTxt("turtle_json:code_error","0 dimensional array not yet handled");
             break;  
         case 1:
+            //This should not happen ...
             memcpy(data,source_data,n_numbers*sizeof(double));
             break;
         case 2:
@@ -785,6 +847,7 @@ mxArray *parse_array_with_options(Data data, int md_index, FullParseOptions *opt
     int cur_array_data_index = data.d1[md_index];
     mxArray *output;
     
+    int n_dimensions;
     int temp_count;
     int temp_data_index;
     int temp_md_index;
@@ -801,8 +864,26 @@ mxArray *parse_array_with_options(Data data, int md_index, FullParseOptions *opt
             break;
         case ARRAY_NUMERIC_TYPE:
             //  [1,2,3,4]
-            output = parse_1d_array(data.d1,data.numeric_data,
-                    data.child_count_array[cur_array_data_index],md_index);
+            n_dimensions = data.array_depths[cur_array_data_index];
+            if (options->max_numeric_collapse_depth == -1 || options->max_numeric_collapse_depth >= n_dimensions){
+                output = parse_1d_array(data.d1,data.numeric_data,
+                        data.child_count_array[cur_array_data_index],md_index);
+            }else{
+                temp_count = data.child_count_array[cur_array_data_index];
+                mexErrMsgIdAndTxt("turtle_json:not_yet_implemented","1d numeric array as cell - functionality not yet implemented");
+                
+                output = mxCreateCellMatrix(1,temp_count);
+                //JAH: At this point ...
+//                 temp_md_index = md_index + 1;
+//                 for (int iData = 0; iData < temp_count; iData++){
+//                     temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+//                     temp_obj = parse_array_with_options(data, temp_md_index, options);
+//                     mxSetCell(output,iData,temp_obj);
+//                     temp_md_index = data.next_sibling_index_array[temp_data_index];
+//                 }
+                
+                
+            }
             break;
         case ARRAY_STRING_TYPE:
             //  ['cheese','crow']
@@ -839,15 +920,30 @@ mxArray *parse_array_with_options(Data data, int md_index, FullParseOptions *opt
             }
             break;
         case ARRAY_ND_NUMERIC:
-            //TODO: This depends on the collapse dimension size ...
-            if (options->stripe_array_low){
-                output = parse_nd_numeric_array(data.d1, data.dims, 
+            n_dimensions = data.array_depths[cur_array_data_index];
+            if (options->max_numeric_collapse_depth == -1 || options->max_numeric_collapse_depth >= n_dimensions){
+                if (options->stripe_array_low){
+                    output = parse_nd_numeric_array(data.d1, data.dims, 
+                            data.child_count_array, data.numeric_data, md_index, 
+                            data.array_depths, data.next_sibling_index_array);
+                }else{
+                    output = parse_nd_numeric_array_high(data.d1, data.dims, 
                         data.child_count_array, data.numeric_data, md_index, 
                         data.array_depths, data.next_sibling_index_array);
+                }
             }else{
-                output = parse_nd_numeric_array_high(data.d1, data.dims, 
-                    data.child_count_array, data.numeric_data, md_index, 
-                    data.array_depths, data.next_sibling_index_array);
+                //Options specify not to collapse, so instead we
+                //loop over each sub-array and parse it, populating 
+                //this array as a cell array
+                temp_count = data.child_count_array[cur_array_data_index];
+                output = mxCreateCellMatrix(1,temp_count);
+                temp_md_index = md_index + 1;
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_data_index = RETRIEVE_DATA_INDEX2(temp_md_index);
+                    temp_obj = parse_array_with_options(data, temp_md_index, options);
+                    mxSetCell(output,iData,temp_obj);
+                    temp_md_index = data.next_sibling_index_array[temp_data_index];
+                }
             }
             break;
         case ARRAY_ND_STRING:
@@ -863,14 +959,10 @@ mxArray *parse_array_with_options(Data data, int md_index, FullParseOptions *opt
             
     }
     return output;
-}
-//=========================================================================
-//=========================================================================
+} //end parse_array_with_options()
 //=========================================================================
 
-
-
-Data populate_data(mxArray *s){
+Data populate_data(const mxArray *s){
 
     Data data;
     
@@ -910,7 +1002,7 @@ Data populate_data(mxArray *s){
     
     return data;
     
-}
+} //end populate_data()
 
 //0 =======================================================================
 void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){

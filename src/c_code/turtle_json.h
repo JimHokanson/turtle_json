@@ -35,14 +35,15 @@
 #define ARRAY_ND_NUMERIC 6
 #define ARRAY_ND_STRING 7
 #define ARRAY_ND_LOGICAL 8
+#define ARRAY_EMPTY_TYPE 9
 
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;
-   bool parse_strings; //Not yet implemented
+   bool parse_strings;
    int n_tokens;
-   int n_keys;
    int n_strings;
+   int n_keys;
    int n_numbers;
    int chars_per_token;
 } Options;
