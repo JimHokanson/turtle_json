@@ -2,8 +2,11 @@ classdef examples
     %
     %   Class:
     %   json.utils.examples
+    %
+    %   See Also
+    %   --------
+    %   json_tests.time_example_file
 
-    %TODO: Get the 1.json file into here
     properties (Constant)
         FILE_LIST = {
             '1.json'        

@@ -26,16 +26,18 @@
 #define TYPE_TRUE   7
 #define TYPE_FALSE  8
 
-#define ARRAY_OTHER_TYPE   0
-#define ARRAY_NUMERIC_TYPE 1
-#define ARRAY_STRING_TYPE  2
-#define ARRAY_LOGICAL_TYPE 3
-#define ARRAY_OBJECT_SAME_TYPE  4
-#define ARRAY_OBJECT_DIFF_TYPE 5
-#define ARRAY_ND_NUMERIC 6
+//see populate_array_flags
+#define ARRAY_OTHER_TYPE   0 //Not one of the other types below - default
+#define ARRAY_NUMERIC_TYPE 1 //1D numeric
+#define ARRAY_STRING_TYPE  2 //1D string
+#define ARRAY_LOGICAL_TYPE 3 //1D logical
+#define ARRAY_OBJECT_SAME_TYPE  4 //All objects with same field names (order matters)
+#define ARRAY_OBJECT_DIFF_TYPE 5 //All objects but with different field names (or order)
+#define ARRAY_ND_NUMERIC 6 
 #define ARRAY_ND_STRING 7
 #define ARRAY_ND_LOGICAL 8
-#define ARRAY_EMPTY_TYPE 9
+#define ARRAY_EMPTY_TYPE 9 //Array with no elements
+#define ARRAY_ND_EMPTY 10
 
 typedef struct {
    bool has_raw_string;

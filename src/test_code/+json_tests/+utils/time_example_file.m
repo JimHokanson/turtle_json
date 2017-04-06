@@ -9,6 +9,7 @@ classdef time_example_file
        average_elapsed_time
        method
        file_name
+       data
     end
     
     methods (Static)
@@ -94,6 +95,7 @@ classdef time_example_file
             
             obj.method = in.method;
             obj.average_elapsed_time = t3;
+            obj.data = data;
 
         end
     end

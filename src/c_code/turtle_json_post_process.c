@@ -112,7 +112,7 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     
     //- Input is the type of processed array
     //- Output is the new type of processed array
-    const uint8_t array_type_map2[9] = { 
+    const uint8_t array_type_map2[11] = { 
         ARRAY_OTHER_TYPE,   //Nothing
         ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
         ARRAY_ND_STRING,    //string
@@ -121,7 +121,9 @@ void check_for_nd_array(int array_md_index, int array_data_index,
         ARRAY_OTHER_TYPE,   //object diff type
         ARRAY_ND_NUMERIC,   //nd_numeric
         ARRAY_ND_STRING,    //nd_string
-        ARRAY_ND_LOGICAL};  //nd_logical     
+        ARRAY_ND_LOGICAL,   //nd_logical     
+        ARRAY_ND_EMPTY,     //empty    
+        ARRAY_ND_EMPTY};    //nd_empty
     
     
     int child_md_index = array_md_index + 1;
@@ -157,18 +159,29 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     //Approach, for each child of the current array, compare its
     //"first sizes" to the "first sizes" of the first child array
     //
-    //i.e. does length(x[1]) == length(x[0]) and
-    //          length(x[1][0] == length(x[0][0]) and
-    //          length(x[1][0][0] == length(x[0][0][0]) etc.
+    //i.e. does length(x[i]) == length(x[0]) and
+    //          length(x[i][0] == length(x[0][0]) and
+    //          length(x[i][0][0] == length(x[0][0][0]) etc.
+    //     for all 'i' where this current area equals:
+    //     current_array = [x[0],x[1],x[2],...,x[n]]
+    //
+    //     Note, we also verify that all of these entries have the same
+    //     dimensionaility, e.g. if x[0] is 3D, then x[1] must be as well
+    //     and so on, otherwise the current_array won't be 4D
     //
     //  We don't need to check something like the following:
-    //      length(x[1][1]) == length(x[0][0])
+    //      length(x[i][1]) == length(x[0][0])
+    //
     //  This is because we have already verified that all children
     //  are the same (based on the array type). In other words, we
-    //  already know that if x[1] is an nd-array type, that
-    //  length(x[1][0]) == length(x[1][1]) == length(x[1][2]) etc.
-    //  Thus, checking length(x[1][1]) == length(x[0][0]) is 
-    //  redudndant if we know length(x[1][0]) == length(x[0][0])
+    //  already know that if x[i] is an nd-array type, that
+    //  length(x[i][0]) == length(x[i][1]) == length(x[i][2]) etc.
+    //
+    //  Thus, checking length(x[i][1]) == length(x[0][0]) is 
+    //  redundant if we know length(x[i][0]) == length(x[0][0])
+    //
+    //  In the end, this approach means we don't need to look at all of
+    //  the child arrays, which saves time.
     
     for (int iChild = 1; iChild < n_children; iChild++){
 
@@ -181,13 +194,13 @@ void check_for_nd_array(int array_md_index, int array_data_index,
             is_nd_array = false;
             break;
         }
-        
+         
         if (first_child_size == child_count_array[child_data_index] &&
                 first_child_depth == array_depths[child_data_index] &&
                 first_child_array_type == array_types[child_data_index]){
+            
             //Depth verification
             moving_child_data_index = child_data_index+1;
-            //mexPrintf("Got to depth sameness check\n");
             for (int iDepth = first_child_depth-1; iDepth > 0; iDepth--){
                 if (child_size_stack[iDepth] != child_count_array[moving_child_data_index]){
                     is_nd_array = false;
@@ -301,10 +314,9 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     int cur_child_array_index;
     int cur_child_data_index;
     
-    //md - main data
-    int cur_md_index;
+    int cur_md_index; //md - Main Data
     
-    int cur_object_index;
+    int cur_object_data_index;
     
     int cur_child_array_index2;
     int cur_child_data_index2;
@@ -347,22 +359,30 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
                     //  o1            o2            o3      <= objects are not the same cell array of structs
                     
-                    cur_object_index = RETRIEVE_DATA_INDEX((cur_process_index+1));
-                    reference_object_id = object_ids[cur_object_index];
+                    cur_object_data_index = d1[cur_process_index+1];
+                    reference_object_id = object_ids[cur_object_data_index];
                     
                     //We need to check 2 things:
                     //1 - do we have an object in the next entry
                     //2 - is the object of the same type?
+                    //
+                    //Three possible outcomes:
+                    //1 - all of the same type
+                    //2 - all objects, but different types
+                    //3 - not all objects
                     object_array_type = ARRAY_OBJECT_SAME_TYPE;
                     for (int iChild = 1; iChild < n_children; iChild++){
-                        cur_md_index = next_sibling_index_object[cur_object_index];
+                        cur_md_index = next_sibling_index_object[cur_object_data_index];
                         if (types[cur_md_index] == TYPE_OBJECT){
-                            cur_object_index = RETRIEVE_DATA_INDEX(cur_md_index);
-                            if (reference_object_id != object_ids[cur_object_index]){
+                            cur_object_data_index = d1[cur_md_index];
+                            if (reference_object_id != object_ids[cur_object_data_index]){
                                 object_array_type = ARRAY_OBJECT_DIFF_TYPE;
                             }
                         }else{
                             object_array_type = ARRAY_OTHER_TYPE;
+                            //This is the most generic case, so we break
+                            //after this
+                            break;
                         }
                     }
                     array_types[cur_array_index] = object_array_type;
@@ -385,7 +405,33 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                 case TYPE_NULL:
                 case TYPE_TRUE:
                 case TYPE_FALSE:
-                    if (n_children == d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1){
+                    //Here we are checking for a 1d array
+                    //
+                    //  Passing the first test
+                    //  ---------------------------------------------------
+                    //  Note, d1 increments for any token, so we can
+                    //  only have non-child entries (or childless objects/arrays)
+                    //  in order to satisfy the first test.
+                    //
+                    //  e.g. [1,2,3,[4],5,6] will be false, because
+                    //  the [4] contains 2 tokens, [] and 4
+                    //  assuming 1 is the first number, we get:
+                    //
+                    //  d1[cur_process_index+1] => 0 (value 1)
+                    //  d1[cur_process_index+n_children] => 4 (value 5)
+                    //  n_children = 6, != (4 - 0 + 1)
+                    //
+                    //  e.g. [1,2,3,[],4,5]
+                    //  Unlike the last example, we now point to the last
+                    //  entry in the array (since we don't have children)
+                    //  but our index has only incremented 5 times, and the
+                    //  array has 6 entries, so the test will fail
+                    //
+                    //  Now however, we could get unlucky and have some 
+                    //  other type that also happens to be 
+                    //  
+                    if (n_children == (d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1) && \
+                            types[cur_process_index+1] == types[cur_process_index+n_children]){
                         array_types[cur_array_index] = array_type_map1[types[cur_process_index+1]];
                     }
                     array_depths[cur_array_index] = 1;
@@ -396,6 +442,8 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     break;
             }
                     
+        }else{
+            array_types[cur_array_index] = ARRAY_EMPTY_TYPE;
         }
     }
     

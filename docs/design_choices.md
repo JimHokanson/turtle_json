@@ -1,11 +1,17 @@
 # Design Choices
 
-## Parsed Value Representation
+## Numbers
 
-* '[]' translates into an empty numeric array (TODO)
+* **Numbers are stored as doubles.** This could eventually change, but that's how it is for now. In particular this means parsing of large integers will fail.
+
+
+## Ambiguous JSON Design Decisions
+
+* '[]' translates into an empty numeric array rather than an empty cell array (NYI)
+
 
 ### Numeric arrays
-
+ redundant
 
 
 

@@ -39,6 +39,40 @@ classdef token < handle
     
     methods
         function data = getParsedData(obj,varargin)
+            %x Returns a fully parsed structure or array for this token
+            %
+            %   data = getParsedData(obj,varargin)
+            %
+            %   Inputs
+            %   ------
+            %   obj : json.objs.token.array
+            %       json.objs.token.object
+            %
+            %   Optional Inputs
+            %   ---------------
+            %   max_numeric_collapse_depth: default -1
+            %   max_string_collape_depth : default -1
+            %   max_bool_collapse_depth : default -1
+            %   column_major : default true
+            %       If true, nd-arrays are read in column-major order,
+            %       otherwise as row major order.
+            %
+            %       For example, consider the following 
+            %       JSON: [[1,2,3],[4,5,6]]
+            %
+            %       column-major: [1, 4; 
+            %                      2, 5; 
+            %                      3, 6]
+            %       row-major: [1,2,3; 
+            %                   4,5,6]
+            %   collapse_objects : default true
+            %       If true, objects with the same properties (in the 
+            %       same order) will be collapsed into a structure
+            %       array, otherwise all object arrays will be returned
+            %       as cell arrays of structures
+            %   For example, consider the following 
+            %   JSON: {'a':1,'b':2} TODO: Finish
+            %           
             
             if isempty(varargin)
                 data = json_info_to_data(0,obj.mex,obj.md_index);
@@ -46,7 +80,7 @@ classdef token < handle
                 in.max_numeric_collapse_depth = [];
                 in.max_string_collape_depth = [];
                 in.max_bool_collapse_depth = [];
-                in.stripe_array_low = [];
+                in.column_major = [];
                 in.collapse_objects = [];
                 in = json.sl.in.processVarargin(in,varargin);
                 data = json_info_to_data(7,obj.mex,obj.md_index,in);

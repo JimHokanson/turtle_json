@@ -9,11 +9,8 @@ classdef object < json.objs.token
     end
     
     properties (Dependent)
-        %TODO: Implement these
-        %key_indices
         key_names
-        %attribute_indices
-        %attribute_types
+        mex_object_info
     end
     
     methods
@@ -29,6 +26,9 @@ classdef object < json.objs.token
                 value = fieldnames(ref_object);
                 obj.p__key_names = value;
             end
+        end
+        function value = get.mex_object_info(obj)
+           value = json.objs.token.object.mex_object_info(obj.mex,obj.md_index);
         end
     end
     

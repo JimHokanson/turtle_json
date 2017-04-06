@@ -91,7 +91,7 @@ end
     'turtle_json_pp_objects.c', ...
     'turtle_json_number_parsing.c');
 
-    mex(FLAGS{:},'json_info_to_data.c');
+    mex(FLAGS{:},'json_info_to_data.c','json_info_to_data__arrays.c','json_info_to_data__objects.c','json_info_to_data__utils.c','json_info_to_data__option_handling.c');
 
     cd(start_path);
 

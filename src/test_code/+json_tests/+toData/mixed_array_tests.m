@@ -3,11 +3,22 @@ function mixed_array_tests()
 %   json_tests.toData.mixed_array_tests
 
 %{
-    for i = 1:10000
     json_tests.toData.mixed_array_tests
-    end
 %}
 
+fh2 = @json_tests.utils.runTest;
+encode = @json_tests.utils.encodeJSON;
+
+%[output_test_number,root,data] = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, post_test, post_test_error_msg)
+
+%Tests to nd-array
+%-------------------------------------------------------
+fh2(1,'[1,2,3,[],4,5]','','array in an array','',@h__keyboard,'asdfasdfsdf');
+
+
+%Old code, needs to be incorporated
+%--------------------------------------------------------------------------
+%{
 %Tried nan, but this gets written as NaN by mexEncodeJSON
 data = {'superstar' true false 15.3 ...
     1:10 {'asdf' 'anna' 'cbs'} [true false true false], ... %1d
@@ -27,6 +38,13 @@ for iData = 1:length(data)
     %s = json.stringToTokens(js);
     temp = json.parse(js);
 end
+%}
 
+
+end
+
+function h__keyboard()
+
+keyboard
 
 end

@@ -1,10 +1,10 @@
 This code parses JSON files/strings using C (mex) code. Writing is not yet supported.
 
-#Why This Code?
+# Why This Code?
 
 I needed JSON parsing for a project. Loading JSON files using existing parsers was painfully slow. This slowness was due to 1) JSON parsing being done in Matlab or 2) parsing using C/C++ or Java, but with inefficient memory structures. This code started off by wrapping an already written C JSON tokenizer, and then post-processing in Matlab. After some nit-picking here and there, I found myself writing an entire parser in C, from scratch.
 
-#Advantages and Disadvantages
+# Advantages and Disadvantages
 
 ## Advantages
 * C parser written specifically for Matlab, rather than wrapping an existing parser
@@ -16,7 +16,7 @@ I needed JSON parsing for a project. Loading JSON files using existing parsers w
 * Currently favors speed over memory (this can be improved)
 * Currently requires newer computers due to use of SIMD (TODO: Insert year), this will also be changed ...
 
-#Status
+# Status
 
 * Parser design is stable.
 * Needs more unit tests (in progress).
@@ -26,9 +26,21 @@ I needed JSON parsing for a project. Loading JSON files using existing parsers w
 
 Parsing can be done in one of two ways. Parsing can either be done to a set of tokens or alternatively, to a complete representation of the structure in Matlab. Parsing to tokens provides finer control over the parsing process.
 
+## Parsing to a Complete Matlab Data Structure
+
+The simplest approach is to parse directly to a Matlab data structure.
+
+```matlab
+data = json.load(file_path);
+%OR
+data = json.parse(json_string);
+```
+
 ## Parsing to Tokens
 
-Tokens include objects, arrays, numbers, etc. in the file. The first step is to parse to tokens. The actual data can be requested from these tokens.
+For those that want a bit more control over the parsing process, one can parse to tokens, and then to data. Tokens include objects, arrays, numbers, etc. in the file. 
+
+The following is an example.
 
 ```matlab
 %This returns a tokenized representation of all of the data
@@ -54,14 +66,6 @@ x_data = x_data_token.get1dNumericArray();
 
 %If 'x_data' contains a cell array of strings
 x_data = x_data_token.getCellstr();
-```
-
-## Parsing to a Complete Matlab Data Structure
-
-```matlab
-data = json.load(file_path);
-%OR
-data = json.parse(json_string);
 ```
 
 # Contributing

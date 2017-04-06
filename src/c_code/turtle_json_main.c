@@ -796,8 +796,8 @@ S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     //  e.g.
     // {"key": value, 1
     //
-	mexPrintf("Position %d\n",CURRENT_INDEX); \
-	mexErrMsgIdAndTxt("turtle_json:no_key", "Key or closing of object expected"); \
+	// mexPrintf("Position %d\n",CURRENT_INDEX); \
+	mexErrMsgIdAndTxt("turtle_json:no_key", "Key or closing of object expected");
     
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("turtle_json:depth_exceeded", "Max depth was exceeded");
@@ -818,8 +818,8 @@ S_ERROR_END_OF_VALUE_IN_KEY:
 //This error comes when we have a comma in an array that is not followed
 // by a valid value => i.e. #, ", [, {, etc.
 S_ERROR_TOKEN_AFTER_COMMA_IN_ARRAY:
-    mexPrintf("Current character: %c\n",CURRENT_CHAR);
-    mexPrintf("Current position in string: %d\n",CURRENT_INDEX);
+    //mexPrintf("Current character: %c\n",CURRENT_CHAR);
+    //mexPrintf("Current position in string: %d\n",CURRENT_INDEX);
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Invalid token found after opening of array or after a comma in an array");
 	//mexErrMsgIdAndTxt("turtle_json:no_primitive","Primitive value was not found after the comma");
    
