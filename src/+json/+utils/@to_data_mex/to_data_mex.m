@@ -2,6 +2,13 @@ classdef to_data_mex
     %
     %   Class
     %   json.utils.to_data_mex
+    %
+    %   This was written to document these functions in Matlab, rather
+    %   than just in mex. They are also called by the tests
+    %
+    %   See Also
+    %   --------
+    %   json_tests.toData.functions.f2__get_key_value_type_and_index
     
     properties
     end

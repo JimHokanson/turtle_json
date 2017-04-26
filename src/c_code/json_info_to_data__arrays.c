@@ -534,6 +534,8 @@ mxArray *parse_array_with_options(Data data, int md_index,
     int cur_array_data_index = data.d1[md_index];
     mxArray *output;
     
+    bool collapse_objects;
+    
     int n_dimensions;
     int temp_count;
     int temp_data_index;
@@ -589,26 +591,34 @@ mxArray *parse_array_with_options(Data data, int md_index,
                     data.child_count_array[cur_array_data_index], md_index);
             break;
         case ARRAY_OBJECT_SAME_TYPE:
+        case ARRAY_OBJECT_DIFF_TYPE:    
+            collapse_objects = options->collapse_objects && 
+                    ARRAY_OBJECT_SAME_TYPE == data.array_types[cur_array_data_index];
+            
+            
             temp_md_index = md_index + 1;
-            temp_data_index = data.d1[temp_md_index];
             temp_count = data.child_count_array[cur_array_data_index];
-            output = get_initialized_struct(data,temp_data_index,temp_count);
-            for (int iObj = 0; iObj < temp_count; iObj++){
-                parse_object(data, output, iObj, temp_md_index);
-                temp_md_index = data.next_sibling_index_object[temp_data_index];
+            
+            if (collapse_objects){
+                //In this case the output is a structure array
                 temp_data_index = data.d1[temp_md_index];
-            }
-            break;
-        case ARRAY_OBJECT_DIFF_TYPE:
-            temp_count = data.child_count_array[cur_array_data_index];
-            output = mxCreateCellMatrix(1,temp_count);
-            temp_md_index = md_index + 1;
-            for (int iData = 0; iData < temp_count; iData++){
-                temp_data_index = data.d1[temp_md_index];
-                temp_obj = get_initialized_struct(data,temp_data_index,1);
-                parse_object(data, temp_obj, 0, temp_md_index);
-                mxSetCell(output,iData,temp_obj);
-                temp_md_index = data.next_sibling_index_object[temp_data_index];
+                output = get_initialized_struct(data,temp_data_index,temp_count);
+                for (int iObj = 0; iObj < temp_count; iObj++){
+                    parse_object(data, output, iObj, temp_md_index);
+                    temp_md_index = data.next_sibling_index_object[temp_data_index];
+                    temp_data_index = data.d1[temp_md_index];
+                }
+
+            }else{
+                //In this case the output is a cell array
+                output = mxCreateCellMatrix(1,temp_count);
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_data_index = data.d1[temp_md_index];
+                    temp_obj = get_initialized_struct(data,temp_data_index,1);
+                    parse_object(data, temp_obj, 0, temp_md_index);
+                    mxSetCell(output,iData,temp_obj);
+                    temp_md_index = data.next_sibling_index_object[temp_data_index];
+                }
             }
             break;
         case ARRAY_ND_NUMERIC:

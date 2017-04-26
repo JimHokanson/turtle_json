@@ -1,5 +1,9 @@
 function f2__get_key_value_type_and_index()
 
+%{
+json_tests.toData.functions.f2__get_key_value_type_and_index
+%}
+
 fh = @json.tokens.parse;
 sdk = json.utils.to_data_mex;
 passed_test = @(x) fprintf('Test %d passed as expected\n',x);
