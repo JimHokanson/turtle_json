@@ -38,6 +38,8 @@ classdef tokens
                         
             %Option Processing
             %-----------------
+            
+            %TODO: This can be slow in a loop for many small files ...
             in.chars_per_token = json.sl.in.NULL;
             in.n_tokens = json.sl.in.NULL;
             in.n_strings = json.sl.in.NULL;
@@ -50,7 +52,8 @@ classdef tokens
             
             %TODO: Starting token needs to be an opening object or array
             %If this happens, we might have a file path
-            %encounerted with json.parse(file_path) which is incorrect
+            %encountered with json.parse(file_path) which is incorrect
+            %- should be json.load(file_path)
             mex_result = turtle_json_mex(file_path__or__string,in);
             
             if mex_result.types(1) == 1

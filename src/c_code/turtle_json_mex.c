@@ -9,7 +9,8 @@
 #define BUFFER_STRING "\0\\\"\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
         
 //                            1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
-uint8_t BUFFER_STRING2[20] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+//                              \   "
+uint8_t BUFFER_STRING2[20] = {0,92, 34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
     //
