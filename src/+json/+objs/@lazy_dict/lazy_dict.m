@@ -250,10 +250,10 @@ classdef lazy_dict < handle
     end
     
     methods
-        function value = getPropertiesStruct(obj)
+        function value = struct(obj)
             %x
             %
-            %   value = getPropertiesStruct(obj)
+            %   value = struct(obj)
             %
             %   This function ensures that all lazy properties have been
             %   evaluated.

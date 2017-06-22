@@ -2,6 +2,11 @@ classdef array < json.objs.token
     %
     %   Class:
     %   json.objs.token.array
+    %
+    %   See Also
+    %   --------
+    %   json.objs.token
+    %   json.objs.token.object
     
     %{
         expected_data = [1,4; 2,5; 3,6];

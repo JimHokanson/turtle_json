@@ -62,7 +62,7 @@ mxArray* get_initialized_struct(Data data, int object_data_index,
 void parse_object(Data data, mxArray *obj, int ouput_struct_index, 
         int object_md_index);
 void parse_object_with_options(Data data, mxArray *obj, 
-        int ouput_struct_index, int object_md_index);
+        int ouput_struct_index, int object_md_index, FullParseOptions *options);
 
 //Array related
 //-------------------------------------------------------------------------

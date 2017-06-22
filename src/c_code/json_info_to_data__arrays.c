@@ -546,6 +546,8 @@ mxArray *parse_array_with_options(Data data, int md_index,
     
     mxArray *temp_obj;
     
+    //mexPrintf("type: %d\n",data.array_types[cur_array_data_index]);
+    
     switch (data.array_types[cur_array_data_index]){
         case ARRAY_OTHER_TYPE:
             //  [1,false,"apples"]
@@ -604,7 +606,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
                 temp_data_index = data.d1[temp_md_index];
                 output = get_initialized_struct(data,temp_data_index,temp_count);
                 for (int iObj = 0; iObj < temp_count; iObj++){
-                    parse_object(data, output, iObj, temp_md_index);
+                    parse_object_with_options(data, output, iObj, temp_md_index, options);
                     temp_md_index = data.next_sibling_index_object[temp_data_index];
                     temp_data_index = data.d1[temp_md_index];
                 }
@@ -615,7 +617,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
                 for (int iData = 0; iData < temp_count; iData++){
                     temp_data_index = data.d1[temp_md_index];
                     temp_obj = get_initialized_struct(data,temp_data_index,1);
-                    parse_object(data, temp_obj, 0, temp_md_index);
+                    parse_object_with_options(data, temp_obj, 0, temp_md_index, options);
                     mxSetCell(output,iData,temp_obj);
                     temp_md_index = data.next_sibling_index_object[temp_data_index];
                 }
@@ -623,6 +625,9 @@ mxArray *parse_array_with_options(Data data, int md_index,
             break;
         case ARRAY_ND_NUMERIC:
             n_dimensions = data.array_depths[cur_array_data_index];
+            //mexPrintf("option: %d\n",options->max_numeric_collapse_depth);
+            //mexPrintf("n_dimensions: %d\n",n_dimensions);
+            
             if (options->max_numeric_collapse_depth == -1 || options->max_numeric_collapse_depth >= n_dimensions){
                 if (options->column_major){
                     output = parse_nd_numeric_array_column_major(data.d1, data.dims, 

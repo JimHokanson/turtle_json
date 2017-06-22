@@ -151,8 +151,8 @@ classdef dict < handle
             end
 
         end
-        function output = getPropertiesStruct(obj)
-           output = obj.props; 
+        function output = struct(obj)
+           output = obj.props;
         end
         function disp(objs)
             

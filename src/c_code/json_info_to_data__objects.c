@@ -84,7 +84,8 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int object_md
     }
 }
 //=========================================================================
-void parse_object_with_options(Data data, mxArray *obj, int ouput_struct_index, int object_md_index){
+void parse_object_with_options(Data data, mxArray *obj, int ouput_struct_index, 
+        int object_md_index, FullParseOptions *options){
     //
     //  Inputs
     //  ------
@@ -108,12 +109,12 @@ void parse_object_with_options(Data data, mxArray *obj, int ouput_struct_index, 
         switch (types[cur_key_value_md_index]){
             case TYPE_OBJECT:
                 temp_mxArray = get_initialized_struct(data,data.d1[cur_key_value_md_index],1);
-                parse_object(data,temp_mxArray,0,cur_key_value_md_index);
+                parse_object_with_options(data,temp_mxArray,0,cur_key_value_md_index, options);
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,temp_mxArray);
                 break;
             case TYPE_ARRAY:
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,
-                        parse_array(data,cur_key_value_md_index));
+                        parse_array_with_options(data,cur_key_value_md_index,options));
                 break;
             case TYPE_KEY:
                 mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
