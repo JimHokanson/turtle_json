@@ -14,7 +14,7 @@ I needed JSON parsing for a project. Loading JSON files using existing parsers w
 ## Disadvantages
 * I used a non-native compiler for both Windows and Mac (GCC)
 * Currently favors speed over memory (this can be improved)
-* Currently requires newer computers due to use of SIMD (TODO: Insert year), this will also be changed ...
+* Currently requires newer computers due to use of SIMD (I believe I'm only using AVX so ~2011 or newer processor required). Ideally a switch would allow an option not to use SIMD.
 
 # Status
 

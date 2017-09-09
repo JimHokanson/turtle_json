@@ -243,10 +243,17 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned 
     
 }
 
-void init_options(int nrhs, const mxArray*prhs[],Options *options){
+void init_options(int nrhs, const mxArray* prhs[], Options *options){
     //
     //  Option parsing
     //  
+    //
+    //  Input format
+    //  ------------
+    //  mex(file_path__or__string,varargin)
+    //
+    //  varargin => property value pairs
+    //
     //  See Also
     //  --------
     //  json.tokens 
@@ -267,63 +274,80 @@ void init_options(int nrhs, const mxArray*prhs[],Options *options){
         return;
     }
     
-    if (!mxIsClass(prhs[1],"struct")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","Second input needs to be a struct");
-    }
-        
-    mxArrayTemp = mxGetField(prhs[1],0,"raw_string");
-    if (mxArrayTemp != NULL){
-        //TODO: Should check that the logical value is true ...
-        if (mxIsClass(prhs[0],"char")){
-            options->has_raw_string = true;
-        }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
-            //Note, we'll allow bytes for a "raw_string"
-            options->has_raw_bytes = true;
-        }else{
-            //TODO: I also got this when the first input was not a string => e.g. (data,'raw_string',true)
-            //TODO: This error message looks wrong 
-            mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
-        }
-    }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+    if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
         options->has_raw_bytes = true;
     }
-
-    mxArrayTemp = mxGetField(prhs[1],0,"n_tokens");
-    if (mxArrayTemp != NULL){
-        if (mxIsClass(mxArrayTemp,"double")){
-            options->n_tokens = (int)mxGetScalar(mxArrayTemp);
-        }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","n_tokens option needs to be a double");
-        }
-    }
-
-    mxArrayTemp = mxGetField(prhs[1],0,"n_keys");
-    if (mxArrayTemp != NULL){
-        if (mxIsClass(mxArrayTemp,"double")){
-            options->n_keys = (int)mxGetScalar(mxArrayTemp);
-        }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","n_keys option needs to be a double");
-        }
+    
+    if (nrhs % 2 == 0){ //a check for even
+        //Note that the # of optional inputs is one less than nrhs
+        //since the first input is the file path or string
+        mexErrMsgIdAndTxt("turtle_json:invalid_input","Number of optional inputs must be even");
     }
     
-    mxArrayTemp = mxGetField(prhs[1],0,"n_strings");
-    if (mxArrayTemp != NULL){
-        if (mxIsClass(mxArrayTemp,"double")){
-            options->n_strings = (int)mxGetScalar(mxArrayTemp);
-        }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","n_strings option needs to be a double");
+    char* prop_string;
+    mxArray *mx_prop;
+    mxArray *mx_value;
+    for (int i = 0; i < nrhs; i+=2){
+        mx_prop = prhs[i];
+        mx_value = prhs[i+1];
+        
+        if (!mxIsClass(mx_prop,"char")){
+            mexErrMsgIdAndTxt("turtle_json:invalid_input","Odd optional input was not a string as expected");
         }
-    }
-    
-    mxArrayTemp = mxGetField(prhs[1],0,"n_numbers");
-    if (mxArrayTemp != NULL){
-        if (mxIsClass(mxArrayTemp,"double")){
-            options->n_numbers = (int)mxGetScalar(mxArrayTemp);
-        }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","n_numbers option needs to be a double");
+        
+        prop_string = mxArrayToString(mx_prop);
+        
+        //Could potentially hash this ...
+        if (strcmp(prop_string,"raw_string") == 0){
+            //TODO: Get logical and exit early if false ...
+            if (mxIsClass(mx_value,"logical")){
+                if (!(*(uint8_t *)mxGetData(mx_value))){
+                    continue;
+                }
+            }else if (mxIsClass(mx_value,"double")){
+                if (!(mxGetScalar(mx_value))){
+                    continue;
+                }                
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","Optional input 'raw_string' must be double or logical");
+            }
+        	if (mxIsClass(prhs[0],"char")){
+                options->has_raw_string = true;
+            }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
+                //Duplicate ... - this isn't really needed anymore since
+                //bytes as an input signals a raw_string
+                //Note, we'll allow bytes for a "raw_string"
+                options->has_raw_bytes = true;
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","raw_string is true but the first data input was not of type 'char', 'int8', or 'uint8'");
+            }
+        }else if (strcmp(prop_string,"n_tokens") == 0){
+            if (mxIsClass(mx_value,"double")){
+                options->n_tokens = (int)mxGetScalar(mx_value);
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_tokens option needs to be a double");
+            }    
+        }else if (strcmp(prop_string,"n_keys") == 0){
+            if (mxIsClass(mx_value,"double")){
+                options->n_keys = (int)mxGetScalar(mx_value);
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_keys option needs to be a double");
+            } 
+    	}else if (strcmp(prop_string,"n_strings") == 0){
+            if (mxIsClass(mx_value,"double")){
+                options->n_strings = (int)mxGetScalar(mx_value);
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_strings option needs to be a double");
+            }
+        }else if (strcmp(prop_string,"n_numbers") == 0){
+         	if (mxIsClass(mx_value,"double")){
+                options->n_numbers = (int)mxGetScalar(mx_value);
+            }else{
+                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_numbers option needs to be a double");
+            }
         }
-    }
-    
+        
+    }  
 }
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])

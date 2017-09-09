@@ -4,6 +4,7 @@
 *.c~
 *.h~
 *.~
+*.o
 *.mat
 /examples/*.json
 

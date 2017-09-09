@@ -7,9 +7,13 @@ classdef time_example_file
     
     properties
        average_elapsed_time
-       method
+       average_tokenize_time
+       average_convert_time
+       method  %TODO: Make this a string ...
        file_name
+       file_path
        data
+       tokens
     end
     
     methods (Static)
@@ -49,25 +53,30 @@ classdef time_example_file
             
             in.n_runs = 10;
             in.method = 1;
+            in.load_options = {};
             in = json.sl.in.processVarargin(in,varargin);
             
             file_path = json.utils.examples.getFilePath(name_or_index);
-            
+            obj.file_path = file_path;
             [~,obj.file_name] = fileparts(file_path);
             
             n_runs = in.n_runs;
             if in.method == 1
                 t0 = tic;
                 for iRun = 1:n_runs
-                    token = json.tokens.load(file_path);
+                    token = json.tokens.load(file_path,in.load_options{:});
                 end
                 t1 = toc(t0)/n_runs;
-                
+                obj.average_tokenize_time = t1;
+                obj.tokens = token;
                 t2 = tic;
                 for iRun = 1:n_runs
                     data = token.getParsedData();
                 end
                 t3 = toc(t2)/n_runs;
+                obj.average_convert_time = t3;
+                
+                obj.average_elapsed_time = t3 + t1;
             elseif in.method == 2
                 t0 = tic;
                 if ismac
@@ -80,7 +89,10 @@ classdef time_example_file
                 end
                 
                 t3 = toc(t0)/n_runs;
+                obj.average_elapsed_time = t3;
             elseif in.method == 3
+                %What is this?????
+                
                 t0 = tic;
 
                 for iRun = 1:n_runs
@@ -94,7 +106,6 @@ classdef time_example_file
             end
             
             obj.method = in.method;
-            obj.average_elapsed_time = t3;
             obj.data = data;
 
         end
