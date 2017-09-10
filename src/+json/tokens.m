@@ -19,11 +19,17 @@ classdef tokens
             %
             %   Optional Inputs
             %   ---------------
-            %   n_tokens
-            %   n_keys
-            %   n_strings
-            %   n_numbers
+            %   n_tokens : double (default )
+            %       # of tokens expected in the file. Default is ...
+            %   n_keys : double (default )
+            %       # of keys expected in the file. 
+            %   n_strings : double
+            %       # of strings expected in the file.
+            %   n_numbers : double
+            %       # of numbers expected in the file.
             %   chars_per_token - NYI
+            %       # of tokens to initially allocate based on the
+            %       length of the json string.
             %   
             %   
             %
@@ -37,6 +43,10 @@ classdef tokens
             %x Parse tokens from file
             %
             %   root = json.tokens.parse(file_path,varargin)
+            %
+            %   Optional Inputs
+            %   ---------------
+            %   Documented in json.tokens.load 
             
             
             %TODO: Starting token needs to be an opening object or array
@@ -57,14 +67,17 @@ classdef tokens
             %
             %   obj = json.tokens(file_path,varargin)
             %
+            %   This function should be called from the load and parse
+            %   functions.
+            %
             %   Optional Inputs
             %   ---------------
-            %   Documented in json.load
+            %   Documented in json.tokens.load
             %
             %   See Also:
             %   ---------
-            %   json.stringToTokens
-            %   json.fileToTokens
+            %   json.load
+            %   json.parse
                         
             mex_result = turtle_json_mex(file_path__or__string,varargin{:});
             

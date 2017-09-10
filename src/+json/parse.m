@@ -9,11 +9,10 @@ function data = parse(json_string)
 %
 %   See Also:
 %   ---------
-%   json.load  %json.load(file_path)
-%   json.
+%   json.load
 
-tokens = json.tokens.parse(json_string);
+root = json.tokens.parse(json_string);
 
-data = tokens.getParsedData();
+data = root.getParsedData();
 
 end

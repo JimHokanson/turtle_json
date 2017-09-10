@@ -1,5 +1,13 @@
 # JSON data sources	#
 
+	This file documents the names of json files that I have as examples as well as their data sources and some notes about the files.
+	
+	Copies of these files have been placed at:
+	https://drive.google.com/drive/folders/0B7to9gBdZEyGMExwTFA0ZWh1OTA?usp=sharing
+
+	This list is out of date and needs to have files from sajson added:
+	https://github.com/chadaustin/Web-Benchmarks/tree/master/json/testdata
+	
 	* 1.json (219 MB) - 
 		- This is my version of the file generated from: https://github.com/kostya/benchmarks/tree/master/json
 		- mainly contains an array of structures: {"x": 0.1, "y": 0.2, "z": 0.3, "name": "asdf", "opts": {'1': [1, true]}}
@@ -22,6 +30,5 @@
 	* wcon_testfile_new.json (58 MB) - OpenWorm
 	* XJ30_NaCl500mM4uL6h_10m45x10s40s_Ea.json (77 MB) - OpenWorm & Rex Kerr
 	
-
-	https://github.com/salessandri/json-bechmarks/tree/master/data
+	
 	

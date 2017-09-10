@@ -20,7 +20,10 @@ classdef token < handle
     properties
         md_index %Main Data Index
         mex %strucure returned from mex parsing
-        %This structure is not specific to any instance
+        %This structure is specific to the file, but gets passed to each
+        %token
+        %
+        %   Format documented in c_data_model.md?
     end
     
     properties (Dependent)
@@ -50,33 +53,14 @@ classdef token < handle
             %
             %   Optional Inputs
             %   ---------------
-            %   max_numeric_collapse_depth: default -1
-            %   max_string_collape_depth : default -1
-            %   max_bool_collapse_depth : default -1
-            %   column_major : default true
-            %       If true, nd-arrays are read in column-major order,
-            %       otherwise as row major order.
-            %
-            %       For example, consider the following 
-            %       JSON: [[1,2,3],[4,5,6]]
-            %
-            %       column-major: [1, 4; 
-            %                      2, 5; 
-            %                      3, 6]
-            %       row-major: [1,2,3; 
-            %                   4,5,6]
-            %   collapse_objects : default true
-            %       If true, objects with the same properties (in the 
-            %       same order) will be collapsed into a structure
-            %       array, otherwise all object arrays will be returned
-            %       as cell arrays of structures
-            %   For example, consider the following 
-            %   JSON: {'a':1,'b':2} TODO: Finish
+            %   See json.load
             %           
             
             if isempty(varargin)
                 data = json_info_to_data(0,obj.mex,obj.md_index);
             else
+                %TODO: Move this into the c code just like we did 
+                %for the parser ...
                 in.max_numeric_collapse_depth = [];
                 in.max_string_collape_depth = [];
                 in.max_bool_collapse_depth = [];

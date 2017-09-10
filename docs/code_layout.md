@@ -26,3 +26,8 @@ With the output structure from the initial tokenization, we still don't have dat
 ## Matlab Code ##
 
 The Matlab code wraps the c code, allowing access to either the tokenizer or to a fully parsed representation of the JSON data. The tokenizer returns a root token (either object or array), which can then be used to return subsets of the data (through calls to json_info_to_data.c).
+
+Entry functions are:
+1. json.load - JSON file to Matlab data
+2. json.parse - JSON string to Matlab data
+3. 

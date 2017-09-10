@@ -1,6 +1,6 @@
 #include "turtle_json.h"
-
-//  This is the entry function 
+//
+//  This file contains the entry function as well as handling of the inputs.
 
 #define N_PADDING 17
 
@@ -82,6 +82,8 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
     //      => mxArrayToUTF8String  - 2015a
     //      - see next TODO, we are likely better off rolling our own ...
     //      - although for now, correct would be better than fast
+    //
+    //
     //  TODO: If the buffer is not present here, we are doing a memory reallocation
     //  anyway, so we might as well both transform the string and add the buffer
     //  at the same time, rather than do two memory reallocations
@@ -157,6 +159,8 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
     #else
         if ((file = fopen(file_path, "rb")) == NULL) {
     #endif
+            
+            //error in reading occurred ...
             file_path_string_length = mxGetNumberOfElements(prhs[0]);
             //TODO: This could be improved for printing long file paths
             if (file_path_string_length > 100){
@@ -278,9 +282,11 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
         options->has_raw_bytes = true;
     }
     
-    if (nrhs % 2 == 0){ //a check for even
-        //Note that the # of optional inputs is one less than nrhs
-        //since the first input is the file path or string
+    //All optional inputs must come in pairs (property,value)
+    if (nrhs % 2 == 0){
+        //We have an error if even, since the # of inputs is 
+        //equal to the # of optional inputs + 1 (json string or bytes), 
+        //thus if nrhs is even then the # of optional inputs is odd
         mexErrMsgIdAndTxt("turtle_json:invalid_input","Number of optional inputs must be even");
     }
     
@@ -356,9 +362,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //
     //  Usage:
     //  ------
-    //  token_info = turtle_json(file_path,options_struct)
+    //  token_info = turtle_json(file_path,varargin)
     //
-    //  token_info = turtle_json(raw_string,options_struct)
+    //  token_info = turtle_json(raw_string,varargin)
     //
     //  Inputs
     //  ------
@@ -367,7 +373,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //
     //  Optional Inputs
     //  ---------------
-    //
+    //  Documented in the Matlab code ...
     //
     //  Outputs:
     //  --------
