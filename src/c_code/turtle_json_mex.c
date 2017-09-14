@@ -293,7 +293,7 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
     char* prop_string;
     mxArray *mx_prop;
     mxArray *mx_value;
-    for (int i = 0; i < nrhs; i+=2){
+    for (int i = 1; i < nrhs; i+=2){
         mx_prop = prhs[i];
         mx_value = prhs[i+1];
         
@@ -351,6 +351,8 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
             }else{
                 mexErrMsgIdAndTxt("turtle_json:invalid_input","n_numbers option needs to be a double");
             }
+        }else{
+            mexErrMsgIdAndTxt("turtle_json:invalid_input","Unrecognized optional input: %s",prop_string);
         }
         
     }  
@@ -406,8 +408,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);
 
     //# of inputs check  --------------------------------------------------
-    if (!(nrhs == 1 || nrhs == 2)){
-        mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs, 1 or 2 expected");
+    if (nrhs < 1){
+        mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
     }else if (!(nlhs == 1)){
         mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of outputs, 1 expected");
     }

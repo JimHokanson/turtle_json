@@ -3,8 +3,8 @@
 /*
  *  This file does the initial parsing of the file. After the parse_json()
  *  function has run, we know how many objects, arrays, etc. that we have
- *  and where they are located. This function does not translate character
- *  arrays into numbers or proper strings/keys.
+ *  and where they are located. Code in this file does not translate 
+ *  characters into strings or numbers.
  *
  */
 

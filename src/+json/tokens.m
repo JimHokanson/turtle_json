@@ -17,19 +17,7 @@ classdef tokens
             %
             %   root = json.tokens.load(file_path,varargin)
             %
-            %   Optional Inputs
-            %   ---------------
-            %   n_tokens : double (default )
-            %       # of tokens expected in the file. Default is ...
-            %   n_keys : double (default )
-            %       # of keys expected in the file. 
-            %   n_strings : double
-            %       # of strings expected in the file.
-            %   n_numbers : double
-            %       # of numbers expected in the file.
-            %   chars_per_token - NYI
-            %       # of tokens to initially allocate based on the
-            %       length of the json string.
+
             %   
             %   
             %
