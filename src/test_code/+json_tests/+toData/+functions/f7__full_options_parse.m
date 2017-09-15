@@ -1,5 +1,9 @@
 function f7__full_options_parse()
 
+%Invalid option testing
+%-----------------------------------------------------------------------
+
+
 %Column Majors
 %-----------------------------------------------------------------------
 JSON_STR = '[1,2,3]';
@@ -28,6 +32,11 @@ end
 
 %Max numeric collapse depth
 %------------------------------------------------------------------------
+JSON_STR = '[[1,2,3],[4,5,6]]';
+data = json.parse(JSON_STR,'max_numeric_collapse_depth',true);
+if ~isequal(data,[1,2,3;4,5,6])
+    error('Failed to properly parse nd-array using row-major order');
+end
 
 %   max_numeric_collapse_depth: default -1
 %

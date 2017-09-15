@@ -17,7 +17,7 @@ double get_double_option_field(const mxArray *s, const char *field_name, double 
             }
         }else{
         	mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                    "Invalid type (non-double) for optional field");
+                    "Invalid type (non-double) for optional field: %s",field_name);
         }
     }
     else{
