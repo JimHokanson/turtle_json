@@ -28,6 +28,8 @@ mxArray* permuteArray(mxArray* temp_array){
     mexCallMATLAB(1,&plhs, 2, prhs, "permute");
     //int mexCallMATLAB(int nlhs, mxArray *plhs[], int nrhs,
     //    mxArray *prhs[], const char *functionName);   
+    
+    return plhs;
 }
 
 
@@ -530,9 +532,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
     //  parse_nd_numeric_array
     //  parse_nd_string_array
     //  parse_logical_nd_array
-    
-    mexPrintf("What the heck\n");
-    
+        
     int cur_array_data_index = data.d1[md_index];
     mxArray *output;
     
@@ -558,14 +558,11 @@ mxArray *parse_array_with_options(Data data, int md_index,
         case ARRAY_NUMERIC_TYPE:
             //  [1,2,3,4]
             n_dimensions = data.array_depths[cur_array_data_index];
-            mexPrintf("What the hec2k\n");
             if (options->max_numeric_collapse_depth == -1 || options->max_numeric_collapse_depth >= n_dimensions){
                 if (options->column_major){
-                    mexPrintf("What the hec4k\n");
-                    output = parse_1d_numeric_array_row_major(data.d1,data.numeric_data,
+                    output = parse_1d_numeric_array_column_major(data.d1,data.numeric_data,
                                 data.child_count_array[cur_array_data_index],md_index);
                 }else{
-                    mexPrintf("What the hec3k\n");
                     output = parse_1d_numeric_array_row_major(data.d1,data.numeric_data,
                                 data.child_count_array[cur_array_data_index],md_index);
                 }
@@ -629,7 +626,6 @@ mxArray *parse_array_with_options(Data data, int md_index,
             }
             break;
         case ARRAY_ND_NUMERIC:
-            mexPrintf("What the hec5\n");
             n_dimensions = data.array_depths[cur_array_data_index];
             //mexPrintf("option: %d\n",options->max_numeric_collapse_depth);
             //mexPrintf("n_dimensions: %d\n",n_dimensions);
