@@ -37,6 +37,18 @@ function data = load(file_path,varargin)
 %   Matlab representation.
 %
 %   max_numeric_collapse_depth: default -1
+%       A value of -1 means that arrays should be collapsed where possible.
+%       Otherwise arrays are only made into a nd-array if this option value
+%       meets or exceeds the dimensionality of the resulting array. For
+%       example value of max_numeric_collapse_depth = 1 means that 1D
+%       arrays will be returned but that 2D or higher arrays will be
+%       returned as cell arrays.
+%
+%       JSON_STR = '[[1,2,3],[4,5,6]]';
+%       1 => {[1,2,3],[4,5,6]}
+%       2 =>   [1, 4;
+%               2, 5;
+%               3, 6]
 %
 %   max_string_collape_depth : default -1
 %
