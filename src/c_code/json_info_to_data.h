@@ -27,7 +27,7 @@ typedef struct {
 
 typedef struct {
     int max_numeric_collapse_depth;
-    int max_string_collape_depth;
+    int max_string_collapse_depth;
     int max_bool_collapse_depth;
     bool column_major;
     bool collapse_objects;
@@ -69,5 +69,7 @@ void parse_object_with_options(Data data, mxArray *obj,
 mxArray* parse_array(Data data, int md_index);
 mxArray* parse_non_homogenous_array(Data data, int array_data_index, 
         int array_md_index);
+mxArray* parse_non_homogenous_array_with_options(Data data, int array_data_index, 
+        int array_md_index, FullParseOptions *options);
 mxArray *parse_array_with_options(Data data, int md_index, 
         FullParseOptions *options);

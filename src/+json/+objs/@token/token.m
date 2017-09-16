@@ -62,7 +62,7 @@ classdef token < handle
                 %TODO: Move this into the c code just like we did 
                 %for the parser ...
                 in.max_numeric_collapse_depth = [];
-                in.max_string_collape_depth = [];
+                in.max_string_collapse_depth = [];
                 in.max_bool_collapse_depth = [];
                 in.column_major = [];
                 in.collapse_objects = [];

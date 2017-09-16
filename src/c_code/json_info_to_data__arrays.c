@@ -545,6 +545,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
     int temp_array_depth;
     mwSize *dims;
     double *temp_value;
+    uint8_t *types;
     
     mxArray *temp_obj;
     
@@ -553,7 +554,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
     switch (data.array_types[cur_array_data_index]){
         case ARRAY_OTHER_TYPE:
             //  [1,false,"apples"]
-            output = parse_non_homogenous_array(data, cur_array_data_index, md_index);     
+            output = parse_non_homogenous_array_with_options(data, cur_array_data_index, md_index, options);     
             break;
         case ARRAY_NUMERIC_TYPE:
             //  [1,2,3,4]
@@ -567,32 +568,55 @@ mxArray *parse_array_with_options(Data data, int md_index,
                                 data.child_count_array[cur_array_data_index],md_index);
                 }
             }else{
-                temp_count = data.child_count_array[cur_array_data_index];
-                mexErrMsgIdAndTxt("turtle_json:not_yet_implemented","1d numeric array as cell - functionality not yet implemented");
-                
+                temp_count = data.child_count_array[cur_array_data_index];                
                 output = mxCreateCellMatrix(1,temp_count);
-                //JAH: At this point ...
-//                 temp_md_index = md_index + 1;
-//                 for (int iData = 0; iData < temp_count; iData++){
-//                     temp_data_index = data.d1[temp_md_index];
-//                     temp_obj = parse_array_with_options(data, temp_md_index, options);
-//                     mxSetCell(output,iData,temp_obj);
-//                     temp_md_index = data.next_sibling_index_array[temp_data_index];
-//                 }
                 
-                
+                temp_md_index = md_index + 1;
+                temp_data_index = data.d1[temp_md_index];
+                temp_value = &(data.numeric_data[temp_data_index]);
+                //Note, since we have a homogenous array we don't need
+                //to go back to the md_index, we can just increment ...
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_obj = mxCreateDoubleScalar(*temp_value);
+                    mxSetCell(output,iData,temp_obj);
+                    temp_value++;
+                }
             }
             break;
         case ARRAY_STRING_TYPE:
             //  ['cheese','crow']
+            //  Note that not collapsing here doesn't make any sense
+            // as all elements go in a cell regardless of options
             output = parse_1d_string_array_column_major(data.d1,
                     data.child_count_array[cur_array_data_index],
                     md_index,data.strings);
             break;
         case ARRAY_LOGICAL_TYPE:
-            //  [true, false, true]
-            output = parse_1d_logical_array_column_major(data.d1, data.types, 
-                    data.child_count_array[cur_array_data_index], md_index);
+            n_dimensions = data.array_depths[cur_array_data_index];
+            if (options->max_bool_collapse_depth == -1 || options->max_bool_collapse_depth >= n_dimensions){
+                if (options->column_major){
+                    output = parse_1d_logical_array_column_major(data.d1, data.types, 
+                            data.child_count_array[cur_array_data_index], md_index);
+                }else{
+                    output = parse_1d_logical_array_row_major(data.d1, data.types, 
+                            data.child_count_array[cur_array_data_index], md_index);
+                }
+            }else{
+                temp_count = data.child_count_array[cur_array_data_index];                
+                output = mxCreateCellMatrix(1,temp_count);
+
+                temp_md_index = md_index + 1;
+                types = &(data.array_types[temp_md_index]);
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_obj = mxCreateLogicalScalar(*types == TYPE_TRUE);
+                    mxSetCell(output,iData,temp_obj);
+                    types++;
+                }
+            }
+    
+//             //  [true, false, true]
+//             output = parse_1d_logical_array_column_major(data.d1, data.types, 
+//                     data.child_count_array[cur_array_data_index], md_index);
             break;
         case ARRAY_OBJECT_SAME_TYPE:
         case ARRAY_OBJECT_DIFF_TYPE:    
@@ -645,6 +669,11 @@ mxArray *parse_array_with_options(Data data, int md_index,
                 //loop over each sub-array and parse it, populating 
                 //this array as a cell array
                 temp_count = data.child_count_array[cur_array_data_index];
+                
+                //Should this be many rows or columns? Leaving as rows
+                //for now ... 
+                //
+                //We might want a 1d array shape preference ...
                 output = mxCreateCellMatrix(1,temp_count);
                 temp_md_index = md_index + 1;
                 for (int iData = 0; iData < temp_count; iData++){
@@ -656,14 +685,66 @@ mxArray *parse_array_with_options(Data data, int md_index,
             }
             break;
         case ARRAY_ND_STRING:
-            output = parse_nd_string_array_column_major(data.d1, data.dims, 
+            n_dimensions = data.array_depths[cur_array_data_index];
+            
+          	if (options->max_string_collapse_depth == -1 || options->max_string_collapse_depth >= n_dimensions){
+                if (options->column_major){
+                    output = parse_nd_string_array_column_major(data.d1, data.dims, 
                         data.child_count_array, md_index, data.array_depths,
                         data.next_sibling_index_array, data.strings);
+                }else{
+                    output = parse_nd_string_array_row_major(data.d1, data.dims, 
+                        data.child_count_array, md_index, data.array_depths,
+                        data.next_sibling_index_array, data.strings);
+                }
+            }else{
+                //Options specify not to collapse, so instead we
+                //loop over each sub-array and parse it, populating 
+                //this array as a cell array
+                
+                //TODO: Ideally this should be a function since it is shared
+                //by number and bool
+                temp_count = data.child_count_array[cur_array_data_index];
+                output = mxCreateCellMatrix(1,temp_count);
+                temp_md_index = md_index + 1;
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_data_index = data.d1[temp_md_index];
+                    temp_obj = parse_array_with_options(data, temp_md_index, options);
+                    mxSetCell(output,iData,temp_obj);
+                    temp_md_index = data.next_sibling_index_array[temp_data_index];
+                }
+            }
             break;
         case ARRAY_ND_LOGICAL:
-            output = parse_nd_logical_array_column_major(data.d1, data.types, data.dims, 
-                    data.child_count_array, md_index, data.array_depths, 
-                    data.next_sibling_index_array);
+          	n_dimensions = data.array_depths[cur_array_data_index];
+            
+          	if (options->max_bool_collapse_depth == -1 || options->max_bool_collapse_depth >= n_dimensions){
+                if (options->column_major){
+                    output = parse_nd_logical_array_column_major(data.d1, data.types, data.dims, 
+                        data.child_count_array, md_index, data.array_depths, 
+                        data.next_sibling_index_array);
+                }else{
+                    output = parse_nd_logical_array_row_major(data.d1, data.types, data.dims, 
+                        data.child_count_array, md_index, data.array_depths, 
+                        data.next_sibling_index_array);
+                }
+            }else{
+                //Options specify not to collapse, so instead we
+                //loop over each sub-array and parse it, populating 
+                //this array as a cell array
+                
+                //TODO: Ideally this should be a function since it is shared
+                //by number and string
+                temp_count = data.child_count_array[cur_array_data_index];
+                output = mxCreateCellMatrix(1,temp_count);
+                temp_md_index = md_index + 1;
+                for (int iData = 0; iData < temp_count; iData++){
+                    temp_data_index = data.d1[temp_md_index];
+                    temp_obj = parse_array_with_options(data, temp_md_index, options);
+                    mxSetCell(output,iData,temp_obj);
+                    temp_md_index = data.next_sibling_index_array[temp_data_index];
+                }
+            }     
             break;
         case ARRAY_EMPTY_TYPE:
         case ARRAY_ND_EMPTY:
@@ -677,6 +758,61 @@ mxArray *parse_array_with_options(Data data, int md_index,
 //=========================================================================
 mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_md_index){
 
+    //This is the "messiest" array option of all. Since we need to go through item
+    //by item and parse the result ...
+    int array_size = data.child_count_array[array_data_index];
+    mxArray* output = mxCreateCellMatrix(1,array_size);
+
+    int current_md_index = array_md_index + 1;
+    int current_data_index;
+    for (int iData = 0; iData < array_size; iData++){
+        switch (data.types[current_md_index]){
+            case TYPE_OBJECT:
+                current_data_index = data.d1[current_md_index];
+                mxArray* temp_obj = get_initialized_struct(data,current_data_index,1);
+                parse_object(data, temp_obj, 0, current_md_index);
+                mxSetCell(output,iData,temp_obj);
+                current_md_index = data.next_sibling_index_object[current_data_index];
+                break;
+            case TYPE_ARRAY:
+                current_data_index = data.d1[current_md_index];
+                mxSetCell(output, iData, parse_array(data,current_md_index));
+                current_md_index = data.next_sibling_index_array[current_data_index];
+                break;
+            case TYPE_KEY:
+                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
+                break;
+            case TYPE_STRING:
+                mxSetCell(output, iData, getString(data.d1,data.strings,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_NUMBER:
+                mxSetCell(output, iData, getNumber(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_NULL:
+                mxSetCell(output, iData, getNull(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_TRUE:
+                mxSetCell(output, iData, getTrue(data,current_md_index));
+                current_md_index++;
+                break;
+            case TYPE_FALSE:
+                mxSetCell(output, iData, getFalse(data,current_md_index));
+                current_md_index++;
+                break;
+        }
+    }   
+    return output;
+}
+
+mxArray* parse_non_homogenous_array_with_options(Data data, int array_data_index, 
+        int array_md_index, FullParseOptions *options){
+
+    mexErrMsgIdAndTxt("turtle_json:code_error","Not yet implemented");
+
+    
     //This is the "messiest" array option of all. Since we need to go through item
     //by item and parse the result ...
     int array_size = data.child_count_array[array_data_index];

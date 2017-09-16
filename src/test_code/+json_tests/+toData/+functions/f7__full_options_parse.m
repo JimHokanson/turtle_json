@@ -1,17 +1,31 @@
 function f7__full_options_parse()
+%
+%   json_tests.toData.functions.f7__full_options_parse
+
+missed_error = @ ()error('turtle_json:f7__full_options_parse','error not thrown as expected');
 
 %Invalid option testing
 %-----------------------------------------------------------------------
-%Numeric not boolean ...
+%value should be Numeric not boolean ...
 JSON_STR = '[[1,2,3],[4,5,6]]';
 try
-data = json.parse(JSON_STR,'max_numeric_collapse_depth',true);
-%Throw error here
+    data = json.parse(JSON_STR,'max_numeric_collapse_depth',true);
+    missed_error();
 catch ME
-    %Throw error if not correct
+    %TODO: check if error is correct
 end
 
-%Column Majors
+%TODO: This should throw an error
+JSON_STR = '[[1,2,3],[4,5,6]]';
+try
+    data = json.parse(JSON_STR,'bad_option',1);
+    missed_error();
+catch ME
+    %TODO: check if error is correct    
+end
+
+
+%Column Majors for numbers
 %-----------------------------------------------------------------------
 JSON_STR = '[1,2,3]';
 data = json.parse(JSON_STR,'column_major',false);
@@ -39,13 +53,19 @@ end
 
 %Max numeric collapse depth
 %------------------------------------------------------------------------
-%NOT YET IMPLEMENTED
-% JSON_STR = '[[1,2,3],[4,5,6]]';
-% data = json.parse(JSON_STR,'max_numeric_collapse_depth',0);
-% d2 = {[1;2;3],[4;5;6]};
-% if ~isequal(data,d2)
-%     error('Failed to properly parse nd-array using max_numeric_collapse_depth = 1');
-% end
+JSON_STR = '[[1,2,3],[4,5,6]]';
+data = json.parse(JSON_STR,'max_numeric_collapse_depth',0);
+d2 = {{1 2 3},{4 5 6}};
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_numeric_collapse_depth = 1');
+end
+
+JSON_STR = '[1,2,"test",[[1,2,3],[4,5,6]],9]';
+data = json.parse(JSON_STR,'max_numeric_collapse_depth',0);
+d2 = {[1;2;3],[4;5;6]};
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_numeric_collapse_depth = 1');
+end
 
 JSON_STR = '[[1,2,3],[4,5,6]]';
 data = json.parse(JSON_STR,'max_numeric_collapse_depth',1);
@@ -61,12 +81,64 @@ if ~isequal(data,d2)
     error('Failed to properly parse nd-array using max_numeric_collapse_depth = 2');
 end
 
+%Max string collapse depth & column order for strings
+%--------------------------------------------------------------------------
+JSON_STR = '[["a","b","c"],["d","e","f"]]';
+
+%Note this doesn't make much sense because strings are stored in cells ...
+data = json.parse(JSON_STR,'max_string_collapse_depth',0);
+d2 = {{'a';'b';'c'},{'d';'e';'f'}};
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_string_collapse_depth = 0');    
+end
+
+data = json.parse(JSON_STR,'max_string_collapse_depth',1);
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_string_collapse_depth = 1');    
+end
+
+data = json.parse(JSON_STR,'max_string_collapse_depth',2);
+d2 = [{'a';'b';'c'},{'d';'e';'f'}];
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_string_collapse_depth = 2');    
+end
+
+data = json.parse(JSON_STR,'column_major',false);
+d2 = [{'a' 'b' 'c'};{'d' 'e' 'f'}];
+if ~isequal(data,d2)
+    error('Failed to properly parse string nd-array using column_major = false');    
+end
+
+%Max logical collapse depth & column order for logicals
+%--------------------------------------------------------------------------
+JSON_STR = '[[true,false,true],[false,true,false]]';
+
+%This is incorrect ...
+data = json.parse(JSON_STR,'max_bool_collapse_depth',0);
+d2 = {{true false true},{false true false}};
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_bool_collapse_depth = 0');    
+end
+
+data = json.parse(JSON_STR,'max_bool_collapse_depth',1);
+d2 = {[true; false;true],[false;true;false]};
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_bool_collapse_depth = 1');    
+end
+
+data = json.parse(JSON_STR,'max_string_collapse_depth',2);
+d2 = [true false; false true; true false];
+if ~isequal(data,d2)
+    error('Failed to properly parse nd-array using max_bool_collapse_depth = 2');    
+end
+
+data = json.parse(JSON_STR,'column_major',false);
+d2 = [{'a' 'b' 'c'};{'d' 'e' 'f'}];
+if ~isequal(data,d2)
+    error('Failed to properly parse string nd-array using column_major = false');    
+end
 
 
-%   max_numeric_collapse_depth: default -1
-%
-%   max_string_collape_depth : default -1
-%
 %   max_bool_collapse_depth : default -1
 %
 %

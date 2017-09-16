@@ -24,6 +24,8 @@ I needed JSON parsing for a project. Loading JSON files using existing parsers w
 * No support for integers (in particular 64 bit integers). Everything gets returned as a double.
 * The information returned during error parsing could be improved to provide more context in the file.
 
+TODO: Provide a link to the standard JSON tests and show which ones pass and which ones don't (like I would say that '03' is ok for 3 whereas technically the leading 0 is invalid)
+
 # Status
 
 * Parser design is stable.
@@ -109,6 +111,10 @@ TODO: Document some issues and reference a different file
 - null as NaN double
 - scalars
 - field names
+
+# Documentation
+
+TODO: More documentation can be found at ...
 
 # Contributing
 
