@@ -57,14 +57,14 @@ JSON_STR = '[[1,2,3],[4,5,6]]';
 data = json.parse(JSON_STR,'max_numeric_collapse_depth',0);
 d2 = {{1 2 3},{4 5 6}};
 if ~isequal(data,d2)
-    error('Failed to properly parse nd-array using max_numeric_collapse_depth = 1');
+    error('Failed to properly parse nd-array using max_numeric_collapse_depth = 0');
 end
 
 JSON_STR = '[1,2,"test",[[1,2,3],[4,5,6]],9]';
 data = json.parse(JSON_STR,'max_numeric_collapse_depth',0);
-d2 = {[1;2;3],[4;5;6]};
+d2 = {1,2,'test',{{1 2 3},{4 5 6}},9};
 if ~isequal(data,d2)
-    error('Failed to properly parse nd-array using max_numeric_collapse_depth = 1');
+    error('Failed to properly array with nd-array using max_numeric_collapse_depth = 0');
 end
 
 JSON_STR = '[[1,2,3],[4,5,6]]';
@@ -133,9 +133,26 @@ if ~isequal(data,d2)
 end
 
 data = json.parse(JSON_STR,'column_major',false);
-d2 = [{'a' 'b' 'c'};{'d' 'e' 'f'}];
+d2 = [true false true; false true false];
 if ~isequal(data,d2)
     error('Failed to properly parse string nd-array using column_major = false');    
+end
+
+%Collapse Objects
+%--------------------------------------------------------------------------
+JSON_STR = '[{"a":1,"b":2},{"a":3,"b":4}]';
+data = json.parse(JSON_STR,'collapse_objects',true);
+d2 = struct('a',{1 3},'b',{2 4});
+if ~isequal(data,d2)
+    error('Failed to properly parse object array with collapse_objects = true');    
+end
+
+data = json.parse(JSON_STR,'collapse_objects',false);
+s1 = struct('a',1,'b',2);
+s2 = struct('a',3,'b',4);
+d2 = {s1 s2};
+if ~isequal(data,d2)
+    error('Failed to properly parse object array with collapse_objects = false');    
 end
 
 

@@ -810,14 +810,13 @@ mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_m
 mxArray* parse_non_homogenous_array_with_options(Data data, int array_data_index, 
         int array_md_index, FullParseOptions *options){
 
-    mexErrMsgIdAndTxt("turtle_json:code_error","Not yet implemented");
-
-    
     //This is the "messiest" array option of all. Since we need to go through item
     //by item and parse the result ...
     int array_size = data.child_count_array[array_data_index];
     mxArray* output = mxCreateCellMatrix(1,array_size);
 
+    //[1,"test",{"cheese":3}]
+    
     int current_md_index = array_md_index + 1;
     int current_data_index;
     for (int iData = 0; iData < array_size; iData++){
@@ -825,13 +824,15 @@ mxArray* parse_non_homogenous_array_with_options(Data data, int array_data_index
             case TYPE_OBJECT:
                 current_data_index = data.d1[current_md_index];
                 mxArray* temp_obj = get_initialized_struct(data,current_data_index,1);
+                //Currently no options for an object
                 parse_object(data, temp_obj, 0, current_md_index);
                 mxSetCell(output,iData,temp_obj);
                 current_md_index = data.next_sibling_index_object[current_data_index];
                 break;
             case TYPE_ARRAY:
                 current_data_index = data.d1[current_md_index];
-                mxSetCell(output, iData, parse_array(data,current_md_index));
+                mxSetCell(output, iData, 
+                        parse_array_with_options(data,current_md_index,options));
                 current_md_index = data.next_sibling_index_array[current_data_index];
                 break;
             case TYPE_KEY:

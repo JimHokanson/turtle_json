@@ -1,21 +1,17 @@
 function data = load(file_path,varargin)
 %x Load json data from disk ...
 %
+%   Calling Forms
+%   -----------------------------------------------------------------------
+%   1) data and token options as separate inputs
 %   s = json.load(file_path,*data_options,*token_options);
 %
-%   In this case 
+%   2) prop/value pairs as data options (see example)
 %   s = json.load(file_path,varargin)
-%
-%   Inputs
-%   ------
-%   file_path
-%   token_options : cell or empty
-%   data_options : cell or empty
-%
 %
 %
 %   Token Options
-%   --------------
+%   -----------------------------------------------------------------------
 %   For the most part these are only necessary to try and speed up parsing
 %   or to limit memory usage.
 %
@@ -51,8 +47,10 @@ function data = load(file_path,varargin)
 %               3, 6]
 %
 %   max_string_collape_depth : default -1
+%       Same as 'max_numeric_collapse_depth' but for strings. 
 %
 %   max_bool_collapse_depth : default -1
+%       Same as 'max_numeric_collapse_depth' but for logicals. 
 %
 %   column_major : default true
 %       If true, nd-arrays are read in column-major order,
