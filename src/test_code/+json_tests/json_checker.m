@@ -1,13 +1,17 @@
-function json_checker_tests()
+function json_checker
 %
-%   json.tests.json_checker_tests
+%   json_tests.json_checker();
+%
+%   http://www.json.org/JSON_checker/
 
-%http://www.json.org/JSON_checker/
-
-%TODO: Place in the actual error types ...
+temp_path = fileparts(which('json_tests.json_checker'));
+data_root = fullfile(temp_path,'data');
 
 t = cell(33,2);
+%This is apparently relaxed at a later point in time ...
 t(1,:) = {'"A JSON payload should be an object or array, not a string."',0};
+
+
 t(2,:) = {'["Unclosed array"',0};
 t(3,:) = {'{unquoted_key: "keys must be quoted"}',0};
 t(4,:) = {'["extra comma",]',0};
@@ -28,7 +32,11 @@ t(14,:) = {'{"Numbers cannot be hex": 0x14}',0};
 t(15,:) = {'["Illegal backslash escape: \x15"',0};
 t(16,:) = {'[\naked]',0};
 t(17,:) = {'["Illegal backslash escape: \017"]',0};
-t(18,:) = {'[[[[[[[[[[[[[[[[[[[["Too deep"]]]]]]]]]]]]]]]]]]]]',0};
+
+%Not really too deep ...
+t(18,:) = {'[[[[[[[[[[[[[[[[[[[["Too deep"]]]]]]]]]]]]]]]]]]]]',1};
+
+
 t(19,:) = {'{"Missing colon" null}',0};
 t(20,:) = {'{"Double colon":: null}',0};
 t(21,:) = {'{"Comma instead of colon", null}',0};
@@ -59,20 +67,18 @@ for iTest = 1:n_tests
     should_pass = t{iTest,2};
     passed = true;
     try
-        jt = json.stringToTokens(cur_test_string);
-        fprintf('Test %d passed as expected\n',iTest);
+        jt = json.parse(cur_test_string);
+        %fprintf('Test %d passed as expected\n',iTest);
     catch ME
         passed = false;
         if should_pass
             error_string = sprintf('Test #%d should have not thrown an error but did',iTest);
             error(error_string);
         end
-        fprintf('Test %d failed as expected with message:\n         %s\n',iTest,ME.message);
+        %fprintf('Test %d failed as expected with message:\n         %s\n',iTest,ME.message);
     end
     if passed && ~should_pass
         error_string = sprintf('Test #%d should have thrown an error but didn''t',iTest);
         error(error_string);
     end
-end
-
 end

@@ -39,6 +39,12 @@
 #define ARRAY_EMPTY_TYPE 9 //Array with no elements
 #define ARRAY_ND_EMPTY 10
 
+
+#define STRING_PARSE_NOT_DONE 0
+#define STRING_PARSE_DONE 1
+#define STRING_PARSE_INVALID_ESCAPE 2
+#define STRING_PARSE_INVALID_HEX 3
+
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;

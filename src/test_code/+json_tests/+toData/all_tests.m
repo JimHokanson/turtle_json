@@ -8,5 +8,6 @@ json_tests.toData.logical_array_tests();
 json_tests.toData.numeric_array_tests();
 
 
+json_tests.toData.functions.all_tests();
 
 end

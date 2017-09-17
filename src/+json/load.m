@@ -82,7 +82,11 @@ function data = load(file_path,varargin)
 %
 %   Examples
 %   --------
-%   data = json.load(file_path,'column_major',false);
+%   1) Mix of data processing and token options
+%   s = json.load(file_path,[],{'n_tokens',1000});
+%
+%   2) All data processing options
+%   data = json.load(file_path,'column_major',false,'collapse_objects',false);
 %
 %   See Also
 %   --------

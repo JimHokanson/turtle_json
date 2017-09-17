@@ -464,9 +464,20 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     //  3) Unicode escapes
     //
     
-    //Goal is to replace escape characters with their values
-    //i.e. go from:
-    //  "\n" => lookup 'n' and get the newline characters as the output
+    //Character Escapes
+    //---------------------------------------------------------------------
+    //Goal is to replace escape characters with their values.
+    //
+    //  When an escape is detected, then if the next character is:
+    //  1) '"' (ASCII 34), then the output is '"'
+    //  i.e. escape_values[34] => '"'
+    //  2) 'n' (ASCII 110), then the output is is '\n' (i.e. newline)
+    //  i.e. escape_values[110] => '\n'
+    //
+    //  Note that the input chars are 1 based (UTF-8/ASCII) and are not 
+    //  being used as indices (which you might expect to be zero based)
+    //
+    //  Default value is 0, which indicates an invalid escape
     const uint16_t escape_values[256] = {
         [34] = '"',
         [47] = '/',
@@ -477,6 +488,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         [114] = '\r',
         [116] = '\t'};
         
+    //Unicode escapes
+    //---------------------------------------------------------------------
     //Input character
     //Output, numerical value to add, unless invalid then -1
     //e.g. a => 10
@@ -567,7 +580,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         
         cur_index = -1;
         shrink_string = false;
-        parse_status = 0;
+        parse_status = STRING_PARSE_NOT_DONE;
         
         
         //This is where we put in the state machine
@@ -577,6 +590,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         
         //parse_status
         //---------------------------
+        //TODO: Make these constants
         //0 - not done
         //1 - done
         //2 - invalid escape char
@@ -585,14 +599,13 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         //TODO: This code would benefit from being broken up into functions ...
         
         while (!parse_status) {
-            
             if (*p == '"'){
-                parse_status = 1;
+                parse_status = STRING_PARSE_DONE;
             }else if(*p == '\\'){
                 ++p; //Move onto the next character that is escaped
-                
                 //TODO: Make this a function
                 //Process a unicode escape value e.g. \u00C8 => È
+                //---------------------------------------------------------
                 if (*p == 'u'){
                     shrink_string = true;
                     
@@ -604,7 +617,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                         //  (i.e. not 0-9,a-f, or A-F)
                         // Couldn't use 0, as 0 is a valid value
                         if (hex_numerical_value == -1){
-                            parse_status == 3;
+                            parse_status == STRING_PARSE_INVALID_HEX;
                             break;
                         }else{
                             unicode_char_value = (unicode_char_value << 4) + hex_numerical_value;
@@ -616,7 +629,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                     escape_char = escape_values[*p];
                     //Here 0 represents an in invalid
                     if(escape_char == 0){
-                        parse_status == 2;
+                        parse_status = STRING_PARSE_INVALID_ESCAPE;
                     }else{
                         shrink_string = true;
                         output_data[++cur_index] = escape_char;
@@ -636,7 +649,7 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
             
         } // End of while statement ...
         
-        if (parse_status == 1){
+        if (parse_status == STRING_PARSE_DONE){
             if (shrink_string){
                 mxSetN(mxGetCell(cell_array,i),cur_index+1);
             }
