@@ -31,7 +31,7 @@ The following information is visible in **mex.object_info**
 The following information is parsed in the initial pass through.
 
 * child_count_object - int32[] (length = # of objects)
-    * # of keys in the object
+    *  \# of keys in the object
 * next_sibling_index_object - int32[] (length = # of objects)
     * index into 'd1' of the token after the object closes
     * this can be used to navigate to the next token
@@ -45,10 +45,11 @@ The following information is parsed in the initial pass through.
 
 **The following information is parsed in post-processing.**
 
-* max_keys_in_object - int32[]
+* max\_keys\_in\_object - int32[]
     * The maximum # of keys present in any object
     * This is largely a temporary variable when needing to allocate key (field) names later on
 * unique_object_first_md_indices - int32[] (length = # of unique objects)
+    * The first object which has fieldnames of the given type
 * object_ids - int32[] (length = # of objects)
     * values specify which object the current object is like
     * e.g. object_ids[5] => 2, means that the fifth object (1 based) is the 3rd unique object type (0 based)
