@@ -141,37 +141,55 @@ void process_input_bytes(const mxArray *prhs[], unsigned char **json_string, siz
 }
 //=========================================================================
 //=========================================================================
+
+void throw_missing_file_error(const char *file_path, size_t file_path_string_length){
+    //
+    //  helper function for read_file_to_string()
+    char file_path_short[100];
+    
+    char buffer[256];
+    
+    if (file_path_string_length > 99){
+        memcpy(file_path_short,file_path,96);
+        file_path_short[96] = '.';
+        file_path_short[97] = '.';
+        file_path_short[98] = '.';
+        file_path_short[99] = '\0';
+    }else{
+        memcpy(file_path_short,file_path,file_path_string_length);
+    }
+    
+    sprintf(buffer,
+            "Unable to read file: \"%s\"\nIf input is really a string use "
+            "json.tokens.parse or json.parse instead",file_path_short);
+    throw_error_simple(0,"turtle_json:file_open",buffer);    
+}
+
 void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
+    //
+    //  This function reads the file to string and also adds the parsing buffer at the end.
+    //
     
 	FILE *file;
     char *file_path;
 	size_t file_length;
     size_t file_path_string_length;
-    
+        
     unsigned char *buffer;
 
     file_path = mxArrayToString(prhs[0]);
     
     //http://stackoverflow.com/questions/2575116/fopen-fopen-s-and-writing-to-files
-    #ifdef WIN32
-        errno_t err;
-        if( (err  = fopen_s( &file, file_path, "rb" )) !=0 ) {
-    #else
-        if ((file = fopen(file_path, "rb")) == NULL) {
-    #endif
-            
-            //error in reading occurred ...
-            file_path_string_length = mxGetNumberOfElements(prhs[0]);
-            //TODO: This could be improved for printing long file paths
-            if (file_path_string_length > 100){
-                file_path[96] = '.';
-                file_path[97] = '.';
-                file_path[98] = '.';
-              	file_path[99] = '\0';
-            }
-            mexErrMsgIdAndTxt("turtle_json:file_open",
-            	"Unable to open file: %s\nIf a string, consider using json.stringToTokens or json.parse instead",file_path);
-        }
+#ifdef WIN32
+    errno_t err;
+	if( (err  = fopen_s( &file, file_path, "rb" )) !=0 ) {
+#else
+	if ((file = fopen(file_path, "rb")) == NULL) {
+#endif
+        //error in reading occurred ...
+        file_path_string_length = mxGetNumberOfElements(prhs[0]);
+        throw_missing_file_error(file_path,file_path_string_length);
+    }
 	
 	//Get file length
 	fseek(file, 0, SEEK_END);
@@ -195,34 +213,33 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
     mxFree(file_path);
 }
         
-void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned char **json_string, size_t *string_byte_length, Options *options){
+void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], 
+        unsigned char **json_string, size_t *string_byte_length, Options *options){
     //
     //  The input JSON can be:
-    //  1) Path to a file
-    //  2) raw character string  
-    //  3) raw byte string
+    //  1) raw character string - Matlab char (UTF-16)
+    //  2) raw byte string (uint8 or int8 array)
+    //  3) Path to a file
     
     mxArray *mxArrayTemp;
     unsigned char *raw_string;
     unsigned char *json_string2;
-    int buffer_added = 0;
+    int buffer_added = 1;
     int is_input = 0;
     
-    //TODO: Get rid of this, and just do the checks below ...
-    //TODO: Actually, I think we do the checks in the input options handling ...
-    if (!(mxIsClass(prhs[0],"char") || options->has_raw_bytes)){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","First input needs to be a string or bytes");   
-    }
-    
     if (options->has_raw_string){
+        //Technically I think options checking covers this ...
      	if (!mxIsClass(prhs[0],"char")){
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","'raw_string' input needs to be a string");   
+            throw_error_simple(0,"turtle_json:invalid_input","'raw_string' input needs to be a string"); 
         }
         process_input_string(prhs,json_string,string_byte_length,&buffer_added);
     }else if (options->has_raw_bytes){
+        //Note here 'is_input' depends on whether or not the buffer was added
         process_input_bytes(prhs,json_string,string_byte_length,&buffer_added,&is_input);
     }else{
-        //file_path
+        if (!mxIsClass(prhs[0],"char")){
+            throw_error_simple(0,"turtle_json:invalid_input","'file_path' input needs to be a string"); 
+        }
         read_file_to_string(prhs,json_string,string_byte_length);
     }
     
@@ -231,9 +248,6 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned 
 	//Let's hold onto the string for the user. Technically it isn't needed
     //once we exit this function, since all information is contained in
     //the other variables.
-    //
-    //We subtract the length of the buffer so that the buffer is not 
-    //displayed to the user
     
     //http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
     if (is_input){
@@ -248,15 +262,23 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], unsigned 
 }
 
 void init_options(int nrhs, const mxArray* prhs[], Options *options){
+    //x Populate options structure based on optional inputs
     //
-    //  Option parsing
+    //  The parsing function is called with the following format:
+    //
+    //      turtle_json_mex(file_path__or__string,varargin)
+    //
     //  
+    //  The varargin represents property/value pairs
     //
-    //  Input format
-    //  ------------
-    //  mex(file_path__or__string,varargin)
     //
-    //  varargin => property value pairs
+    //  For example we might have:
+    //  
+    //      turtle_json_mex(file_path,'n_tokens',10)
+    //
+    //  This function populates the options structure based on these
+    //  optional inputs.
+    //
     //
     //  See Also
     //  --------
@@ -274,12 +296,12 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
     options->n_numbers = 0;
     options->chars_per_token = 0;
     
-    if (nrhs < 2){
-        return;
-    }
-    
     if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
         options->has_raw_bytes = true;
+    }
+    
+    if (nrhs < 2){
+        return;
     }
     
     //All optional inputs must come in pairs (property,value)
@@ -358,6 +380,16 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
     }  
 }
 
+void throw_error_simple(mxArray *plhs[], const char *error_source, const char *error_msg){
+    //TODO: If plhs is null, then don't do anything
+    
+     //TODO: Do the logging of the error message 
+     
+    mexErrMsgIdAndTxt(error_source, error_msg);
+
+}
+
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     //  This function is meant to be called by the json.tokens constructor
@@ -400,18 +432,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     
     size_t string_byte_length;
     unsigned char *json_string = NULL;
-    bool is_file_path = true;
 
-    Options options;
+    Options options = {.read_file_only = false};
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);
 
     //# of inputs check  --------------------------------------------------
     if (nrhs < 1){
-        mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
+        throw_error_simple(0,"turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
     }else if (!(nlhs == 1)){
-        mexErrMsgIdAndTxt("turtle_json:n_inputs","Invalid # of outputs, 1 expected");
+      	throw_error_simple(0,"turtle_json:n_inputs","Invalid # of outputs, 1 expected");
     }
     
     //Processing of inputs

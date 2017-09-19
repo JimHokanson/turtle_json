@@ -45,11 +45,17 @@ t(23,:) = {'["Bad value", truth]',0}; %TODO: Let's do trueasdsf
 t(24,:) = {'[''single quote'']',0};
 
 %Apparently you need to escape control characters?
-t(25,:) = {'["	tab	character	in	string	"]',0};
+%Perhaps we can make this optional ????
+t(25,:) = {'["	tab	character	in	string	"]',1};
 
 t(26,:) = {'["tab\   character\   in\  string\  "]',0};
-t(27,:) = {sprintf('["line\nbreak"]'),0};
-t(28,:) = {sprintf('["line\\\nbreak"]'),0};
+
+%Note the sprintf
+%Optional???
+t(27,:) = {sprintf('["line\nbreak"]'),1};
+
+%Optional???
+t(28,:) = {sprintf('["line\\\nbreak"]'),1};
 
 t(29,:) = {'[0e]',0};
 t(30,:) = {'[0e+]',0};

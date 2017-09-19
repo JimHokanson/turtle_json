@@ -26,38 +26,38 @@ There are two arrays that have elements for each token. The order of the entries
 
 ### Objects ###
 
-The following information is visible in ** mex.object_info **
+The following information is visible in **mex.object_info**
 
 The following information is parsed in the initial pass through.
 
-*child_count_object - int32[] (length = # of objects)
-..* # of keys in the object
-*next_sibling_index_object - int32[] (length = # of objects)
-..* index into 'd1' of the token after the object closes
-..* this can be used to navigate to the next token
-..* out of all the 'next' pointers is probably the least used
-*object_depths - uint8[]
-..* depth at which the object occurs. The top most level is 1 (0 based indexing) (0 is not used)
-..* TODO: I'm not sure why I hold onto this ...
-*n_objects_at_depth - int32[]
-..* The # of objects at each depth. 
-..* TODO: I'm not sure why I hold onto this ...
+* child_count_object - int32[] (length = # of objects)
+    * # of keys in the object
+* next_sibling_index_object - int32[] (length = # of objects)
+    * index into 'd1' of the token after the object closes
+    * this can be used to navigate to the next token
+    * out of all the 'next' pointers is probably the least used
+* object_depths - uint8[]
+    * depth at which the object occurs. The top most level is 1 (0 based indexing) (0 is not used)
+    * TODO: I'm not sure why I hold onto this ...
+* n_objects_at_depth - int32[]
+    * The # of objects at each depth. 
+    * TODO: I'm not sure why I hold onto this ...
 
-The following information is parsed in post-processing
+**The following information is parsed in post-processing.**
 
-*max_keys_in_object - int32[]
-..* The maximum # of keys present in any object
-..* This is largely a temporary variable when needing to allocate key (field) names later on
-*unique_object_first_md_indices - int32[] (length = # of unique objects)
-*object_ids - int32[] (length = # of objects)
-..* values specify which object the current object is like
-..* e.g. object_ids[5] => 2, means that the fifth object (1 based) is the 3rd unique object type (0 based)
-..* values are indices (0 based) into the 'objects' property
-*n_unique_objects - int32
-..* The # of unique objects, where being unique means a unique set of key names (not values)
-..* In the current implementation, order matters, so changing the key order would create more unique objects
-*objects - cell array of structures (length = # of unique objects)
-..* Each structure is of size [1 0] but contains the parsed (i.e. non UTF-8) fieldnames in that object
+* max_keys_in_object - int32[]
+    * The maximum # of keys present in any object
+    * This is largely a temporary variable when needing to allocate key (field) names later on
+* unique_object_first_md_indices - int32[] (length = # of unique objects)
+* object_ids - int32[] (length = # of objects)
+    * values specify which object the current object is like
+    * e.g. object_ids[5] => 2, means that the fifth object (1 based) is the 3rd unique object type (0 based)
+    * values are indices (0 based) into the 'objects' property
+* n_unique_objects - int32
+    * The # of unique objects, where being unique means a unique set of key names (not values)
+    * In the current implementation, order matters, so changing the key order would create more unique objects
+* objects - cell array of structures (length = # of unique objects)
+    * Each structure is of size [1 0] but contains the parsed (i.e. non UTF-8) fieldnames in that object. This makes it easy to initialize an object as we simply copy this base object and resize.
 
 ### Arrays ###
 
@@ -69,6 +69,20 @@ The following information is parsed in post-processing
 
 ### Logicals ###
 
+### Timing Info ###
+
+All reported timing values are in seconds.
+
+* elapsed_read_time - how long it took to read the file from disk
+* parsed_data_logging_time - ????
+* elapsed_parse_time - time to parse initial token locations
+* object_parsing_time - time to determine unique objects
+* array_parsing_time - time to identify array types (homogenous, non-homogenous, 1d arrays, nd arrays, etc.)
+* number_parsing_time - time to convert strings into numbers
+* string_memory_allocation_time - the amount of time required to allocate memory for all strings in the file
+* string_parsing_time
+* elapsed_pp_time
+* total_elapsed_time_mex
 
 Below is old and will be changed ...
 

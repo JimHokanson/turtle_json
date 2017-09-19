@@ -5,13 +5,11 @@ function data = parse(json_string,varargin)
 %
 %   data = json.parse(json_string,varargin);
 %
-%   Inputs
-%   ------
-%   json_string : uint8, int8, string
-%   token_options : cell or empty
-%       See json.load() for details
-%   data_options : cell or empty
-%       See json.load() for details
+%   data = json.parse(json_bytes,...);
+%
+%   This function is identical to json.load() except that it tells the
+%   parser that the input string is a JSON string and not a file path.
+%
 %
 %   Examples
 %   --------

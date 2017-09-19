@@ -49,6 +49,7 @@ typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;
    bool parse_strings;
+   bool read_file_only;
    int n_tokens;
    int n_strings;
    int n_keys;
@@ -121,6 +122,9 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
 //Main parsing
 //-------------------------------------------------------------------------
 void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options, mxArray *timing_info);
+
+//
+void throw_error_simple(mxArray *plhs[], const char *error_source, const char *error_msg);
 
 //Helpers
 //-------------------------------------------------------------------------

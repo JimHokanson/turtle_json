@@ -1,9 +1,7 @@
-classdef mex
+classdef json_parse_error
     %
     %   Class
-    %   json.mex
     %
-    %   NOT YET IMPLEMENTED
     
     properties
     end

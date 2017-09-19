@@ -178,7 +178,7 @@
            
 
   
-//================       Navigation       =================================  
+//========================       Navigation       =========================
 #define CURRENT_CHAR    *p
 #define CURRENT_POINTER p
 #define CURRENT_INDEX   p - js
@@ -313,6 +313,9 @@
     } else { \
         PROCESS_END_OF_ARRAY_VALUE; \
     }    
+    
+//======================    End of  Navigation       ======================
+    
     
 //=========================================================================
 //=========================================================================    
@@ -780,9 +783,7 @@ S_PARSE_FALSE_IN_ARRAY:
 S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
     if (!(CURRENT_CHAR == '\0')) {
-        mexPrintf("Current char: %d",CURRENT_CHAR);
-        mexErrMsgIdAndTxt("turtle_json:invalid_end", 
-                "non-whitespace characters found after end of root token close");
+        goto S_ERROR_BAD_ENDING;
     }
 	goto S_FINISH_GOOD;
 
@@ -790,6 +791,11 @@ S_PARSE_END_OF_FILE:
 //===============       ERRORS   ==========================================
 //=========================================================================
 //TODO: This is going to be redone 
+ 
+S_ERROR_BAD_ENDING:
+	mexPrintf("Current char: %d",CURRENT_CHAR);
+ 	mexErrMsgIdAndTxt("turtle_json:invalid_end", 
+                "non-whitespace characters found after end of root token close");   
   
 S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     // {"key": value, #ERROR
