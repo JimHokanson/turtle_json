@@ -5,9 +5,10 @@ function number_tests()
     json_tests.toTokens.number_tests
 %}
 
-%Column 1: json string
-%Column 2: error identifier or expected value
-%Column 3: Internal note as to what's happening
+%Column 1: reset test number
+%Column 2: json string
+%Column 3: error identifier or expected value
+%Column 4: Internal note as to what's happening
 
 
 fh2 = @json_tests.utils.runTest;
@@ -17,6 +18,9 @@ fh2(0,'[+1]','turtle_json:invalid_token','''+'' is not ok to lead a number','');
 fh2(0,'[1.]','turtle_json:no_fractional_numbers','''.'' needs to be followed by a numeric value','');
 fh2(0,'[1.3]','','',1.3);
 fh2(0,'[-1.3]','','',-1.3);
+
+%TODO: This needs to be an error
+fh2(0,'[1E]','','');
 
 % tests(1,:) = {['[12312312,1231,12,' ...
 %     '123123123123123123123123123123,123123]'],...

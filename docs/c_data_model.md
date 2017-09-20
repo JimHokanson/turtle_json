@@ -45,19 +45,19 @@ The following information is parsed in the initial pass through.
 
 **The following information is parsed in post-processing.**
 
-* max\_keys\_in\_object - int32[]
+* **max\_keys\_in\_object** - int32[]
     * The maximum # of keys present in any object
     * This is largely a temporary variable when needing to allocate key (field) names later on
-* unique_object_first_md_indices - int32[] (length = # of unique objects)
+* **unique\_object\_first\_md\_indices** - int32[] (length = # of unique objects)
     * The first object which has fieldnames of the given type
-* object_ids - int32[] (length = # of objects)
+* **object\_ids** - int32[] (length = # of objects)
     * values specify which object the current object is like
     * e.g. object_ids[5] => 2, means that the fifth object (1 based) is the 3rd unique object type (0 based)
     * values are indices (0 based) into the 'objects' property
-* n_unique_objects - int32
+* **n\_unique\_objects** - int32
     * The # of unique objects, where being unique means a unique set of key names (not values)
     * In the current implementation, order matters, so changing the key order would create more unique objects
-* objects - cell array of structures (length = # of unique objects)
+* **objects** - cell array of structures (length = # of unique objects)
     * Each structure is of size [1 0] but contains the parsed (i.e. non UTF-8) fieldnames in that object. This makes it easy to initialize an object as we simply copy this base object and resize.
 
 ### Arrays ###
@@ -74,66 +74,13 @@ The following information is parsed in the initial pass through.
 
 All reported timing values are in seconds.
 
-* elapsed_read_time - how long it took to read the file from disk
-* parsed_data_logging_time - ????
-* elapsed_parse_time - time to parse initial token locations
-* object_parsing_time - time to determine unique objects
-* array_parsing_time - time to identify array types (homogenous, non-homogenous, 1d arrays, nd arrays, etc.)
-* number_parsing_time - time to convert strings into numbers
-* string_memory_allocation_time - the amount of time required to allocate memory for all strings in the file
-* string_parsing_time
-* elapsed_pp_time
-* total_elapsed_time_mex
-
-Below is old and will be changed ...
-
-
-Data Type Specific
-------------------
-
-    --------  Key Related -------
-            keys : cellstr
-                Parsed key strings
-            key_p: array of unsigned char *
-                Pointer to the first character in the key string (not the 
-                opening double quotes)
-
-        TODO: These might change since the processing approach changed
-        ---------------------------
-        A better approach now might be to keep track of the # of characters
-        in the entry, since key_p is a sufficient pointer
-
-key_start_indices: array of int
-            Count of the # of key characters at the start of processing
-            this key. This is used for placing all keys into a singular
-            array.
-  key_end_indices: array of int
-            Count of the # of key characters (really bytes) after initial
-            processing of the key. This gets updated in post-processing
-            based on UTF8 processing (conversion to UTF16).
-    
-    -------- String Related -------
-        strings: cellstr
-            Parsed string values    
-       string_p: array of unsigned char *
-            Pointer to the first character in the key string (not the 
-            opening double quotes)
-
-TODO: See note in key section regarding these values. Since d2 is unused
-it could possibly store the length.
-string_end_indices:
-string_start_indices:
-
-    -------  Number Related  ------
-      numeric_p: 1) Initially a pointer to the start of a number to process
-                 2) Later this takes on the 
-
-General Meta Data
-----------------------
-          n_key_chars: total # of bytes in the JSON string that are part 
-            of keys (not including double quotes)
-       n_string_chars: same as 'n_key_chars' but for string values
-    n_key_allocations:
- n_string_allocations:
-n_numeric_allocations:
-
+* **elapsed\_read\_time** - how long it took to read the file from disk
+* **parsed\_data\_logging\_time** - ????
+* **elapsed\_parse\_time** - time to parse initial token locations
+* **object\_parsing\_time** - time to determine unique objects
+* **array\_parsing\_time** - time to identify array types (homogenous, non-homogenous, 1d arrays, nd arrays, etc.)
+* **number\_parsing\_time** - time to convert strings into numbers
+* **string\_memory\_allocation_time** - the amount of time required to allocate memory for all strings in the file
+* **string\_parsing\_time** - time required to convert strings from bytes (UTF-8) into Matlab strings (UTF-16)
+* **elapsed\_pp\_time** - total amount of time spent in post-processing (objects, arrays, numbers, strings)
+* **total\_elapsed\_time_mex** - total amount of time spent in the mex code

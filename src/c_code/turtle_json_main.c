@@ -392,7 +392,8 @@ STRING_SEEK:
     if (*(--p) == '\\'){
         //See documentation on the buffer we've added to the string
         if (*(--p) == 0){
-            mexErrMsgIdAndTxt("turtle_json:unterminated_string", "JSON string is not terminated with a double-quote character");
+            mexErrMsgIdAndTxt("turtle_json:unterminated_string", 
+                    "JSON string is not terminated with a double-quote character");
         }
         //At this point, we either have a true end of the string, or we've
         //escaped the escape character
