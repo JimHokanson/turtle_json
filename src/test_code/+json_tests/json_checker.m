@@ -4,11 +4,13 @@ function json_checker
 %
 %   http://www.json.org/JSON_checker/
 
+fprintf('Running json_tests.json_checker\n');
+
 temp_path = fileparts(which('json_tests.json_checker'));
 data_root = fullfile(temp_path,'data');
 
 t = cell(33,2);
-%This is apparently relaxed at a later point in time ...
+%This could be relaxed ... (would require changes to the parser)
 t(1,:) = {'"A JSON payload should be an object or array, not a string."',0};
 
 
@@ -25,8 +27,7 @@ t(11,:) = {'{"Illegal expression": 1 + 2}',0};
 t(12,:) = {'{"Illegal invocation": alert()}',0};
 
 %I need to look into this one ...
-t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',1}; %??????
-
+t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',1};
 
 t(14,:) = {'{"Numbers cannot be hex": 0x14}',0};
 t(15,:) = {'["Illegal backslash escape: \x15"',0};
@@ -35,7 +36,6 @@ t(17,:) = {'["Illegal backslash escape: \017"]',0};
 
 %Not really too deep ...
 t(18,:) = {'[[[[[[[[[[[[[[[[[[[["Too deep"]]]]]]]]]]]]]]]]]]]]',1};
-
 
 t(19,:) = {'{"Missing colon" null}',0};
 t(20,:) = {'{"Double colon":: null}',0};
@@ -51,11 +51,9 @@ t(25,:) = {'["	tab	character	in	string	"]',1};
 t(26,:) = {'["tab\   character\   in\  string\  "]',0};
 
 %Note the sprintf
-%Optional???
+%Eventually we could make a strict mode which checks for these strings
 t(27,:) = {sprintf('["line\nbreak"]'),1};
-
-%Optional???
-t(28,:) = {sprintf('["line\\\nbreak"]'),1};
+t(28,:) = {sprintf('["line\\\nbreak"]'),0};
 
 t(29,:) = {'[0e]',0};
 t(30,:) = {'[0e+]',0};
@@ -63,12 +61,19 @@ t(31,:) = {'[0e+-1]',0};
 t(32,:) = {'{"Comma instead if closing brace": true,',0};
 t(33,:) = {'["mismatch"}',0};
 
-%Onto the passing
-%TODO: Need to load from file
+fr = @(x)fileread(fullfile(data_root,x));
+t(34,:) = {fr('pass1.json'),1};
+
+%This doesn't look like it is being parsed correctly ...
+t(35,:) = {fr('pass2.json'),1};
+
+
+t(36,:) = {fr('pass3.json'),1};
 
 
 n_tests = size(t,1);
 for iTest = 1:n_tests
+    %fprintf('-------------- JSON checker test: %d\n',iTest);
     cur_test_string = t{iTest,1};
     should_pass = t{iTest,2};
     passed = true;
@@ -78,6 +83,7 @@ for iTest = 1:n_tests
     catch ME
         passed = false;
         if should_pass
+            ME
             error_string = sprintf('Test #%d should have not thrown an error but did',iTest);
             error(error_string);
         end
@@ -86,5 +92,9 @@ for iTest = 1:n_tests
     if passed && ~should_pass
         error_string = sprintf('Test #%d should have thrown an error but didn''t',iTest);
         error(error_string);
+    else
+        fprintf('#%d succeeded\n',iTest);
     end
+    %fprintf('Clearing result\n');
+    clear jt
 end

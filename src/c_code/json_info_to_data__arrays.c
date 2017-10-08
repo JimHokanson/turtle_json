@@ -278,7 +278,6 @@ mxArray* parse_1d_logical_array_row_major(int *d1, uint8_t *types,
     int md_index = array_md_index + 1;
     
     uint8_t *data = mxMalloc(array_size*sizeof(uint8_t));
-    
     for (int iElem = 0; iElem < array_size; iElem++){
         data[iElem] = types[md_index] == TYPE_TRUE;
         md_index++;
@@ -382,6 +381,8 @@ mxArray* parse_1d_string_array_row_major(int *d1, int array_size, int array_md_i
 mxArray* parse_nd_string_array_column_major(int *d1, mwSize *dims, 
         int *child_count_array, int array_md_index, uint8_t *array_depths, 
         int *next_sibling_index_array, mxArray *strings){
+    
+    //[["a","b"],["c","d"]]
 
     int array_data_index = d1[array_md_index];
     int array_depth = array_depths[array_data_index];
@@ -394,6 +395,8 @@ mxArray* parse_nd_string_array_column_major(int *d1, mwSize *dims,
     int first_string_data_index = d1[first_string_md_index];
     
     int n_strings = d1[last_string_md_index] - first_string_data_index + 1;
+    
+    //mexPrintf("n_strings: %d\n",n_strings);
     
     mxArray *output = mxCreateCellArray(array_depth,dims);
     int string_data_index = first_string_data_index;
@@ -436,15 +439,20 @@ mxArray *parse_array(Data data, int md_index){
     
     int cur_array_data_index = data.d1[md_index];
     mxArray *output;
-    
+        
     int temp_count;
     int temp_data_index;
     int temp_md_index;
-    int temp_array_depth;
-    mwSize *dims;
+    //int temp_array_depth;
+    //mwSize *dims;
     double *temp_value;
     
     mxArray *temp_obj;
+    
+//     mexPrintf("md_index: %d\n",md_index);
+//     mexPrintf("data_index: %d\n",cur_array_data_index);
+//     mexPrintf("Type: %d\n",data.array_types[cur_array_data_index]);
+    //return output;
     
     switch (data.array_types[cur_array_data_index]){
         case ARRAY_OTHER_TYPE:
@@ -606,7 +614,7 @@ mxArray *parse_array_with_options(Data data, int md_index,
                 output = mxCreateCellMatrix(1,temp_count);
 
                 temp_md_index = md_index + 1;
-                types = &(data.array_types[temp_md_index]);
+                types = &(data.types[temp_md_index]);
                 for (int iData = 0; iData < temp_count; iData++){
                     temp_obj = mxCreateLogicalScalar(*types == TYPE_TRUE);
                     mxSetCell(output,iData,temp_obj);

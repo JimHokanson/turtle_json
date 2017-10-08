@@ -2,6 +2,9 @@
 #include "json_info_to_data.h"
 
 //-------------------------------------------------------------------------
+
+mwSize *dims_file_scope[MAX_DEPTH_ARRAY_LENGTH_BYTES]; //= mxMalloc(MAX_DEPTH_ARRAY_LENGTH_BYTES);
+
 Data populate_data(const mxArray *s){
     
     Data data;
@@ -35,7 +38,7 @@ Data populate_data(const mxArray *s){
     //String Data --------------------------
     data.strings = get_mx_field_safe(s,"strings");
     
-    data.dims = mxMalloc(MAX_ARRAY_DIMS*sizeof(mwSize));
+    data.dims = dims_file_scope;
     
     //Numeric Data -------------------------
     data.numeric_data = (double *)mxGetData(mxGetField(s,0,"numeric_p"));
@@ -54,7 +57,7 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //  -----------------------
     //  struct mex_struct
     //  double md_index_1b
-    
+        
     if (nrhs != 3){
         mexErrMsgIdAndTxt("turtle_json:invalid_input",
                 "json_info_to_data.f0__full_parse requires 3 inputs");

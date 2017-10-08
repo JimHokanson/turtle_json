@@ -9,6 +9,7 @@
  */
 
 
+
 #define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
 #define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
   
@@ -34,7 +35,7 @@
 
 #define INITIALIZE_PARENT_INFO_OA(x) \
         ++current_depth; \
-        if (current_depth > 200){\
+        if (current_depth > MAX_DEPTH){\
             goto S_ERROR_DEPTH_EXCEEDED; \
         }\
         parent_types[current_depth] = x; \
@@ -45,7 +46,7 @@
 //key does not care about size, size = 1
 #define INITIALIZE_PARENT_INFO_KEY(x) \
         ++current_depth; \
-        if (current_depth > 200){\
+        if (current_depth > MAX_DEPTH){\
             goto S_ERROR_DEPTH_EXCEEDED; \
         }\
         parent_types[current_depth] = x; \
@@ -272,10 +273,9 @@
         ADVANCE_TO_NON_WHITESPACE_CHAR; \
         if (CURRENT_CHAR == '"') { \
             goto S_PARSE_KEY; \
-        } \
-        else { \
+        } else { \
             goto S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA; \
-        }INCREMENT_PARENT_SIZE
+        }
     
 #define PROCESS_END_OF_KEY_VALUE_COMPLEX \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
@@ -494,15 +494,15 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
         
     //---------------------------------------------------------------------
     //TODO: This should be made dynamic, with user capable modification
-    const int MAX_DEPTH = 20; //0 to N
-    int parent_types[21];
-    int parent_indices[21];
-    int parent_sizes[21];
-    int *n_arrays_at_depth = mxCalloc(21,sizeof(int));
-    int *n_objects_at_depth = mxCalloc(21,sizeof(int));
+    //This would require creating and holding onto a dims array
+    //for converting to data
+    int parent_types[MAX_DEPTH_ARRAY_LENGTH];
+    int parent_indices[MAX_DEPTH_ARRAY_LENGTH];
+    int parent_sizes[MAX_DEPTH_ARRAY_LENGTH];
+    int *n_arrays_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
+    int *n_objects_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
     int current_parent_data_index;
     int current_depth = 0;
-    
     //---------------------------------------------------------------------
     int current_logical_index = -1; 
     //---------------------------------------------------------------------
@@ -568,7 +568,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
 //=========================================================================    
 //        ================= Start of the parsing =================
 //=========================================================================
-            
+          
     //We decrement so that we can use the same advance to non-whisespace
     //code that we use everywhere else, where we assume that we've already
     //consumed the current character, even though we may not have
@@ -794,7 +794,7 @@ S_PARSE_END_OF_FILE:
 //TODO: This is going to be redone 
  
 S_ERROR_BAD_ENDING:
-	mexPrintf("Current char: %d",CURRENT_CHAR);
+	//mexPrintf("Current char: %d",CURRENT_CHAR);
  	mexErrMsgIdAndTxt("turtle_json:invalid_end", 
                 "non-whitespace characters found after end of root token close");   
   
@@ -803,9 +803,9 @@ S_ERROR_BAD_TOKEN_FOLLOWING_OBJECT_VALUE_COMMA:
     //  e.g.
     // {"key": value, 1
     //
-	// mexPrintf("Position %d\n",CURRENT_INDEX); \
+	// mexPrintf("Position %d\n",CURRENT_INDEX); 
 	mexErrMsgIdAndTxt("turtle_json:no_key", "Key or closing of object expected");
-    
+
 S_ERROR_DEPTH_EXCEEDED:
     mexErrMsgIdAndTxt("turtle_json:depth_exceeded", "Max depth was exceeded");
 
@@ -838,7 +838,7 @@ S_ERROR_TOKEN_AFTER_KEY:
 
 S_ERROR_END_OF_VALUE_IN_ARRAY:  
     //TODO: Print the character
-	mexPrintf("Current position: %d\n", CURRENT_INDEX);
+	//mexPrintf("Current position: %d\n", CURRENT_INDEX);
 	mexErrMsgIdAndTxt("turtle_json:invalid_token", "Token in array must be followed by a comma or a closing array ""]"" character ");    
 
 
@@ -887,7 +887,8 @@ S_FINISH_GOOD:
     setStructField(object_info,child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
     setStructField(object_info,next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
     setStructField(object_info,object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
-    setStructField(object_info,n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    //Note we don't track what's used, so we just pass in its size
+    setStructField(object_info,n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH_ARRAY_LENGTH);
     ADD_STRUCT_FIELD(object_info,object_info);
 
     TRUNCATE_ARRAY_DATA

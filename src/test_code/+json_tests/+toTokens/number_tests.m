@@ -10,6 +10,7 @@ function number_tests()
 %Column 3: error identifier or expected value
 %Column 4: Internal note as to what's happening
 
+fprintf('Running toTokens.numeric_tests()\n')
 
 fh2 = @json_tests.utils.runTest;
 fh2(1,'[1]','','single number in array',1);

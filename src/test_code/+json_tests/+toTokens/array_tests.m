@@ -6,16 +6,17 @@ function array_tests()
     json_tests.toTokens.array_tests
 %}
 
-
+fprintf('Running json_tests.toTokens.array_tests \n')
 fh2 = @json_tests.utils.runTest;
 encode = @json_tests.utils.encodeJSON;
 
 %Generic tests
 %--------------------------------------------------------------------------
-fh2(1,'[1,2,3]','','numeric array test',1:3);
+fh2(1,'[1,2,3]','','numeric array test',(1:3)');
 fh2(0,'[1,2,]','turtle_json:invalid_token','trailing comma');
 fh2(0,'[1,,2,3]','turtle_json:invalid_token','comma with no value');
-fh2(0,'[]','turtle_json:invalid_token','comma with no value');
+fh2(0,'[,]','turtle_json:invalid_token','comma with no value');
+fh2(0,[repmat('[',1,300) '1' repmat(']',1,300)],'turtle_json:depth_exceeded','array that is too deep for the parser');
 
 %Numeric Arrays
 %--------------------------------------------------------------------------

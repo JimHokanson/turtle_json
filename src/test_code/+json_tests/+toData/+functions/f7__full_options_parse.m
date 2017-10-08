@@ -4,6 +4,8 @@ function f7__full_options_parse()
 
 missed_error = @ ()error('turtle_json:f7__full_options_parse','error not thrown as expected');
 
+fprintf('Running "toData.functions.f7__full_options_parse" tests\n');
+
 %Invalid option testing
 %-----------------------------------------------------------------------
 %value should be Numeric not boolean ...

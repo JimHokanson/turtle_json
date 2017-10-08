@@ -13,6 +13,8 @@ function string_tests()
 %   3) notes on reason for error or thing being tested
 %   4) expected answer
 
+fprintf('Running toTokens.string_tests()\n')
+
 fh = @(x) char(org.apache.commons.lang.StringEscapeUtils.unescapeJava(x));
 
 fh2 = @json_tests.utils.runTest;
