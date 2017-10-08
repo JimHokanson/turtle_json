@@ -131,8 +131,8 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     uint8_t first_child_array_type = array_types[child_data_index];
     
     //0 indicates that the child array does not hold homogenous data
-    //TODO: Do we want to allow nd arrays for objects?
-    //TODO: We should only allow ND_NUMERIC, ND_STRING, ND_LOGICAL, numeric, string, and logical
+    //
+    //If the child is not-homogenous, then the parent can't be either
     if (first_child_array_type == 0){
         return;
     }

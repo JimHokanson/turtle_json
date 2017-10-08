@@ -286,16 +286,6 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
     
     mxArray *mxArrayTemp;
     
-    //Initialization of defaults
-    //--------------------------
-    options->has_raw_string = false;
-    options->has_raw_bytes = false;
-    options->n_tokens = 0;
-    options->n_keys = 0;
-    options->n_strings = 0;
-    options->n_numbers = 0;
-    options->chars_per_token = 0;
-    
     if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
         options->has_raw_bytes = true;
     }
@@ -433,7 +423,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     size_t string_byte_length;
     unsigned char *json_string = NULL;
 
-    Options options = {.read_file_only = false};
+    Options options;
     
     plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
     mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);

@@ -256,6 +256,8 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
             unique_object_first_md_indices = mxRealloc(unique_object_first_md_indices,n_unique_allocated*sizeof(int));
         }
         unique_object_first_md_indices[cur_object_id] = cur_object_md_index; 
+
+        
         //-----------------------------------------------------------------
         
         //Store key information for comparison to other objects ...
@@ -285,6 +287,8 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
             
             if (n_keys_current_object == child_count_object[cur_object_data_index]){
                 
+                //It might be better to combine these two loops
+                
                 //Here we check if the keys are the same length
                 //---------------------------------------------------------
                 cur_key_data_index = RETRIEVE_DATA_INDEX((cur_object_md_index + 1));
@@ -302,7 +306,11 @@ void populate_object_flags(unsigned char *js,mxArray *plhs[]){
                 if (!diff_object){
                     cur_key_data_index = RETRIEVE_DATA_INDEX((cur_object_md_index + 1));
                     for (int iKey = 0; iKey < n_keys_current_object; iKey ++){
-                        if (!same_keys(object_key_pointers[iKey],key_p[cur_key_data_index],object_key_sizes[iKey])){
+                        
+                        //TODO: SIMD might be better here 
+                        if (memcmp(object_key_pointers[iKey],
+                                key_p[cur_key_data_index],object_key_sizes[iKey])){
+                       //%if (!same_keys(object_key_pointers[iKey],key_p[cur_key_data_index],object_key_sizes[iKey])){
                             diff_object = true;
                             break;
                         };

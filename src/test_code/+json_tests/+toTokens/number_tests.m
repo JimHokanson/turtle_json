@@ -18,15 +18,7 @@ fh2(0,'[+1]','turtle_json:invalid_token','''+'' is not ok to lead a number','');
 fh2(0,'[1.]','turtle_json:no_fractional_numbers','''.'' needs to be followed by a numeric value','');
 fh2(0,'[1.3]','','',1.3);
 fh2(0,'[-1.3]','','',-1.3);
-
-%TODO: This needs to be an error
-fh2(0,'[1E]','','');
-
-% tests(1,:) = {['[12312312,1231,12,' ...
-%     '123123123123123123123123123123,123123]'],...
-%     'turtle_json:integer_component_too_large','Too many digits in the number'};
-% tests(end+1,:) = {'[1.]','turtle_json:no_fractional_numbers','Number with a period had no fractional numbers that followed'};
-% tests(end+1,:) = {'[+1]','turtle_json:invalid_token','Can''t lead with a positive'};
+fh2(0,'[1E]','turtle_json:no_exponent_numbers','exponent "e" or "E" not followed by digits');
 
 
 % tests(3,:) = {'[1.3]',1.3,''};
