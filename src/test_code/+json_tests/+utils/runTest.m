@@ -6,7 +6,7 @@ function [output_test_number,root,data] = runTest(reset_test_number,cur_test_str
 %
 %   ... = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, post_test, post_test_error_msg)
 %
-%   ... = TODO: might provide file testing option ...
+%   ... = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, parse_options)
 %
 %   Inputs
 %   ------
@@ -25,7 +25,16 @@ function [output_test_number,root,data] = runTest(reset_test_number,cur_test_str
 %   post_test_error_msg: string
 %       The error message that should be displayed if the post_test fails.
 
+
+
 persistent test_number
+
+    if exist('post_test','var')
+        parse_options = post_test;
+        clear post_test;
+    else
+        parse_options = {};
+    end
 
     if reset_test_number
         test_number = 1;
@@ -39,7 +48,7 @@ persistent test_number
 
     try
         root = json.tokens.parse(cur_test_string);
-        data = root.getParsedData();
+        data = root.getParsedData(parse_options{:});
         s.root = root;
         s.data = data;
         passed = true;

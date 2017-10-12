@@ -1,9 +1,16 @@
 #include "turtle_json.h"
 #include "json_info_to_data.h"
 
-mxArray* permuteArray(mxArray* temp_array){
+mxArray* permuteArray(mxArray* temp_array, int n_dimensions){
     
-    int n_dimensions = mxGetNumberOfDimensions(temp_array);
+    //Ideally this would be avoided since it is only called to change from
+    //column-major to row-major ordering
+    
+    //Note, we pass in the # of dimensions since mxGetNumberOfDimensions
+    //truncates all trailing 1d dimensions, i.e. so if we have an array
+    //of size [3,1,1,1] it would get permuted to [1,3] and not [1,1,1,3]
+    
+    //int n_dimensions = mxGetNumberOfDimensions(temp_array);
     
     mxArray* second_dims = mxCreateNumericMatrix(1,n_dimensions,mxDOUBLE_CLASS,0);
     double* output_array_dims = mxGetData(second_dims);
@@ -20,15 +27,20 @@ mxArray* permuteArray(mxArray* temp_array){
         output_array_dims[i] = n_dimensions - i;
     }
     
+    //B = permute(A,ORDER)
+    //int mexCallMATLAB(int nlhs, mxArray *plhs[], int nrhs, mxArray *prhs[], const char *functionName);   
+    //
+    //  plhs    = output
+    //  prhs[0] = input_array;
+    //  prhs[1] = order
+    
     mxArray* plhs;
     mxArray* prhs[2];
     prhs[0] = temp_array;
     prhs[1] = second_dims;
             
     mexCallMATLAB(1,&plhs, 2, prhs, "permute");
-    //int mexCallMATLAB(int nlhs, mxArray *plhs[], int nrhs,
-    //    mxArray *prhs[], const char *functionName);   
-    
+
     return plhs;
 }
 
@@ -173,7 +185,10 @@ mxArray* parse_nd_numeric_array_row_major(int *d1, mwSize *dims,
             dims, child_count_array, numeric_data, array_md_index, 
             array_depths, next_sibling_index_array);
     
-    return permuteArray(temp_array);
+    int array_data_index = d1[array_md_index];
+    int array_depth = array_depths[array_data_index];
+    
+    return permuteArray(temp_array, array_depth);
     
    
 }
@@ -349,8 +364,11 @@ mxArray* parse_nd_logical_array_row_major(int *d1, uint8_t *types, mwSize *dims,
             dims, child_count_array, array_md_index, array_depths, 
             next_sibling_index_array);
     
-    return permuteArray(temp_array);
-      
+    
+    int array_data_index = d1[array_md_index];
+    int array_depth = array_depths[array_data_index];
+    
+    return permuteArray(temp_array, array_depth);
 }
 
 
@@ -411,12 +429,21 @@ mxArray* parse_nd_string_array_row_major(int *d1, mwSize *dims,
         int *child_count_array, int array_md_index, uint8_t *array_depths, 
         int *next_sibling_index_array, mxArray *strings){
     
+    //This doesn't work if we lose dimensions due to collapsing
+    //i.e. if we have the following as column major for size
+    //[9,1,1,1]
+    //In Matlab once created we only have [9,1] 
+    //Which then gets permuted to be [1,9]
+    
     mxArray* temp_array = parse_nd_string_array_column_major(d1, dims, 
         child_count_array, array_md_index, array_depths, 
         next_sibling_index_array, strings);
+   
     
-    return permuteArray(temp_array);
+    int array_data_index = d1[array_md_index];
+    int array_depth = array_depths[array_data_index];
     
+    return permuteArray(temp_array, array_depth);
 }
 
 //=========================================================================
