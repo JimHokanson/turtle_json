@@ -131,7 +131,16 @@ classdef dict < handle
                 catch
                     %TODO: Might want to look for s1.subs being a method
                     %see commented out code above
-                    varargout{1} = builtin('subsref', obj, subStruct);
+                    try
+                        varargout{1} = builtin('subsref', obj, subStruct);
+                    catch ME
+                        %Ran into with w.data(1).plotWorm
+                        if strcmp(ME.identifier,'MATLAB:maxlhs')
+                            builtin('subsref', obj, subStruct);
+                        else
+                            rethrow(ME)
+                        end
+                    end
                     return
                 end
                 %TODO: Can we avoid the check on prop_lookup_failed by 
