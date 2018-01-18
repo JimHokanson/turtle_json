@@ -414,6 +414,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 //         "types", "d1","child_count_object","next_sibling_index_object",
 //         "object_depths","n_objects_at_depth","object_ids","object_indices"}
     
+    
+    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
+    
     TIC(start_mex);
     
     //TODO: Detect the supported features of the processor
@@ -423,9 +427,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     size_t string_byte_length;
     unsigned char *json_string = NULL;
 
-    Options options;
-    
-    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    Options options = {};
+
     mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);
 
     //# of inputs check  --------------------------------------------------

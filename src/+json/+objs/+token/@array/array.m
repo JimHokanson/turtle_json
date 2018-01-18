@@ -41,6 +41,7 @@ classdef array < json.objs.token
         array_depth
         array_type
         array_type_string
+        dimensions
     end
     
     methods
@@ -60,7 +61,7 @@ classdef array < json.objs.token
                lp = obj.mex;
                array_data_index = lp.d1(obj.md_index)+1;
                array_info = lp.array_info;
-               value = array_info.array_depths(array_data_index);
+               value = double(array_info.array_depths(array_data_index));
                obj.p__array_depth = value;
            end  
         end
@@ -77,12 +78,24 @@ classdef array < json.objs.token
         function value = get.array_type_string(obj)
            value = obj.all_type_strings{obj.array_type+1};
         end
+        function value = get.dimensions(obj)
+            value = obj.p__dimensions;
+            if isempty(value)
+               lp = obj.mex;
+               array_data_index = lp.d1(obj.md_index)+1;
+               array_info = lp.array_info;
+               cur_depth = double(array_info.array_depths(array_data_index));
+               obj.p__dimensions = array_info.child_count_array(array_data_index:array_data_index+cur_depth-1);
+               value = obj.p__dimensions;
+            end
+        end
     end
     
     properties (Hidden)
        p__n_elements
        p__array_depth
        p__array_type
+       p__dimensions
     end
     
     methods

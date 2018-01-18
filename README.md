@@ -29,7 +29,7 @@ TODO: Provide a link to the standard JSON tests and show which ones pass and whi
 # Status
 
 * Parser design is stable.
-* Needs more unit tests (in progress).
+* Tests are in place although more could be added to get better coverage (help on this is always appreciated!)
 * Lots of small issues, although nothing critical.
 
 # Usage

@@ -168,7 +168,8 @@ void string_to_double_v3(double *value_p, char *p, int i, int *error_p, int *err
                 exponent_value = 10*exponent_value + (double)((*p) - '0');
                 ++p;
             }else{
-                ++p;
+             	*error_p = i+1;
+                *error_value = NO_EXPONENT_ERROR;
             }
         }else if (isdigit(*p)){
             negate = false;
@@ -179,7 +180,8 @@ void string_to_double_v3(double *value_p, char *p, int i, int *error_p, int *err
                 exponent_value = 10*exponent_value + (double)((*p) - '0');
                 ++p;
             }else{
-                ++p;
+                *error_p = i+1;
+                *error_value = NO_EXPONENT_ERROR;
             }
         }else{
             *error_p = i+1;

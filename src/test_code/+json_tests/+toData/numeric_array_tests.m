@@ -13,6 +13,8 @@ encode = @json_tests.utils.encodeJSON;
 %When our writer changes, this will essentially do nothing.
 p = @json_tests.utils.permuter;
 
+fprintf('json_tests.toData.numeric_array_tests\n');
+
 data = [];
 fh2(1,encode(data),'','1d numeric array testing',p(data));
 %-----------------

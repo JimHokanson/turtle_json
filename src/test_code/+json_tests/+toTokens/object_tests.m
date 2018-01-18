@@ -6,6 +6,7 @@ function object_tests()
     json_tests.toTokens.object_tests
 %}
 
+fprintf('Running toTokens.object_tests()\n')
 
 fh2 = @json_tests.utils.runTest;
 encode = @json_tests.utils.encodeJSON;

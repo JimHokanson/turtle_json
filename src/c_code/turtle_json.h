@@ -10,6 +10,12 @@
 #include <omp.h>        //openmp
 #include "turtle_json_memory.h"
 
+//Note these must be related ...
+//I'm not sure how to make this happen automatically ...
+#define MAX_DEPTH_ARRAY_LENGTH 21
+#define MAX_DEPTH_ARRAY_LENGTH_BYTES 168
+#define MAX_DEPTH 20
+
 //AVX
 //#include "immintrin.h"
 

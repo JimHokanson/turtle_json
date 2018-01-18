@@ -403,35 +403,68 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                 case TYPE_STRING:
                 case TYPE_NUMBER:
                 case TYPE_NULL:
-                case TYPE_TRUE:
-                case TYPE_FALSE:
                     //Here we are checking for a 1d array
                     //
-                    //  Passing the first test
-                    //  ---------------------------------------------------
-                    //  Note, d1 increments for any token, so we can
-                    //  only have non-child entries (or childless objects/arrays)
-                    //  in order to satisfy the first test.
+                    //  n_children - # of elements in the array (of any type)
+                    //  d1 - increments for any token and points to 
+                    //  another indexthat increments based on type
                     //
-                    //  e.g. [1,2,3,[4],5,6] will be false, because
-                    //  the [4] contains 2 tokens, [] and 4
-                    //  assuming 1 is the first number, we get:
+                    //  Consider:
+                    //  -------------------------
+                    //  [3,4,5,[6],7,8]
+                    //  - n_children = 6
+                    //  - n_tokens = 7  (3,4,5,[],6,7,8)
+                    //  - [  d1[x+0] => current array, let's say 10
+                    //  - 3  d1[x+1] => current # count, let's say 1
+                    //  - 4  d1[x+2] => 1 + 1 => 2 (since d1[1] is 1
+                    //  - 5  d1[x+3] => 3
+                    //  - [  d1[x+4] => 10 + 1 => 11 (since array type and d1[0] = 10
+                    //  - 6  d1[x+5] => 4 (back to numbers type, last one was 3)
+                    //  - 7  d1[x+6] => 5 (4 + 1)
+                    //  - 8  d1[x+7] => 6 (note, this is the last element in the array)
                     //
-                    //  d1[cur_process_index+1] => 0 (value 1)
-                    //  d1[cur_process_index+n_children] => 4 (value 5)
-                    //  n_children = 6, != (4 - 0 + 1)
                     //
-                    //  e.g. [1,2,3,[],4,5]
-                    //  Unlike the last example, we now point to the last
-                    //  entry in the array (since we don't have children)
-                    //  but our index has only incremented 5 times, and the
-                    //  array has 6 entries, so the test will fail
+                    //  d1[cur_process_index+n_children] => 5
+                    //  d1[cur_process_index+1] => 1
+                    //  n_children != (5 - 1 + 1)  => since array is present
                     //
-                    //  Now however, we could get unlucky and have some 
-                    //  other type that also happens to be 
-                    //  
+                    //  [4,5,6]
+                    //  - n_children = 3
+                    //  - n_tokens = 3
+                    //  - [   d1[x+0] => let's say 25
+                    //  - 4   d1[x+1] => let's say 32
+                    //  - 5   d1[x+2] => 33 (32 + 1)
+                    //  - 6   d1[x+3] => 34
+                    //  d1[cur_process_index+n_children] => 34
+                    //  d1[cur_process_index+1] => 32
+                    //  n_children == (34 - 32 + 1) => thus 1d numeric array
+                    //
+                    //  [6,7,[],8]
+                    //  - n_children = 4
+                    //  - n_tokens = 4
+                    //  - [   d1[x+0] => let's say 105
+                    //  - 6   d1[x+1] => let's say 53
+                    //  - 7   d1[x+2] => 54
+                    //  - [   d1[x+3] => 106
+                    //  - 8   d1[x+4] => 55
+                    //  d1[cur_process_index+n_children] => 55
+                    //  d1[cur_process_index+1] => 53
+                    //  n_children != (55 - 53 + 1)
+                    
+                    //TODO: We might want to reorder to have micro-speedup
                     if (n_children == (d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1) && \
                             types[cur_process_index+1] == types[cur_process_index+n_children]){
+                        //homogeneous, assign to appropriate type
+                        array_types[cur_array_index] = array_type_map1[types[cur_process_index+1]];
+                    }
+                    array_depths[cur_array_index] = 1;
+                    break;
+                case TYPE_TRUE:
+                case TYPE_FALSE:
+                    if (n_children == (d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1) && \
+                            types[cur_process_index+1] >= TYPE_TRUE && \
+                            types[cur_process_index+n_children] >= TYPE_TRUE){
+                        //homogeneous, assign to appropriate type
                         array_types[cur_array_index] = array_type_map1[types[cur_process_index+1]];
                     }
                     array_depths[cur_array_index] = 1;
@@ -626,9 +659,12 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                     
                     output_data[++cur_index] = unicode_char_value;
                 }else{
+                    //mexPrintf("escape3 %c\n",*p);
                     escape_char = escape_values[*p];
                     //Here 0 represents an in invalid
+                    //mexPrintf("escape %c\n",escape_char);
                     if(escape_char == 0){
+                        //mexPrintf("escape2 %c\n",escape_char);
                         parse_status = STRING_PARSE_INVALID_ESCAPE;
                     }else{
                         shrink_string = true;
@@ -637,8 +673,9 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
                 }
             }else if(*p > 127){
                 shrink_string = true;
-                
+                //mexPrintf("diff3 %d\n",p-js);
                 output_data[++cur_index] = parse_utf8_char(&p,p,&parse_status);
+                //mexPrintf("diff4 %d\n",p-js);
  
             //Just a regular old character to store    
             }else{
@@ -665,8 +702,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
 // //                     break;
 // //             }
             //TODO: This needs to be flushed out with parse_status values
-            mexPrintf("diff %d\n",p-js);
-            mexPrintf("error parse status: %d\n",parse_status);
+            //mexPrintf("diff %d\n",p-js);
+            //mexPrintf("error parse status: %d\n",parse_status);
             mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
             //We have an error 
         }
@@ -788,7 +825,7 @@ uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status
         *parse_status = 13;
         return ERROR_UTF_CHAR;
     }else{
-        mexPrintf("first byte: %d\n",*p);
+        //mexPrintf("first byte: %d\n",*p);
         //invalid first byte
         *parse_status = 10;
         return ERROR_UTF_CHAR;

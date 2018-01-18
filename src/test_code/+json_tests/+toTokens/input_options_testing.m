@@ -6,6 +6,8 @@ function input_options_testing()
     json_tests.toTokens.input_options_testing
 %}
 
+fprintf('Running toTokens.input_options_testing()\n');
+
 fh2 = @json_tests.utils.runTest;
 encode = @json_tests.utils.encodeJSON;
 

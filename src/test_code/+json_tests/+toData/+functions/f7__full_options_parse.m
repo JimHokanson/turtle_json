@@ -2,7 +2,18 @@ function f7__full_options_parse()
 %
 %   json_tests.toData.functions.f7__full_options_parse
 
+
+%Options
+%-------------------
+%   max_numeric_collapse_depth: default -1
+%   max_string_collape_depth : default -1
+%   max_bool_collapse_depth : default -1
+%   column_major : default true
+%   collapse_objects : default true
+
 missed_error = @ ()error('turtle_json:f7__full_options_parse','error not thrown as expected');
+
+fprintf('Running "toData.functions.f7__full_options_parse" tests\n');
 
 %Invalid option testing
 %-----------------------------------------------------------------------

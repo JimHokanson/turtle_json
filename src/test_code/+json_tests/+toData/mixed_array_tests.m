@@ -9,11 +9,14 @@ function mixed_array_tests()
 fh2 = @json_tests.utils.runTest;
 encode = @json_tests.utils.encodeJSON;
 
-%[output_test_number,root,data] = runTest(reset_test_number,cur_test_string,error_id,memo,expected_value, post_test, post_test_error_msg)
+%runTest(reset_test_number,cur_test_string,error_id, memo, expected_value, post_test, post_test_error_msg)
 
 %Tests to nd-array
 %-------------------------------------------------------
-fh2(1,'[1,2,3,[],4,5]','','array in an array','',@h__keyboard,'asdfasdfsdf');
+%fh2(1,'[1,2,3,[],4,5]','','array in an array','',@h__keyboard,'asdfasdfsdf');
+fh2(1,'[1,2,3,[],4,5]','','array in an array',{1,2,3,[],4,5});
+fh2(0,'[1,2,3,[4],5,6]','','array in an array',{1,2,3,4,5,6});
+
 
 
 %Old code, needs to be incorporated
@@ -43,7 +46,7 @@ end
 
 end
 
-function h__keyboard()
+function passed = h__keyboard(s)
 
 keyboard
 
