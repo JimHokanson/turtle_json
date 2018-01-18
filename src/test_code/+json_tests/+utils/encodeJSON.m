@@ -1,4 +1,4 @@
-function string = tjSave(data)
+function string = encodeJSON(data)
 
 %This points to the current save function. I haven't yet written a saver
 %so we'll use something else.
@@ -12,11 +12,8 @@ function string = tjSave(data)
 %json_encode(data)
 
 %https://www.mathworks.com/matlabcentral/fileexchange/52244-thingspeak-support-toolbox/
-if ismac
-    string = mexEncodeJSON_15a(data);
-else
-    string = mexEncodeJSON(data);
-end
+
+string = jsonencode(data);
 
 
 end

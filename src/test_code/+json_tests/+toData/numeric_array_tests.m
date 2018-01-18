@@ -31,6 +31,20 @@ fh2(0,encode(data),'','3d numeric array with scalar middle',p(data));
 data = {1:5 2:6 1:5 2:3};
 data2 = cellfun(p,data,'un',0);
 fh2(0,encode(data),'','cell of numbers',data2);
+%--------------------------------------------------------------
+for i = 0:9
+    for j = 1:2
+        if j == 1
+            sign = 1;
+        else
+            sign = -1;
+        end
+        x = sign*i;
+        %Not sure why jsonencode isn't creating an array only
+        %converting the # to string, so adding an array
+        fh2(0,encode([x 1]),'','Testing all leading numbers',[x; 1]);
+    end
+end
 %-----------------
 
 %JSON writers
