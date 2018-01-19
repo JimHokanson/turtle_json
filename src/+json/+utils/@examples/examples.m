@@ -46,6 +46,23 @@ classdef examples
                 file_name = json.utils.examples.FILE_LIST{file_name_or_index};
             end
             file_path = fullfile(root_path,file_name);
+            if ~exist(file_path,'file')
+                %1) - file not downloadded
+                %2) - partial file name given ...
+                if ischar(file_name_or_index)
+                    d = dir(fullfile(root_path,['*' file_name '*']));
+                    if isempty(d)
+                        error('file missing')
+                    elseif length(d) == 1
+                        file_path = fullfile(root_path,d.name);
+                    else
+                        error('Multiple files found for: %s',file_name)
+                    end
+                else
+                    %TODO: provide more info
+                    error('File missing')
+                end
+            end
         end
         function bin_path = getExamplesRoot()
             %
