@@ -1,8 +1,12 @@
 # Data Model
 
-Following is a description of the internal data model used during parsing.
+Following is a description of the internal data model used during parsing. This document is useful if:
+
+1. You want to understand what I'm doing in the C code
+2. You want to write your own code that works on the initial tokenized data.
 
 Tokens include:
+
     * Object  {
     * Array   [
     * Key     :
@@ -14,14 +18,17 @@ Tokens include:
 
 
 ## Things that exist for every token ##
+
 There are two arrays that have elements for each token. The order of the entries is in the order in which they are encountered. Thus the first value corresponds to the first token. This order is often used to navigate between elements, particularly for arrays.
 
 * types: [uint8]
-  * types include object, array, key, string, etc. (see turtle_json.h)
+  * types include object, array, key, string, etc. 
+  * Values are defined in turtle_json.h => e.g. 4 is the string type
 * d1: [int32]
-  * indices (0 based) of data indices (see next section)
-  * in code, I've tried to refer to this as the **md_index (main data index)**
-  * Since the indices are incremental, this can serve as an indicator of the # of values between two different locations, e.g. if the 100th index has a value of 30 and 105th index has a value of 35 (and is of the same type -> e.g. types[100] == types[105]), then we know that types[101:104] == types[100] as well)
+  * Indices (0 based) into type based indices. For example, a value of 2 means we've encountered our 3rd string at this location, and this entry corresponds with any other arrays that describe string data (where length equals # of strings or more generically, # of elements of type)
+  * Unique index counts are for objects, arrays, keys, strings, numbers and nulls (1 group), and true and false (1 group)
+  * In code, I've tried to refer to this as the **md_index (main data index)**
+  * Since the values (indices) are incremental (by type), this can serve as an indicator of the # of values between two different locations, e.g. if d1[100] == 30 and d1[105] == 35, and types[100] == types[105], then types[101:104] == types[100] and d1[101] == 31, and d1[102] == 32, etc.
 
 ## Data Type Specific Information ##
 
