@@ -6,7 +6,7 @@ function data = load(file_path,varargin)
 %   1) data and token options as separate inputs
 %   s = json.load(file_path,*data_options,*token_options);
 %
-%   2) prop/value pairs as data options (see example)
+%   2) prop/value pairs as data options (see example) - no token options
 %   s = json.load(file_path,varargin)
 %
 %
@@ -83,9 +83,9 @@ function data = load(file_path,varargin)
 %   Examples
 %   --------
 %   1) Mix of data processing and token options
-%   s = json.load(file_path,[],{'n_tokens',1000});
+%   s = json.load(file_path,{'column_major',false},{'n_tokens',1000});
 %
-%   2) All data processing options
+%   2) All data processing options - no token options
 %   data = json.load(file_path,'column_major',false,'collapse_objects',false);
 %
 %   See Also
@@ -111,18 +111,32 @@ if nargin > 1
     end 
 end
 
-%Retrieve tokens
-root = json.tokens.load(file_path,token_options{:});
-
-%root is either:
-%   json.objs.token.array
-%   json.objs.token.object
-%
-%which are both a subclass of:
-%   json.objs.token
+mex_result = turtle_json_mex(file_path,token_options{:});
 
 %Parse the resulting data
-data = root.getParsedData(data_options{:});
+%Taken from json.objs.token.getParsedData - TODO: Need to implement
+%options parsing in mex ...
+
+if isempty(varargin)
+    data = json_info_to_data(0,mex_result,1);
+else
+    %TODO: Move this into the c code just like we did 
+    %for the parser ...
+    in.max_numeric_collapse_depth = [];
+    in.max_string_collapse_depth = [];
+    in.max_bool_collapse_depth = [];
+    in.column_major = [];
+    in.collapse_objects = [];
+    in = json.sl.in.processVarargin(in,data_options);
+    data = json_info_to_data(7,mex_result,1,in);
+end
+
+
+%Old call for comparison - objects slow so we try and make calls directly
+%... (new code above)
+%root = json.tokens.load(file_path,token_options{:});
+%data = root.getParsedData(data_options{:});
+
 
 
 end

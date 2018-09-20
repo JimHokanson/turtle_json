@@ -4,14 +4,62 @@
 
 #define N_PADDING 17
 
-//TODO: Clean these two up ... I don't think both are needed
-//                      1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7
-#define BUFFER_STRING "\0\\\"\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-        
-//                            1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
-//                              \   "
-uint8_t BUFFER_STRING2[20] = {0,92, 34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+//                                   1 2  3  4 5 6 7 8 9 0 1 2 3 4 5 6 7
+//                                     \  "
+uint8_t BUFFER_STRING2[N_PADDING] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
+int initialized = 0;
+mxArray *perm_out; 
+
+const char *fieldnames_out[] = {
+    "json_string",
+     "types",
+     "d1",
+     "obj__child_count_object",
+     "obj__next_sibling_index_object",
+     "obj__object_depths",
+     "obj__unique_object_first_md_indices",
+     "obj__object_ids",
+     "obj__objects",
+     "arr__child_count_array",
+     "arr__next_sibling_index_array",
+     "arr__array_depths",
+     "arr__array_types",
+     "key__key_p",
+     "key__key_sizes",
+     "key__next_sibling_index_key",
+     "string_p",
+     "string_sizes",
+     "numeric_p",
+     "strings",
+     "slog"};
+
+//=========================================================================
+
+
+
+void initialize_structs(){
+    
+    mxArray *mx_temp;
+    
+    perm_out = mxCreateStructMatrix(1,1,ARRAY_SIZE(fieldnames_out),fieldnames_out);   
+    mexMakeArrayPersistent(perm_out);
+    
+    //TODO: Add fields
+    
+    //mxSetFieldByNumber(perm_out,1,5,perm_obj);
+    //void mxSetFieldByNumber(mxArray *pm, mwIndex index, int fieldnumber, mxArray *pvalue);
+    
+}
+
+static void clear_persistent_data(void)
+{
+    //mexPrintf("Clearing peristent memory.\n");
+    mxDestroyArray(perm_out);
+    //mxDestroyArray(perm_obj);
+}
+
+//=========================================================================
 bool padding_is_necessary(unsigned char *input_bytes, size_t input_string_length){
     //
     //  Return whether or not the parse buffer is present/necessary. If
@@ -46,22 +94,30 @@ void add_parse_buffer(unsigned char *buffer, size_t array_length){
     //      vs
     //      ...test string is not terminated0\"0000000  <= bad json string
     //
+    //
+    //      TODO: An even better test would be to verify location after
+    //      confirming the 0 character
+    //
     //  The length of the buffer is to prevent search problems with SIMD
     //  that process multiple characters at a time (i.e. we don't want to
     //  parse past the end of the string)
     
     //TODO: Do a memcpy
     
-    buffer[array_length] = 0;
-    //On encountering a quote, we always need to look back.
-    buffer[array_length+1] = '\\';
-    buffer[array_length+2] = '"';
-    for (int i = 3; i < N_PADDING; i++){
-        //length 1, index 0
-        //length file_length, max index - file_length-1
-        //so padding starts at file_length + 0
-        buffer[array_length + i] = 0;
-    }
+    //void * memcpy ( void * destination, const void * source, s );
+    
+    memcpy(&buffer[array_length],BUFFER_STRING2,N_PADDING);
+//     
+//     buffer[array_length] = 0;
+//     //On encountering a quote, we always need to look back.
+//     buffer[array_length+1] = '\\';
+//     buffer[array_length+2] = '"';
+//     for (int i = 3; i < N_PADDING; i++){
+//         //length 1, index 0
+//         //length file_length, max index - file_length-1
+//         //so padding starts at file_length + 0
+//         buffer[array_length + i] = 0;
+//     }
 }
 
 void process_input_string(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added){
@@ -214,7 +270,8 @@ void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t
 }
         
 void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[], 
-        unsigned char **json_string, size_t *string_byte_length, Options *options){
+        unsigned char **json_string, size_t *string_byte_length, 
+        Options *options, struct sdata *slog){
     //
     //  The input JSON can be:
     //  1) raw character string - Matlab char (UTF-16)
@@ -243,7 +300,8 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[],
         read_file_to_string(prhs,json_string,string_byte_length);
     }
     
-    setIntScalar(plhs[0],"buffer_added",buffer_added);
+    slog->buffer_added = buffer_added;
+    //setIntScalar(plhs[0],"buffer_added",buffer_added);
     
 	//Let's hold onto the string for the user. Technically it isn't needed
     //once we exit this function, since all information is contained in
@@ -252,12 +310,16 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[],
     //http://stackoverflow.com/questions/19813718/mex-files-how-to-return-an-already-allocated-matlab-array
     if (is_input){
         mxArrayTemp = mxCreateSharedDataCopy(prhs[0]);
-        mxSetN(mxArrayTemp,*string_byte_length);
-        mxAddField(plhs[0],"json_string");
-        mxSetField(plhs[0],0,"json_string",mxArrayTemp);
+        //mxSetN(mxArrayTemp,*string_byte_length);
+        //mxAddField(plhs[0],"json_string");
+        //mxSetField(plhs[0],0,"json_string",mxArrayTemp);
     }else{
-        setStructField(plhs[0],*json_string,"json_string",mxUINT8_CLASS,*string_byte_length);
+        mxArrayTemp = mxCreateNumericMatrix(1, 0, mxUINT8_CLASS, 0);
+        mxSetData(mxArrayTemp, *json_string);
+        mxSetN(mxArrayTemp,*string_byte_length);
+        //setStructField(plhs[0],*json_string,"json_string",mxUINT8_CLASS,*string_byte_length);
     }
+    mxSetFieldByNumber(plhs[0], 0, E_json_string, mxArrayTemp);
     
 }
 
@@ -397,7 +459,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //
     //  Optional Inputs
     //  ---------------
-    //  Documented in the Matlab code ...
+    //  Documented in the Matlab code @ json.tokens.load
     //
     //  Outputs:
     //  --------
@@ -414,11 +476,43 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 //         "types", "d1","child_count_object","next_sibling_index_object",
 //         "object_depths","n_objects_at_depth","object_ids","object_indices"}
     
-    
-    plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
-    
+    //Structures
+    //1) output
+    //2) object info
+    //3) array info
+    //4) key_info
+    //5) timing_info
+    //6) allocation info
     
     TIC(start_mex);
+    
+    //# of inputs check  --------------------------------------------------
+    if (nrhs < 1){
+        throw_error_simple(0,"turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
+    }else if (!(nlhs == 1)){
+      	throw_error_simple(0,"turtle_json:n_inputs","Invalid # of outputs, 1 expected");
+    }
+    
+    
+    
+    
+    if (!initialized){
+        initialized = 1;
+        initialize_structs();        
+        mexAtExit(clear_persistent_data);
+    }
+    
+    struct sdata *slog = (struct sdata*)mxCalloc(1,sizeof(struct sdata));
+    
+    plhs[0] = mxDuplicateArray(perm_out);
+    
+    //TODO: Let's try copying the output 
+    
+    
+    //plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
+    
+    
+    
     
     //TODO: Detect the supported features of the processor
     //http://stackoverflow.com/questions/6121792/how-to-check-if-a-cpu-supports-the-sse3-instruction-set
@@ -428,35 +522,43 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     unsigned char *json_string = NULL;
 
     Options options = {};
-
-    mxArray *timing_info = mxCreateStructMatrix(1, 1, 0, 0);
-
-    //# of inputs check  --------------------------------------------------
-    if (nrhs < 1){
-        throw_error_simple(0,"turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
-    }else if (!(nlhs == 1)){
-      	throw_error_simple(0,"turtle_json:n_inputs","Invalid # of outputs, 1 expected");
-    }
+    
+    
     
     //Processing of inputs
     //-------------------------------------
     init_options(nrhs, prhs, &options);
     
     TIC(start_read);
-    get_json_string(plhs, nrhs, prhs, &json_string, &string_byte_length, &options);
-    TOC(start_read,elapsed_read_time);
+    get_json_string(plhs, nrhs, prhs, &json_string, &string_byte_length, 
+            &options, slog);
+    TOC(start_read,time__elapsed_read_time);
+    
     
     //Token parsing
     //-------------
     TIC(start_parse);
-    parse_json(json_string, string_byte_length, plhs, &options, timing_info);
-    TOC(start_parse, elapsed_parse_time);
+    parse_json(json_string, string_byte_length, plhs, &options, slog);
+    TOC(start_parse, time__total_elapsed_parse_time);
+   
     
     //Post token parsing
-    post_process(json_string, plhs, timing_info);
+    post_process(json_string, plhs, slog);
     
-    TOC(start_mex,total_elapsed_time_mex);
+    TOC(start_mex,time__total_elapsed_time_mex);
 
-    ADD_STRUCT_FIELD(timing_info,timing_info);
+    //TODO: Only if defined
+    //ADD_STRUCT_FIELD(timing_info,timing_info);
+    
+    
+    //Move c_struct log to field of output
+    //---------------------------------------
+    mxArray *mx_slog = mxCreateNumericMatrix(0, 1, mxUINT8_CLASS, 0);
+    mxSetData(mx_slog,slog);
+    mxSetM(mx_slog,sizeof(struct sdata));
+    mxSetFieldByNumber(plhs[0],0,E_slog,mx_slog);
+    
+    TOC(start_mex,time__total_elapsed_time_mex);
+    
 }
 

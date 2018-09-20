@@ -72,6 +72,9 @@ classdef token < handle
         end
     end
     
+    %This is done to try and clean up tab complete by hiding default
+    %methods
+    %---------------------------------------------------------------------
     methods (Hidden)
       function lh = addlistener(varargin)
          lh = addlistener@handle(varargin{:});

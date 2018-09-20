@@ -17,7 +17,7 @@ The following are the relevant tokenizer files, in order of usage:
 
 Note, the post-processor relies on other helper files.
 
-The output from the tokenizer is a large Matlab structure. The format of this structure is discussed in the [C Data Model](c_data_model.md)
+The output from the tokenizer is a large Matlab structure. The format of this structure is discussed in the [C Data Model](c_data_model_and_outputs.md)
 
 ### Tokens to Data ###
 

@@ -1,4 +1,4 @@
-function turtle_json_write_v0(s)
+function str = turtle_json_write_v0(s)
 
 state = write_state();
 
@@ -82,7 +82,7 @@ else
 end
 
 while (true)
-    if state.I > state.n
+    if state.I == 0
         break
     end
     
@@ -91,7 +91,7 @@ while (true)
         case 0
             %array of objects
             if state.index(state.I) == 0
-                state.initArray();
+                state.initStructArray();
             end
             
             state.addNextObjectArrayElement();
@@ -120,6 +120,9 @@ while (true)
     end
 end
 
+str = state.out(1:state.out_I);
+
+keyboard
 
 
 %Options

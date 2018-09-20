@@ -27,7 +27,13 @@ fh2(0,encode(data),'','empty and non-empty objects',data);
 data = {struct('ab',1,'ac',2),struct('ab',2,'ad',3)};
 fh2(0,encode(data),'','2 different structs',data,...
     @(x) x.root.mex.object_info.n_unique_objects == 2,'The # of unique objects should have been 2');
+
 data = [struct('ab',1,'ac',2),struct('ab',2,'ac',3)];
 fh2(0,encode(data),'','2 different structs',data,...
     @(x) x.root.mex.object_info.n_unique_objects == 1,'The # of unique objects should have been 1');
+
+
+%TODO: We need to test the methods ...
+
+
 end

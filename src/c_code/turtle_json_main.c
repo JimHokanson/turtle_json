@@ -30,9 +30,12 @@
 #define INCREMENT_PARENT_SIZE \
     parent_sizes[current_depth] += 1
 
+            
+//example types include object, array, string, etc.            
 #define SET_TYPE(x) \
     types[current_data_index] = x;            
 
+//OA => stands for object/array
 #define INITIALIZE_PARENT_INFO_OA(x) \
         ++current_depth; \
         if (current_depth > MAX_DEPTH){\
@@ -442,9 +445,11 @@ STRING_SEEK:
 //=========================================================================
 //=========================================================================
 void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
-        Options *options, mxArray *timing_info) {
+        Options *options, struct sdata *slog) {
     
     //TODO: Check string_byte_length - can't be zero ...
+    
+    TIC(start_parse2);
     
     //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
@@ -499,8 +504,12 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     int parent_types[MAX_DEPTH_ARRAY_LENGTH];
     int parent_indices[MAX_DEPTH_ARRAY_LENGTH];
     int parent_sizes[MAX_DEPTH_ARRAY_LENGTH];
-    int *n_arrays_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
-    int *n_objects_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
+    
+    
+    //int *n_arrays_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
+    //int *n_objects_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
+    int *n_arrays_at_depth = slog->arr__n_arrays_at_depth;
+    int *n_objects_at_depth = slog->obj__n_objects_at_depth;
     int current_parent_data_index;
     int current_depth = 0;
     //---------------------------------------------------------------------
@@ -569,7 +578,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
 //        ================= Start of the parsing =================
 //=========================================================================
           
-    //We decrement so that we can use the same advance to non-whisespace
+    //We decrement so that we can use the same advance to non-whitespace
     //code that we use everywhere else, where we assume that we've already
     //consumed the current character, even though we may not have
     DECREMENT_POINTER;
@@ -791,7 +800,9 @@ S_PARSE_END_OF_FILE:
 
 //===============       ERRORS   ==========================================
 //=========================================================================
-//TODO: This is going to be redone 
+//TODO: This is going to be redone. I'd like to have more central
+//handling of errors along with the ability to inspect location/context
+//as can be seen in my hacky comments below
  
 S_ERROR_BAD_ENDING:
 	//mexPrintf("Current char: %d",CURRENT_CHAR);
@@ -848,74 +859,74 @@ S_ERROR_DEBUG:
    
 S_FINISH_GOOD:
     
+    TOC(start_parse2, time__c_parse_time);
+    
+    
+    
     //The normal TIC() approach was not working, so we iniitialize earlier
     //and start the TIC here.
     //TIC(parsed_data_logging);
     START_TIC(parsed_data_logging);
     
-    mxArray *allocation_info = mxCreateStructMatrix(1, 1, 0, 0);
-    
     //Meta data storage
     //--------------------
     //This information can be used to tell how efficient we were
-    //relative to the allocation
-    setIntScalar(allocation_info,"n_tokens_allocated",data_size_allocated);
-    setIntScalar(allocation_info,"n_objects_allocated",object_size_allocated);
-    setIntScalar(allocation_info,"n_arrays_allocated",array_size_allocated);
-    setIntScalar(allocation_info,"n_keys_allocated",key_size_allocated);
-    setIntScalar(allocation_info,"n_strings_allocated",string_size_allocated);
-    setIntScalar(allocation_info,"n_numbers_allocated",numeric_size_allocated);
+    //relative to the allocation  
+    slog->alloc__n_tokens_allocated = data_size_allocated;
+    slog->alloc__n_objects_allocated = object_size_allocated;
+    slog->alloc__n_arrays_allocated = array_size_allocated;
+    slog->alloc__n_keys_allocated = key_size_allocated;
+    slog->alloc__n_strings_allocated = string_size_allocated;
+    slog->alloc__n_numbers_allocated = numeric_size_allocated;
+    slog->alloc__n_data_allocations = n_data_allocations;
+    slog->alloc__n_object_allocations = n_object_allocations;
+    slog->alloc__n_array_allocations = n_array_allocations;
+    slog->alloc__n_key_allocations = n_key_allocations;
+    slog->alloc__n_string_allocations = n_string_allocations;
+    slog->alloc__n_numeric_allocations = n_numeric_allocations;    
     
-    setIntScalar(allocation_info,"n_data_allocations",n_data_allocations);
-    setIntScalar(allocation_info,"n_object_allocations",n_object_allocations);
-    setIntScalar(allocation_info,"n_array_allocations",n_array_allocations);
-    setIntScalar(allocation_info,"n_key_allocations",n_key_allocations);
-    setIntScalar(allocation_info,"n_string_allocations",n_string_allocations);
-    setIntScalar(allocation_info,"n_numeric_allocations",n_numeric_allocations);
-    ADD_STRUCT_FIELD(allocation_info,allocation_info);
+
+
     
     //------------------------    Main Data   -----------------------------
     
-    
-    
     TRUNCATE_MAIN_DATA
-    setStructField(plhs[0],types,"types",mxUINT8_CLASS,current_data_index + 1);
-    setStructField(plhs[0],d1,"d1",mxINT32_CLASS,current_data_index + 1);
-    
+    setStructField2(plhs[0],types,mxUINT8_CLASS,current_data_index + 1,E_types);
+    setStructField2(plhs[0],d1,mxINT32_CLASS,current_data_index + 1,E_d1);
+        
     TRUNCATE_OBJECT_DATA
-    mxArray *object_info = mxCreateStructMatrix(1, 1, 0, 0);
-    setStructField(object_info,child_count_object,"child_count_object",mxINT32_CLASS,current_object_index + 1); 
-    setStructField(object_info,next_sibling_index_object,"next_sibling_index_object",mxINT32_CLASS,current_object_index + 1);
-    setStructField(object_info,object_depths,"object_depths",mxUINT8_CLASS,current_object_index + 1);
+    setStructField2(plhs[0],child_count_object,
+            mxINT32_CLASS,current_object_index + 1,E_obj__child_count_object); 
+    setStructField2(plhs[0],next_sibling_index_object,
+            mxINT32_CLASS,current_object_index + 1,E_obj__next_sibling_index_object);
+    setStructField2(plhs[0],object_depths,
+            mxUINT8_CLASS,current_object_index + 1,E_obj__object_depths);
     //Note we don't track what's used, so we just pass in its size
-    setStructField(object_info,n_objects_at_depth,"n_objects_at_depth",mxINT32_CLASS,MAX_DEPTH_ARRAY_LENGTH);
-    ADD_STRUCT_FIELD(object_info,object_info);
-
+    //setStructField2(plhs[0],n_objects_at_depth,
+    //        mxINT32_CLASS,MAX_DEPTH_ARRAY_LENGTH,E_obj__n_objects_at_depth);
+  
     TRUNCATE_ARRAY_DATA
-    mxArray *array_info = mxCreateStructMatrix(1, 1, 0, 0);
-    setStructField(array_info,n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
-    setStructField(array_info,child_count_array,"child_count_array",mxINT32_CLASS,current_array_index + 1); 
-    setStructField(array_info,next_sibling_index_array,"next_sibling_index_array",mxINT32_CLASS,current_array_index + 1);
-    setStructField(array_info,array_depths,"array_depths",mxUINT8_CLASS,current_array_index + 1);
-    ADD_STRUCT_FIELD(array_info,array_info);
+    //TODO: This is of fixed size so we can use slog ...
+    //setStructField(plhs[0],n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    setStructField2(plhs[0],child_count_array,mxINT32_CLASS,current_array_index + 1,E_arr__child_count_array); 
+    setStructField2(plhs[0],next_sibling_index_array,mxINT32_CLASS,current_array_index + 1,E_arr__next_sibling_index_array);
+    setStructField2(plhs[0],array_depths,mxUINT8_CLASS,current_array_index + 1,E_arr__array_depths);
 
     TRUNCATE_KEY_DATA
-   	mxArray *key_info = mxCreateStructMatrix(1, 1, 0, 0);
-    setStructField(key_info,key_p,"key_p",mxUINT64_CLASS,current_key_index + 1);
-    setStructField(key_info,key_sizes,"key_sizes",mxINT32_CLASS,current_key_index + 1);
-    setStructField(key_info,next_sibling_index_key,"next_sibling_index_key",mxINT32_CLASS,current_key_index + 1);
-    ADD_STRUCT_FIELD(key_info,key_info);
-    
+    setStructField2(plhs[0],key_p,mxUINT64_CLASS,current_key_index + 1,E_key__key_p);
+    setStructField2(plhs[0],key_sizes,mxINT32_CLASS,current_key_index + 1,E_key__key_sizes);
+    setStructField2(plhs[0],next_sibling_index_key,mxINT32_CLASS,current_key_index + 1,E_key__next_sibling_index_key);
+        
     TRUNCATE_STRING_DATA
-    setStructField(plhs[0],string_p,"string_p",mxUINT64_CLASS,current_string_index + 1);
-    setStructField(plhs[0],string_sizes,"string_sizes",mxINT32_CLASS,current_string_index + 1);
+    setStructField2(plhs[0],string_p,mxUINT64_CLASS,current_string_index + 1,E_string_p);
+    setStructField2(plhs[0],string_sizes,mxINT32_CLASS,current_string_index + 1,E_string_sizes);
     
     TRUNCATE_NUMERIC_DATA
     //Note, it seems the class type may only be needed for viewing in Matlab
     //Internally it is just bytes (assuming sizeof is the same)
-    setStructField(plhs[0],numeric_p,"numeric_p",mxDOUBLE_CLASS,current_numeric_index + 1);
+    setStructField2(plhs[0],numeric_p,mxDOUBLE_CLASS,current_numeric_index + 1,E_numeric_p);
 
-    TOC(parsed_data_logging,parsed_data_logging_time);
+    TOC(parsed_data_logging,time__parsed_data_logging_time);
 
 	return;
     

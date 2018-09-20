@@ -1,5 +1,24 @@
 #include "turtle_json.h"
 
+//  File: turtle_json_post_process.c
+
+//In this file:
+//-------------
+//+ post_process - main file
+//  - populate_object_flags - in turtle_json_pp_objects.c
+//  - initialize_unique_objects
+//  - populate_array_flags
+//  - parse_numbers
+//  - parse_char_data
+//
+//+ populateProcessingOrder - helper for specifying order of processing for objects and arrays
+//+ check_for_nd_array - 
+//+ populate_array_flags - 
+//   - flags include
+//+ parse_char_data
+//+ parse_utf8_char
+
+
 
 //UTF-8 parsing related
 //-------------------------------------------------------------------------
@@ -15,6 +34,7 @@
 #define UNREPRESENTABLE_UTF8_CHAR 0xFFFD
 
 //Not sure if we would ever want to change this ...
+//TODO: Document what this means
 #define ERROR_UTF_CHAR 0
 
 //-------------------------------------------------------------------------
@@ -27,52 +47,70 @@
 //=========================================================================
 //=========================================================================
 
-void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, uint8_t type_to_match, int *n_values_at_depth, int n_depths, uint8_t *value_depths){
+void populateProcessingOrder(int *process_order, uint8_t *types, 
+        int n_entries, uint8_t type_to_match, int *n_values_at_depth, 
+        int n_depths, uint8_t *value_depths){
     //
     //  This is a helper function which orders data by depth (nesting level).
+    //  Processing starts at the lowest depth first, which is important
+    //  for arrays and determining homogeneity.
+    //
+    //  For objects this allows us to try and find objects of the type type.
     //
     //  The names have been made generic to accomodate both arrays and objects.
     //
     //  Inputs
     //  ------
-    //  types: array (length => n_entries)
-    //  n_entries: 
-    //  type_to_match: scalar
+    //  types : array (length => n_entries)
+    //  n_entries : 
+    //  type_to_match : scalar
+    //          
     //  n_values_at_depth: array
     //  n_depths:
     //  value_depths:
     //
     //  Output
     //  ------
-    //  process_order : array
+    //  process_order : array, length == n_arrays or n_objects
+    //       
     //       - order in which to process array objects, from the 0th index
     //       to the end of the array
-    //       - indices are md_index values (not indices to the 
-    //       array or object specific arrays)
+    //       - values of the array are md_indices of the specified caller
+    //       type (array or object)
+    //
+    //  Memory Allocations
+    //  ------------------
+    //  none
+    
+    int cur_depth_index[MAX_DEPTH_ARRAY_LENGTH];
     
 
-    int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
+    //This is a temporary variable, we could malloc/free it ...
+    //int *cur_depth_index = mxMalloc(n_depths*sizeof(int));
     
     int cur_running_index = 0;
     //- This sets the start index in 'process_order' for each depth
     //- The order is based on how many arrays came at lower depths
     //- Note that we start from lowest depth first
-    //- Depth currently starts at 1 (0 index is empty) ... TODO: We should code this in with
-    //  defined levels in some header
+    //- Depth currently starts at 1 (0 index is empty) ... 
+    //      TODO: We should code this (that 0 is empty) in 
+    //            with defined levels in some header
     //
-    //- e.g. if we have the following numbers of things (arrays or objects) at each depth:
+    //- e.g. if we have the following numbers of 
+    //              things (arrays or objects) at each depth:
     //
     //   0 1 2 3  <= depths
-    //  [2 3 2 1] Then we will note the following starts 
-    //                  (starting with deepest first)
+    //  [2 3 4 1] <= n values at depth
     //
-    //   0 1 2 3 4 5 6 7   <- indices in array
-    //  [x x   x     x  ]  <- x denotes first index for that depth
-    //   1 2   3     2     <- n values at depth
+    //  cur_depth_index[3] = 0
+    //  cur_depth_index[2] = 1 (only 1 value at depth 3)
+    //  cur_depth_index[1] = 5 (since 4 values at depth 2, i.e. 1 + 4)
+    //  cur_depth_index[0] = 8 (since 3 values at depth 1, i.e. 5 + 3)
     //
-    //  Now if we populate an array, with each of these starting locations
-    //  and process the array in order, we'll go continuously in depth
-    //  and, importantly for the arrays, we'll process deepest first.
+    //
+    //  With this info we can populate an array whereby all indices
+    //  of a given depth preceed indices of a shallower depth, allowing
+    //  us to process info from deepest to shallowest.
     for (int iDepth = n_depths - 1; iDepth > 0; iDepth--){
         cur_depth_index[iDepth] = cur_running_index;
         cur_running_index += n_values_at_depth[iDepth];
@@ -92,7 +130,7 @@ void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 
             cur_value_index++;
         }
     }    
-    mxFree(cur_depth_index);
+    //mxFree(cur_depth_index);
 }
 //=========================================================================
 //=========================================================================
@@ -102,16 +140,41 @@ void check_for_nd_array(int array_md_index, int array_data_index,
         uint8_t *array_depths, int* child_size_stack, int *next_sibling_index_array,
         uint8_t *types, int *d1, int n_children){
     //
-    //Populates array_types[array_data_index]
+    //  
+    //
+    //  Populates
+    //  ---------
+    //  array_types[array_data_index]
     //
     //  An ND array is an array that contains arrays of the same type
     //  and shape
+    //
+    //  Inputs
+    //  ------
+    //  array_md_index :
+    //      Index into the d1 and types arrays.
+    //  array_data_index :
+    //      The array counter value i.e. d1[array_md_index]
+    //  array_types : length n_arrays
+    //      see specifics in turtle_json.h
+    //  child_count_array : 
+    //  array_depths : 
+    //  child_size_stack :
+    //  next_sibling_index_array : 
+    //  types : length n_tokens
+    //  d1 : length n_tokens
+    //  n_children : 
+    //
+    //  See Also
+    //  --------
+    //  populate_array_flags (caller)
+    //
     
     
     //mexPrintf("Running check_for_nd_array\n");
     
-    //- Input is the type of processed array
-    //- Output is the new type of processed array
+    //- Input (index) is the type of processed array
+    //- Output (value) is the new type of processed array
     const uint8_t array_type_map2[11] = { 
         ARRAY_OTHER_TYPE,   //Nothing
         ARRAY_ND_NUMERIC,   //numeric - i.e. if children contain numeric arrays (1d), then we become a 2d numeric array
@@ -174,7 +237,8 @@ void check_for_nd_array(int array_md_index, int array_data_index,
     //
     //  This is because we have already verified that all children
     //  are the same (based on the array type). In other words, we
-    //  already know that if x[i] is an nd-array type, that
+    //  already know that if x[i] is an nd-array type (as opposed to
+    //  a non-homogenous array), that
     //  length(x[i][0]) == length(x[i][1]) == length(x[i][2]) etc.
     //
     //  Thus, checking length(x[i][1]) == length(x[0][0]) is 
@@ -227,7 +291,7 @@ void check_for_nd_array(int array_md_index, int array_data_index,
 //                          Array Flags
 //=========================================================================
 //=========================================================================
-void populate_array_flags(unsigned char *js,mxArray *plhs[]){
+void populate_array_flags(unsigned char *js,mxArray *plhs[], struct sdata *slog){
 //
 //  This function populates:
 //  --------------------------------------------
@@ -239,31 +303,33 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     //TODO: I need to go through and rename things 
     
     //---- array info ------
-    mxArray *array_info = mxGetField(plhs[0],0,"array_info");
-    mwSize n_arrays = get_field_length2(array_info,"next_sibling_index_array");
+    mxArray *array_info = plhs[0]; //mxGetField(plhs[0],0,"array_info");
+    mwSize n_arrays = get_field_length2(array_info,"arr__next_sibling_index_array");
     
     if (n_arrays == 0){
-        setStructField(array_info,0,"array_types",mxUINT8_CLASS,0);
+        //Set arr_array_types to empty ...
+        //TODO: Can this be a fixed array???
+        setStructField2(array_info,0,mxUINT8_CLASS,0,E_arr__array_types);
         return;
     }
-    uint8_t *array_depths = get_u8_field(array_info,"array_depths");
-    int *child_count_array = get_int_field(array_info,"child_count_array");
-    int *next_sibling_index_array = get_int_field(array_info,"next_sibling_index_array");
+    uint8_t *array_depths = get_u8_field_by_number(array_info,E_arr__array_depths);
+    int *child_count_array = get_int_field_by_number(array_info,E_arr__child_count_array);
+    int *next_sibling_index_array = get_int_field_by_number(array_info,E_arr__next_sibling_index_array);
     
     //Extraction of relevant local variables
     //---------------------------------------------------------------------
     //---- main data info -----
-    uint8_t *types = (uint8_t *)get_field(plhs,"types");
-    int *d1 = (int *)get_field(plhs,"d1");
+    uint8_t *types = get_u8_field_by_number(plhs[0],E_types);
+    int *d1 = get_int_field_by_number(plhs[0],E_d1);
     mwSize n_entries = get_field_length(plhs,"d1");
     
     //---- depth info ------
-    int *n_arrays_at_depth = get_int_field(array_info,"n_arrays_at_depth");
-    mwSize n_depths = get_field_length2(array_info,"n_arrays_at_depth");
+    int *n_arrays_at_depth = slog->arr__n_arrays_at_depth;
+    mwSize n_depths = MAX_DEPTH_ARRAY_LENGTH;
     
     //---- object info ------
-    mxArray *object_info = mxGetField(plhs[0],0,"object_info");
-    int n_objects = get_field_length2(object_info,"next_sibling_index_object");
+    mxArray *object_info = plhs[0];
+    int n_objects = get_field_length2(object_info,"obj__next_sibling_index_object");
     
     int *object_ids;
     int *next_sibling_index_object;
@@ -276,8 +342,8 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
         //  i.e. we can't distinguish between a null pointer and
         //  a missing call to mxGetField
         
-        object_ids = get_int_field(object_info,"object_ids");  
-        next_sibling_index_object = get_int_field(object_info,"next_sibling_index_object");
+        object_ids = get_int_field_by_number(object_info,E_obj__object_ids);  
+        next_sibling_index_object = get_int_field_by_number(object_info,E_obj__next_sibling_index_object);
     }
         
     //Determining the order to process arrays
@@ -285,16 +351,31 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     //We process arrays from deepest in the JSON structure to shallowest
     //This allows us to make claims about the parent array type
     //with a bit less hassle since the child array types have already
-    //been processed (since they are deeper structures)
+    //been processed (since they are deeper structures
+    //
+    //  process_order = 
     int *process_order = mxMalloc(n_arrays*sizeof(int));
-    populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, n_arrays_at_depth, n_depths, array_depths);
+    populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, 
+            n_arrays_at_depth, n_depths, array_depths);
 
-    
     //Variable setup for actual processing
     //---------------------------------------------------------------------
 
     //Map the input types of an array to more generic mixed types
     //e.g. true and false to logical
+    //
+    //  We process the children of arrays.
+    //  [ [ => need to process a nd array
+    //  [ 4 => could be a homogenous numeric array
+    //  [ "test" => could be a homogenous string array
+    //  
+    //  This variable only handles non-array types (possible 1d values)
+    //  
+    //  Thus if we detect all strings (type 4) in an array then we mark 
+    //  the array as a 1d array string type.
+    //
+    //  i.e. array_type[i] = array_type_map1[4] = ARRAY_STRING_TYPE
+    
     uint8_t array_type_map1[9] = { 
         ARRAY_OTHER_TYPE,    //Nothing - i.e. not specified
         ARRAY_OTHER_TYPE,    //Object
@@ -327,9 +408,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     
     int n_object_keys;
     
-    //TODO: Check that this won't ever be exceeded
-    //TODO: Dynamically allocate this ...
-    int child_size_stack[20];
+    int child_size_stack[MAX_DEPTH_ARRAY_LENGTH];
 
     
     //This is the output that is getting populated in this function
@@ -354,10 +433,12 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                 case TYPE_OBJECT:
                     //
                     //[ {'a':1,'b':2},{'a':1,'b':2}]
-                    //  o1            o2              <= both objects are the same, create a struct array
+                    //  o1            o2      <= both objects are the same,
+                    //                          create a struct array
                     //
                     //[ {'a':1,'b':2},{'a':1,'b':2},{'a':1,'b':2,'c':3}]
-                    //  o1            o2            o3      <= objects are not the same cell array of structs
+                    //  o1            o2            o3    <= objects are not 
+                    //                              the same, cell array of structs
                     
                     cur_object_data_index = d1[cur_process_index+1];
                     reference_object_id = object_ids[cur_object_data_index];
@@ -390,14 +471,19 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                 case TYPE_ARRAY:
                     //This indicates that our array holds an array.
                     
-                    check_for_nd_array(cur_process_index, cur_array_index, 
-                        array_types, child_count_array, 
-                        array_depths, child_size_stack, next_sibling_index_array,
-                        types, d1, n_children);
+                    check_for_nd_array(cur_process_index, 
+                            cur_array_index, 
+                            array_types, 
+                            child_count_array, 
+                            array_depths, 
+                            child_size_stack, 
+                            next_sibling_index_array,
+                            types, d1, n_children);
 
                     break;
                 case TYPE_KEY:
-                    mexErrMsgIdAndTxt("turtle_json:code_error", "Code error detected, key was found as child of array in post-processing");
+                    mexErrMsgIdAndTxt("turtle_json:code_error", 
+                            "Code error detected, key was found as child of array in post-processing");
                     break;
                 //---------------------------------------------------------    
                 case TYPE_STRING:
@@ -451,7 +537,6 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
                     //  d1[cur_process_index+1] => 53
                     //  n_children != (55 - 53 + 1)
                     
-                    //TODO: We might want to reorder to have micro-speedup
                     if (n_children == (d1[cur_process_index+n_children] - d1[cur_process_index+1] + 1) && \
                             types[cur_process_index+1] == types[cur_process_index+n_children]){
                         //homogeneous, assign to appropriate type
@@ -481,21 +566,22 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[]){
     }
     
     mxFree(process_order);
-    setStructField(array_info,array_types,"array_types",mxUINT8_CLASS,n_arrays);
-    
+    setStructField2(array_info,array_types,mxUINT8_CLASS,n_arrays,E_arr__array_types); 
 }
 
 //=========================================================================
 //=========================================================================
-void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
+void parse_char_data(unsigned char *js,mxArray *plhs[],struct sdata *slog){
     //
     //  Parses string characters into Matlab strings
     //  
     //  This includes:
     //  1) Initializaton of cell arrays and string Matlab objects
-    //  2) Processing of character escapes => \n to newline
-    //  3) Unicode escapes
+    //  2) Processing of character escapes, e.g. \n to newline
+    //  3) Unicode escapes - code assumes UTF-8 encoding
     //
+    //  Note, not a lot of time was spent on trying to be clever in this 
+    //  section. The majority of 
     
     //Character Escapes
     //---------------------------------------------------------------------
@@ -525,8 +611,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     //---------------------------------------------------------------------
     //Input character
     //Output, numerical value to add, unless invalid then -1
-    //e.g. a => 10
-    //     C => 12
+    //e.g. a => 10 (hex a has value 10)
+    //     C => 12 (hex C has value 12, handling lower and upper case)
     const int hex_numerical_values[256] = {
         [0 ... 47] = -1,
         [48] = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, // '0 ... 9'
@@ -536,25 +622,20 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         [97] = 10, 11, 12, 13, 14, 15, 
         [103 ... 255] = -1};
 
-    mxArray *temp;
-    unsigned char **char_p;
-    int n_entries;
+    mxArray *temp = mxGetFieldByNumber(plhs[0],0,E_string_p);
+    unsigned char **char_p = (unsigned char **)mxGetData(temp);
+    int n_entries = mxGetN(temp);
     int *start_indices;
     int *end_indices;
-    int *sizes;
     
-    temp = mxGetField(plhs[0],0,"string_p");
+    //TODO: rename to string sizes
+    int *sizes = get_int_field_by_number(plhs[0],E_string_sizes);
 
-    char_p = (unsigned char **)mxGetData(temp);
-    n_entries = mxGetN(temp);
-
-    temp = mxGetField(plhs[0],0,"string_sizes");
-    sizes = (int *)mxGetData(temp);
     
-    
-    TIC(string_memory_allocation);
     //Initial allocation of memory
-    //------------------------------------------------------
+    //---------------------------------------------------------------------
+    //  This takes forever relative to everything else.
+    TIC(string_memory_allocation);
     int n_chars_max_in_string;
     mxArray *cell_array = mxCreateCellMatrix(1,n_entries);
     mxArray *temp_mx_array;
@@ -580,12 +661,12 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
         //Put the string in the cell array
         mxSetCell(cell_array,i,temp_mx_array); 
     } 
-    TOC(string_memory_allocation,string_memory_allocation_time);
+    TOC(string_memory_allocation,time__string_memory_allocation_time);
     
-    TIC(string_parse);
     
     //Parsing of the string into proper UTF-8
     //---------------------------------------------------------------------
+    TIC(string_parse);
     unsigned char *p;
     int cur_index;
     bool shrink_string; //Set true when we reduce the # of characters in 
@@ -713,8 +794,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[], mxArray *timing_info){
     
     //Storage of the data for later
     //---------------------------------------------------
-    TOC(string_parse,string_parsing_time);
-    ADD_STRUCT_FIELD(strings,cell_array);
+    TOC(string_parse,time__string_parsing_time);
+    mxSetFieldByNumber(plhs[0],0,E_strings,cell_array); 
 
 }
 
@@ -833,31 +914,40 @@ uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status
 
 }
 
-void post_process(unsigned char *json_string,mxArray *plhs[], mxArray *timing_info){
+void post_process(unsigned char *json_string,mxArray *plhs[], struct sdata *slog){
     
     TIC(start_pp);
     
     //mexPrintf("Object flags\n");
+    //File: turtle_json_pp_objects.c
     TIC(object_parse);
-    populate_object_flags(json_string,plhs);
-    TOC(object_parse,object_parsing_time);
+    populate_object_flags(json_string,plhs,slog);
+    TOC(object_parse,time__object_parsing_time);
     
     //mexPrintf("Key chars\n");
-    initialize_unique_objects(json_string,plhs);
+    //File: turtle_json_pp_objects.c
+    TIC(init_objects)
+    initialize_unique_objects(json_string,plhs,slog);
+    TOC(init_objects,time__object_init_time);
     
     //mexPrintf("Array parse\n");
     TIC(array_parse);
-    populate_array_flags(json_string,plhs);
-    TOC(array_parse,array_parsing_time);
+    populate_array_flags(json_string,plhs,slog);
+    TOC(array_parse,time__array_parsing_time);
     
     //mexPrintf("Number parase\n");
     TIC(number_parse);
     parse_numbers(json_string,plhs);
-    TOC(number_parse,number_parsing_time);
+    TOC(number_parse,time__number_parsing_time);
     
     //mexPrintf("char data\n");
-    parse_char_data(json_string,plhs,timing_info);
+    //TIC(char_parse);
+    //TODO: Break this up into parts
+    //- string allocation
+    //- 
+    parse_char_data(json_string,plhs,slog);
+    //TOC(char_parse,char_parsing_time);
         
-    TOC(start_pp,elapsed_pp_time);  
+    TOC(start_pp,time__total_elapsed_pp_time);  
     
 }

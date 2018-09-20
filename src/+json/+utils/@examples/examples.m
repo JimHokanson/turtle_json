@@ -33,6 +33,113 @@ classdef examples
     end
     
     methods (Static)
+        function data = speedTokenTest(file_name_or_index,N,option)
+            %
+            %   data = json.utils.examples.speedTokenTest(file_name_or_index)
+            %
+            %   TODO: Document option ...
+            
+            if nargin < 3
+                option = 1;
+            end
+            
+            %turtle_json_mex
+            
+            if option == 1
+                fh = @json.tokens.load;
+            elseif option == 2
+                fh = @turtle_json_mex;
+            end
+            
+            file_path = json.utils.examples.getFilePath(file_name_or_index);
+            
+            
+            %TODO: Ideally we would discard the first time because
+            %it might not be stable ...
+            tic
+            data = fh(file_path);
+            t = toc;
+            if nargin == 1
+                if t > 1
+                    N = 4;
+                elseif t > 0.1
+                    N = 100;
+                else
+                    N = 1000;
+                end
+            else
+                N = N-1;
+            end
+            
+            for i = 1:N
+            	data = fh(file_path);
+            end
+            t = toc;
+            
+            avg_time = t/(N+1);
+            if avg_time > 1
+                fprintf('avg elapsed time: %0.2f (s)\n',avg_time);
+            else
+                fprintf('avg elapsed time: %0.2f (ms)\n',1000*avg_time);
+            end           
+        end
+        function data = speedDataTest(file_name_or_index,N,option)
+            %
+            %   json.utils.examples.speedDataTest(file_name_or_index)
+            
+            %option
+            %1) this
+            %2) jsondecode
+            %3) cpanton - fromjson
+            %4) loadjson
+            %5) c++ json - json_read
+            
+            if nargin < 3
+                option = 1;
+            end
+            
+            %turtle_json_mex
+            
+            if option == 1
+                fh = @json.load;
+            elseif option == 2
+                fh = @(x)jsondecode(fileread(x));
+            elseif option == 3
+                fh = @(x)fromjson(fileread(x));
+            elseif option == 4
+                fh = @loadjson;
+            elseif option == 5
+                fh = @json_read;
+            end
+            
+            file_path = json.utils.examples.getFilePath(file_name_or_index);
+            tic
+            data = fh(file_path);
+            t = toc;
+            if nargin == 1
+                if t > 1
+                    N = 4;
+                elseif t > 0.1
+                    N = 100;
+                else
+                    N = 1000;
+                end
+            else
+                N = N - 1;
+            end
+            
+            for i = 1:N
+            	data = fh(file_path);
+            end
+            t = toc;
+            
+            avg_time = t/(N+1);
+            if avg_time > 1
+                fprintf('avg elapsed time: %0.2f (s)\n',avg_time);
+            else
+                fprintf('avg elapsed time: %0.2f (ms)\n',1000*avg_time);
+            end
+        end
         function file_path = getFilePath(file_name_or_index)
             %
             %   file_path = json.utils.examples.getFilePath(file_name_or_index)

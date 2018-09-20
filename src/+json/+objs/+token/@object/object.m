@@ -38,25 +38,37 @@ classdef object < json.objs.token
     
     methods
         function obj = object(name,full_name,md_index,parse_object)
+            %
+            %   
+            %   See Also
+            %   --------
+            %   json.tokens.load
+            %   json.tokens.parse
+            
             obj.name = name;
             obj.full_name = full_name;
             obj.md_index = md_index;
             obj.mex = parse_object;
         end
         function [data,key_locations] = parseExcept(obj,keys_to_not_parse,keep_keys)
-            %
+            %X Return the object parsed except for the specified fields
             %   
             %   [data,key_locations] = parseExcept(obj,keys_to_not_parse,*keep_keys)
             %
             %   Inputs
             %   ------
-            %   keys_to_not_parse:
-            %   keep_keys:
+            %   keys_to_not_parse : cellstr
+            %       Keys to not parse.
+            %   keep_keys :
+            %       TODO: I think this means that the keys get returned
+            %       as empty even though they are ignored.
             %
             %   Outputs
             %   -------
-            %   data: 
-            %   key_locations:
+            %   data : struct
+            %       The parsed data in final format.
+            %   key_locations :
+            %       ?????
             %
             
             if nargin == 2
@@ -64,12 +76,17 @@ classdef object < json.objs.token
             else
                 keep_keys = logical(keep_keys);
             end
+            
             if ischar(keys_to_not_parse)
                 keys_to_not_parse = {keys_to_not_parse};
             end
+            
             [data,key_locations] = json_info_to_data(6,obj.mex,obj.md_index,keys_to_not_parse,keep_keys);
         end
         function nd_arrray = getNumericArray(obj,name)
+            %X Return field as a numeric array
+            %
+            %
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             %json_info_to_data(4,mex_struct,array_md_index,expected_array_type)
             nd_arrray = json_info_to_data(4,obj.mex,key_value_md_index,0);
@@ -106,12 +123,29 @@ classdef object < json.objs.token
             end
         end
         function output = getParsedToken(obj,name)
+            %X Runs the generic parse method on the field ...
+            %
+            %   output = getParsedToken(obj,name)
+            %
+            %   Unlike the other methods this method doesn't check for a
+            %   particular type.
+            
             %v3
             [~,key_value_md_index] = h__getKeyValueInfo(obj,name);
             output = json_info_to_data(0,s.mex,key_value_md_index);
         end
         %function output = getPartialToken(obj,name
         function output = getArrayToken(obj,name)
+            %x 
+            %
+            %   output = getArrayToken(obj,name)
+            %
+            %   Output
+            %   ------
+            %   output : 
+            
+            %TODO: This doesn't seem valid anymore ...
+            
             %v3
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
             if key_value_type ~= 2
@@ -128,7 +162,25 @@ classdef object < json.objs.token
             end
             output = obj.mex.numeric_p(key_value_md_index);
         end
+        function output = getStringToken(obj,name)
+            %X Retrieve a string field
+            %   
+            %   output = getStringToken(obj,name)
+            
+            %v3
+            %    Use this to retrieve a string token.
+            [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);
+            if key_value_type ~= 4
+                error('Requested key: "%s" is not a string',name);
+            end
+            output = obj.mex.strings{key_value_md_index}; 
+        end
         function output = getTokenString(obj,name)
+            %
+            %   
+            
+            %TODO: Remove this after checking WCON code
+            
             %v3
             %    Use this to retrieve a string token.
             [key_value_type,key_value_md_index] = h__getKeyValueInfo(obj,name);

@@ -11,9 +11,16 @@ mxArray *mxCreateReference(const mxArray *mx)
     return (mxArray *) mx;
 }
 
+//TODO: Rename this ...
 void *get_field(mxArray *plhs[],const char *fieldname){
     mxArray *temp = mxGetField(plhs[0],0,fieldname);
     return mxGetData(temp);
+}
+
+uint8_t *get_u8_field_by_number(mxArray *p, int fieldnumber){
+    mxArray *temp = mxGetFieldByNumber(p,0,fieldnumber);
+    uint8_t *data = (uint8_t *)mxGetData(temp);
+    return data;
 }
 
 uint8_t * get_u8_field(mxArray *p,const char *fieldname){
@@ -23,6 +30,12 @@ uint8_t * get_u8_field(mxArray *p,const char *fieldname){
     if (data == 0){
     	mexErrMsgIdAndTxt("turtle_json:bad_pointer","bad pointer %s",fieldname);
     }
+    return data;
+}
+
+int *get_int_field_by_number(mxArray *p, int fieldnumber){
+    mxArray *temp = mxGetFieldByNumber(p,0,fieldnumber);
+    int *data = (int *)mxGetData(temp);
     return data;
 }
 
@@ -46,6 +59,19 @@ mwSize get_field_length2(mxArray *p,const char *fieldname){
     mxArray *temp = mxGetField(p,0,fieldname);
     return mxGetN(temp);
 }   
+
+void setStructField2(mxArray *s, void *pr, mxClassID classid, mwSize N, int field_id)
+{
+    //This is a helper function for setting the field in the output struct.
+    //It should only be used on dynamically allocated memory.
+        
+    mxArray *pm;
+    
+    pm = mxCreateNumericMatrix(1, 0, classid, mxREAL);
+    mxSetData(pm, pr);
+    mxSetN(pm, N);
+    mxSetFieldByNumber(s,0,field_id,pm);
+}
     
 void setStructField(mxArray *s, void *pr, const char *fieldname, mxClassID classid, mwSize N)
 {

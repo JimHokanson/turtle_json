@@ -23,12 +23,12 @@ There are two arrays that have elements for each token. The order of the entries
 
 * types: [uint8]
   * types include object, array, key, string, etc. 
-  * Values are defined in turtle_json.h => e.g. 4 is the string type
+  * Values are defined in turtle\_json.h => e.g. 4 is the string type
 * d1: [int32]
   * Indices (0 based) into type based indices. For example, a value of 2 means we've encountered our 3rd string at this location, and this entry corresponds with any other arrays that describe string data (where length equals # of strings or more generically, # of elements of type)
-  * Unique index counts are for objects, arrays, keys, strings, numbers and nulls (1 group), and true and false (1 group)
-  * In code, I've tried to refer to this as the **md_index (main data index)**
-  * Since the values (indices) are incremental (by type), this can serve as an indicator of the # of values between two different locations, e.g. if d1[100] == 30 and d1[105] == 35, and types[100] == types[105], then types[101:104] == types[100] and d1[101] == 31, and d1[102] == 32, etc.
+  * Unique index counts are for objects, arrays, keys, strings. Numbers and nulls form one group and true and false another (logicals).
+  * In code, I've tried to refer to this as the **md\_index (main data index)**
+  * Since the values (indices) are incremental (by type), this can serve as an indicator of the # of values between two different locations, e.g. if d1[100] == 30 and d1[105] == 35, and types[100] == types[105], then types[101:104] == types[100] and d1[101] == 31, and d1[102] == 32, etc. Put another way, if for example some entry is the 10th number, and two elements later is the 12th number, then the element in between must be the 11th number.
 
 ## Data Type Specific Information ##
 

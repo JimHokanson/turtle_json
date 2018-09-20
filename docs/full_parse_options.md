@@ -1,4 +1,4 @@
-# Full Parse Options
+# Full Parse Options #
 
 * max_numeric_collapse_depth
    - default -1, collapse everything

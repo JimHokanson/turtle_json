@@ -2,6 +2,11 @@
 #include "json_info_to_data.h"
 
 //-------------------------------------------------------------------------
+//  
+//  Functions:
+//  
+
+//-------------------------------------------------------------------------
 
 mwSize *dims_file_scope[MAX_DEPTH_ARRAY_LENGTH_BYTES]; //= mxMalloc(MAX_DEPTH_ARRAY_LENGTH_BYTES);
 
@@ -221,10 +226,15 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     //   [key_value_type,md_index_1b] = json_info_to_data(2,mex_struct,obj_md_index,key_index_1b)
     //
     //
+    //   Inputs
+    //   ------
+    //   double obj_index_1b :
+    //   double key_index_1b :  
     //
     //   Given an object and key index, return:
     //   1) the type of the key value, e.g. string, number, array, etc.
-    //   2) the unique md_index (1 based) for the key value
+    //   2) the unique md_index (1 based) for the key value - note this is 
+    //      different than the key index
     //
     //   See Also
     //  ----------
@@ -478,15 +488,21 @@ void f3__get_homogenous_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray
 
 void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
     //
-    // 0) 6
-    // 1) mex
-    // 2) object_md_index
-    // 3) keys_not_to_parse
-    // 4) include_non_parsed_keys
+    //
+    //                                            0  1           2             3              4
+    //  [struct,key_location] = json_info_to_data(6, mex_struct, object_index, keys_no_parse, keep_all_keys)
+    //
+    //      0) 6
+    //      1) mex_structure
+    //      2) object_md_index - md_index for the object we are parsing
+    //      3) keys_not_to_parse - cellstr
+    //      4) include_non_parsed_keys
     //
     //  Outputs
     //  0) struct
     //  1) key_location (1 based)
+    //      Location of the keys to ignore ...
+    //  
     
     if (nrhs != 5){
         mexErrMsgIdAndTxt("turtle_json:invalid_input",
@@ -542,13 +558,20 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
     int field_number;
     char *field_name;
     for (int iKey = 0; iKey < n_keys_to_ignore; iKey++){
+        //If not a string then field name is null - so yes ...
         field_name = mxArrayToString(mxGetCell(keys_to_ignore,iKey));
+        //Note this approach assumes failure returns null
+        if (!field_name){
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input","not all keys to ignore were strings");
+        }
         field_number = mxGetFieldNumber(example_object,field_name);
         key_locations[iKey] = (double)(field_number+1);
         if (field_number >= 0){
             dont_parse[field_number] = 1;
         }
     }
+    
+    mxFree(field_name);
     
     plhs[1] = mxCreateNumericMatrix(1,0,mxDOUBLE_CLASS,0);
     mxSetN(plhs[1],n_keys_to_ignore);
