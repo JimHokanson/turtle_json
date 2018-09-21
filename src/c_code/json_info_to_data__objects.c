@@ -61,7 +61,8 @@ void parse_object(Data data, mxArray *obj, int ouput_struct_index, int object_md
                         parse_array(data,cur_key_value_md_index));
                 break;
             case TYPE_KEY:
-                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
+                mexErrMsgIdAndTxt("turtle_json:code_error",
+                        "Found key type as child of key");
                 break;
             case TYPE_STRING:
                 mxSetFieldByNumber(obj,ouput_struct_index,iKey,getString(data.d1,data.strings,cur_key_value_md_index));

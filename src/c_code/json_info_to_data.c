@@ -16,29 +16,29 @@ Data populate_data(const mxArray *s){
     
     //Main Data -----------------------------------------------------------
     int n_md_values;
-    data.types = get_u8_field_safe(s, "types");
+    data.types = get_u8_field_safe(s,"types");
     data.d1 = get_int_field_and_length_safe(s,"d1",&n_md_values);
     data.n_md_values = n_md_values;
     
     //Object Data  --------------------------------------------------------
-    const mxArray *object_info = mxGetField(s,0,"object_info");
+    const mxArray *object_info = s; //mxGetField(s,0,"object_info");
     int n_objects;
-    data.object_ids = get_int_field_and_length_safe(object_info,"object_ids",&n_objects);
+    data.object_ids = get_int_field_and_length_safe(object_info,"obj__object_ids",&n_objects);
     
     if (n_objects){
-        data.child_count_object = get_int_field_safe(object_info,"child_count_object");
-        data.next_sibling_index_object = get_int_field_safe(object_info,"next_sibling_index_object");
-        data.objects = get_mx_field_safe(object_info,"objects");
-        const mxArray *key_info = mxGetField(s,0,"key_info");
-        data.next_sibling_index_key = get_int_field_safe(key_info,"next_sibling_index_key");
+        data.child_count_object = get_int_field_safe(object_info,"obj__child_count_object");
+        data.next_sibling_index_object = get_int_field_safe(object_info,"obj__next_sibling_index_object");
+        data.objects = get_mx_field_safe(object_info,"obj__objects");
+        const mxArray *key_info = s;
+        data.next_sibling_index_key = get_int_field_safe(key_info,"key__next_sibling_index_key");
     }
     
     //Array Data  ---------------------------------------------------------
-    const mxArray *array_info = mxGetField(s,0,"array_info");
-    data.child_count_array = get_int_field_safe(array_info,"child_count_array");
-    data.next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
-    data.array_types = get_u8_field_safe(array_info,"array_types");
-    data.array_depths = get_u8_field_safe(array_info,"array_depths");
+    const mxArray *array_info = s;
+    data.child_count_array = get_int_field_safe(array_info,"arr__child_count_array");
+    data.next_sibling_index_array = get_int_field_safe(array_info,"arr__next_sibling_index_array");
+    data.array_types = get_u8_field_safe(array_info,"arr__array_types");
+    data.array_depths = get_u8_field_safe(array_info,"arr__array_depths");
     
     //String Data --------------------------
     data.strings = get_mx_field_safe(s,"strings");
@@ -126,7 +126,7 @@ void f0__full_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
 }
 
 //=========================================================================
-void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]){
+void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]){
     //
     //  index_1b = json_info_to_data(1, mex_struct, obj_md_index, key_name)
     //
@@ -201,10 +201,10 @@ void f1__get_key_index(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[]
     //The actual finding of the key
     //---------------------------------------------------------------------
     int object_data_index = d1[object_md_index];
-    const mxArray *object_info = mxGetField(mex_input,0,"object_info");
-    int *object_ids = get_int_field_safe(object_info,"object_ids");
+    const mxArray *object_info = mex_input;
+    int *object_ids = get_int_field_safe(object_info,"obj__object_ids");
     int object_id = object_ids[object_data_index];
-    const mxArray *objects = get_mx_field_safe(object_info,"objects");
+    const mxArray *objects = get_mx_field_safe(object_info,"obj__objects");
     mxArray *s = mxGetCell(objects,object_id);
     
     char *field_name = mxArrayToString(prhs[3]);
@@ -255,7 +255,8 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     }
     
     if (nlhs != 2){
-        mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.getKeyIndex requires 2 output");
+        mexErrMsgIdAndTxt("turtle_json:invalid_output",
+                "json_info_to_data.getKeyIndex requires 2 output");
     }
     
     const mxArray *mex_input = prhs[1];
@@ -278,8 +279,8 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     //Object Info Setup
     //-----------------------------------------------------------
     int object_data_index = d1[object_md_index];
-    const mxArray *object_info = mxGetField(mex_input,0,"object_info");
-    int *object_counts = get_int_field_and_length_safe(object_info,"child_count_object",&n_values);
+    const mxArray *object_info = mex_input; //mxGetField(mex_input,0,"object_info");
+    int *object_counts = get_int_field_and_length_safe(object_info,"obj__child_count_object",&n_values);
     
     //Key Retrieval and Validation
     //---------------------------------------------------------------------
@@ -294,8 +295,8 @@ void f2__get_key_value_type_and_index(int nlhs, mxArray *plhs[], int nrhs, const
     
     //Now we walk along the object keys until we get to the specified index
     //---------------------------------------------------------------------
-    mxArray *key_info = mxGetField(mex_input,0,"key_info");
-    int *next_sibling_index_key = get_int_field_safe(key_info,"next_sibling_index_key");
+    mxArray *key_info = mex_input; //mxGetField(mex_input,0,"key_info");
+    int *next_sibling_index_key = get_int_field_safe(key_info,"key__next_sibling_index_key");
     
     //-----------------------------------------------
     
@@ -362,7 +363,8 @@ void f3__get_homogenous_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray
     }
     
     if (nlhs != 1){
-        mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f3__get_homogenous_array requires 1 output");
+        mexErrMsgIdAndTxt("turtle_json:invalid_output",
+                "json_info_to_data.f3__get_homogenous_array requires 1 output");
     }
     
     const mxArray *mex_input = prhs[1];
@@ -398,11 +400,11 @@ void f3__get_homogenous_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray
     
     //Array info extraction
     //---------------------------------------------------------------------
-    const mxArray *array_info = mxGetField(mex_input,0,"array_info");
-    uint8_t *array_types = get_u8_field_safe(array_info,"array_types");
-    int *child_count_array = get_int_field_safe(array_info,"child_count_array");
-    int *next_sibling_index_array = get_int_field_safe(array_info,"next_sibling_index_array");
-    uint8_t *array_depths = get_u8_field_safe(array_info,"array_depths");
+    const mxArray *array_info = mex_input; //mxGetField(mex_input,0,"array_info");
+    uint8_t *array_types = get_u8_field_safe(array_info,"arr__array_types");
+    int *child_count_array = get_int_field_safe(array_info,"arr__child_count_array");
+    int *next_sibling_index_array = get_int_field_safe(array_info,"arr__next_sibling_index_array");
+    uint8_t *array_depths = get_u8_field_safe(array_info,"arr__array_depths");
     
     mxArray *strings = get_mx_field_safe(mex_input,"strings");
     double *numeric_data = (double *)mxGetData(mxGetField(mex_input,0,"numeric_p"));
@@ -430,13 +432,15 @@ void f3__get_homogenous_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray
     
     switch (observed_array_type){
         case ARRAY_OTHER_TYPE:
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array option not support for non nd-array");
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "nd_array option not support for non nd-array");
             break;
         case ARRAY_NUMERIC_TYPE:
             if (expected_array_type == 0){
                 plhs[0] = parse_array_with_options(data, array_md_index, &options);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","numeric array observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "numeric array observed but not expected");
             }
             break;
         case ARRAY_STRING_TYPE:
@@ -446,41 +450,48 @@ void f3__get_homogenous_array(int nlhs, mxArray *plhs[], int nrhs, const mxArray
 //                     child_count_array[cur_array_data_index],
 //                     array_md_index,strings);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array string observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "nd_array string observed but not expected");
             }
             break;
         case ARRAY_LOGICAL_TYPE:
             if (expected_array_type == 2){
                 plhs[0] = parse_array_with_options(data, array_md_index, &options);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array logical observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "nd_array logical observed but not expected");
             }
             break;
         case ARRAY_OBJECT_SAME_TYPE:
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array option not support for non nd-array");
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "nd_array option not support for non nd-array");
             break;
         case ARRAY_OBJECT_DIFF_TYPE:
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array option not support for non nd-array");
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "nd_array option not support for non nd-array");
             break;
         case ARRAY_ND_NUMERIC:
             if (expected_array_type == 0){
                 plhs[0] = parse_array_with_options(data, array_md_index, &options);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array numeric observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "nd_array numeric observed but not expected");
             }
             break;
         case ARRAY_ND_STRING:
             if (expected_array_type == 1){
                 plhs[0] = parse_array_with_options(data, array_md_index, &options);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array string observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "nd_array string observed but not expected");
             }
             break;
         case ARRAY_ND_LOGICAL:
             if (expected_array_type == 2){
                 plhs[0] = parse_array_with_options(data, array_md_index, &options);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","nd_array logical observed but not expected");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "nd_array logical observed but not expected");
             }
             break;
     }
@@ -536,9 +547,11 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
     int object_md_index = ((int)mxGetScalar(prhs[2]))-1;
     
     if (object_md_index < 0 || object_md_index >= data.n_md_values){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f6");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "md_index out of range for f6");
     }else if (data.types[object_md_index] != TYPE_OBJECT){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index does not point to an object");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "md_index does not point to an object");
     }
     
     int object_data_index = data.d1[object_md_index];
@@ -562,7 +575,8 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
         field_name = mxArrayToString(mxGetCell(keys_to_ignore,iKey));
         //Note this approach assumes failure returns null
         if (!field_name){
-        	mexErrMsgIdAndTxt("turtle_json:invalid_input","not all keys to ignore were strings");
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "not all keys to ignore were strings");
         }
         field_number = mxGetFieldNumber(example_object,field_name);
         key_locations[iKey] = (double)(field_number+1);
@@ -601,7 +615,8 @@ void f6__partial_object_parsing(int nlhs, mxArray *plhs[], int nrhs, const mxArr
                             parse_array(data,cur_key_value_md_index));
                     break;
                 case TYPE_KEY:
-                    mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of key");
+                    mexErrMsgIdAndTxt("turtle_json:code_error",
+                            "Found key type as child of key");
                     break;
                 case TYPE_STRING:
                     mxSetFieldByNumber(obj,0,iKey,getString(data.d1,data.strings,cur_key_value_md_index));
@@ -646,17 +661,22 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
     //
     
     if (nrhs != 4){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.f7 requires 4 inputs");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "json_info_to_data.f7 requires 4 inputs");
     }else if (!mxIsClass(prhs[1],"struct")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","2nd input to json_info_to_data.f7 needs to be a structure");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "2nd input to json_info_to_data.f7 needs to be a structure");
     }else if (!mxIsClass(prhs[2],"double")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","3rd input to json_info_to_data.f7 needs to be a double");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "3rd input to json_info_to_data.f7 needs to be a double");
     }else if (!mxIsClass(prhs[3],"struct")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","4th input to json_info_to_data.f7 needs to be a structure");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "4th input to json_info_to_data.f7 needs to be a structure");
     }
     
     if (nlhs != 1){
-        mexErrMsgIdAndTxt("turtle_json:invalid_output","json_info_to_data.f0 requires 1 output");
+        mexErrMsgIdAndTxt("turtle_json:invalid_output",
+                "json_info_to_data.f0 requires 1 output");
     }
     
     const mxArray *s = prhs[1];
@@ -667,7 +687,8 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
     FullParseOptions options = populate_parse_options(prhs[3]);
     
     if (md_index < 0 || md_index >= data.n_md_values){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","md_index out of range for f0");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "md_index out of range for f0");
     }
     
     if (data.types[md_index] == TYPE_KEY){
@@ -687,7 +708,8 @@ void f7__full_options_parse(int nlhs, mxArray *plhs[], int nrhs, const mxArray*p
             break;
         case TYPE_KEY:
             //We should already check against this ...
-            mexErrMsgIdAndTxt("turtle_json:code_error","key child of key found, code error made somewhere");
+            mexErrMsgIdAndTxt("turtle_json:code_error",
+                    "key child of key found, code error made somewhere");
             break;
         case TYPE_STRING:
             plhs[0] = getString(data.d1,data.strings,md_index);
@@ -744,12 +766,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //  mex_struct : output structure from turtle_json
     
     if (nrhs < 1){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","json_info_to_data.mex requires at least one input");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "json_info_to_data.mex requires at least one input");
     }
     
     //Ideally we could allow any number, but Matlab tends to use doubles
     if (!mxIsClass(prhs[0],"double")){
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","First input needs to be a double");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "First input needs to be a double");
     }
     
     switch ((int)mxGetScalar(prhs[0])){
@@ -778,7 +802,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             f7__full_options_parse(nlhs,plhs,nrhs,prhs);
             break;
         default:
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","Function option not recognized");
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "Function option not recognized");
             
     }
 }

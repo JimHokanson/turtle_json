@@ -88,7 +88,8 @@ void populate_dims__column_major(mwSize *dims, int *d1,
 mxArray* parse_empty_numeric_array(mwSize *dims, int array_size){
     
     if (array_size > MAX_ARRAY_DIMS){
-        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth",
+                "The maximum nd array depth depth was exceeded");
     }
     
     for (int iDim = 0; iDim < array_size; iDim++){
@@ -147,7 +148,8 @@ mxArray* parse_nd_numeric_array_column_major(int *d1, mwSize *dims,
     //and recycle between mex calls
     
     if (array_depth > MAX_ARRAY_DIMS){
-        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth","The maximum nd array depth depth was exceeded");
+        mexErrMsgIdAndTxt("turtle_json:max_nd_array_depth",
+                "The maximum nd array depth depth was exceeded");
     }
     
     //The -1 is for previous value before the next sibling
@@ -815,7 +817,8 @@ mxArray* parse_non_homogenous_array(Data data, int array_data_index, int array_m
                 current_md_index = data.next_sibling_index_array[current_data_index];
                 break;
             case TYPE_KEY:
-                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
+                mexErrMsgIdAndTxt("turtle_json:code_error",
+                        "Found key type as child of array");
                 break;
             case TYPE_STRING:
                 mxSetCell(output, iData, getString(data.d1,data.strings,current_md_index));
@@ -871,7 +874,8 @@ mxArray* parse_non_homogenous_array_with_options(Data data, int array_data_index
                 current_md_index = data.next_sibling_index_array[current_data_index];
                 break;
             case TYPE_KEY:
-                mexErrMsgIdAndTxt("turtle_json:code_error","Found key type as child of array");
+                mexErrMsgIdAndTxt("turtle_json:code_error",
+                        "Found key type as child of array");
                 break;
             case TYPE_STRING:
                 mxSetCell(output, iData, getString(data.d1,data.strings,current_md_index));

@@ -44,7 +44,8 @@ uint8_t* get_u8_field_safe(const mxArray *s,const char *fieldname){
     if (temp){
         return (uint8_t *)mxGetData(temp);
     }else{
-        mexErrMsgIdAndTxt("turtle_json:field_retrieval","Failed to retrieve field: %s",fieldname);
+        mexErrMsgIdAndTxt("turtle_json:field_retrieval",
+                "Failed to retrieve field: %s",fieldname);
     }
 }
 int* get_int_field_safe(const mxArray *s,const char *fieldname){
@@ -52,7 +53,8 @@ int* get_int_field_safe(const mxArray *s,const char *fieldname){
     if (temp){
         return (int *)mxGetData(temp);
     }else{
-        mexErrMsgIdAndTxt("turtle_json:field_retrieval","Failed to retrieve field: %s",fieldname);
+        mexErrMsgIdAndTxt("turtle_json:field_retrieval",
+                "Failed to retrieve field: %s",fieldname);
     }
 }
 int* get_int_field_and_length_safe(const mxArray *s,const char *fieldname,int *n_values){
@@ -67,7 +69,8 @@ int* get_int_field_and_length_safe(const mxArray *s,const char *fieldname,int *n
         *n_values = mxGetN(temp);
         return (int *)mxGetData(temp);
     }else{
-        mexErrMsgIdAndTxt("turtle_json:field_retrieval","Failed to retrieve field: %s",fieldname);
+        mexErrMsgIdAndTxt("turtle_json:field_retrieval",
+                "Failed to retrieve field: %s",fieldname);
     }
 }
 mxArray* get_mx_field_safe(const mxArray *s,const char *fieldname){
@@ -75,7 +78,8 @@ mxArray* get_mx_field_safe(const mxArray *s,const char *fieldname){
     if (temp){
         return temp;
     }else{
-        mexErrMsgIdAndTxt("turtle_json:field_retrieval","Failed to retrieve field: %s",fieldname);
+        mexErrMsgIdAndTxt("turtle_json:field_retrieval",
+                "Failed to retrieve field: %s",fieldname);
     }
 }
 //=========================================================================
