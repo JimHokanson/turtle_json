@@ -389,7 +389,8 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
                     continue;
                 }                
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","Optional input 'raw_string' must be double or logical");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "Optional input 'raw_string' must be double or logical");
             }
         	if (mxIsClass(prhs[0],"char")){
                 options->has_raw_string = true;
@@ -399,34 +400,40 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
                 //Note, we'll allow bytes for a "raw_string"
                 options->has_raw_bytes = true;
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","raw_string is true but the first data input was not of type 'char', 'int8', or 'uint8'");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "raw_string is true but the first data input was not of type 'char', 'int8', or 'uint8'");
             }
         }else if (strcmp(prop_string,"n_tokens") == 0){
             if (mxIsClass(mx_value,"double")){
                 options->n_tokens = (int)mxGetScalar(mx_value);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_tokens option needs to be a double");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "n_tokens option needs to be a double");
             }    
         }else if (strcmp(prop_string,"n_keys") == 0){
             if (mxIsClass(mx_value,"double")){
                 options->n_keys = (int)mxGetScalar(mx_value);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_keys option needs to be a double");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "n_keys option needs to be a double");
             } 
     	}else if (strcmp(prop_string,"n_strings") == 0){
             if (mxIsClass(mx_value,"double")){
                 options->n_strings = (int)mxGetScalar(mx_value);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_strings option needs to be a double");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "n_strings option needs to be a double");
             }
         }else if (strcmp(prop_string,"n_numbers") == 0){
          	if (mxIsClass(mx_value,"double")){
                 options->n_numbers = (int)mxGetScalar(mx_value);
             }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input","n_numbers option needs to be a double");
+                mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                        "n_numbers option needs to be a double");
             }
         }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","Unrecognized optional input: %s",prop_string);
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "Unrecognized optional input: %s",prop_string);
         }
         
     }  

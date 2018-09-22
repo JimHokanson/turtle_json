@@ -22,6 +22,8 @@ function mex_turtle_json(file_id,varargin)
 %
 %   TODO: move clearing code to mex maker
 
+
+%TODO: These are not really needed anymore ...
 p = inputParser;
 addOptional(p,'log_timing',true);
 addOptional(p,'log_alloc',true);

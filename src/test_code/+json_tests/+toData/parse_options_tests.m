@@ -6,6 +6,8 @@ function parse_options_tests()
 json_tests.toData.parse_options_tests
 %}
 
+fprintf('Running toData.parse_options_tests()\n')
+
 
 % typedef struct {
 %     int max_numeric_collapse_depth;

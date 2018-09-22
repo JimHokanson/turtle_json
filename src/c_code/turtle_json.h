@@ -199,10 +199,14 @@ enum OUT_FIELD {
  *
  */
 
+//mac ns
+//https://stackoverflow.com/questions/361363/how-to-measure-time-in-milliseconds-using-ansi-c/37920181#37920181
+        
 //http://stackoverflow.com/questions/10673732/openmp-time-and-clock-calculates-two-different-results
 //These two MACROS are meant to be used like TIC and TOC in Matlab
 //These were added when I got an error declaring TIC(x) immediately
 //after a label
+       
 #ifdef LOG_TIME
 #define DEFINE_TIC(x) \
     struct timeval x ## _0; \
@@ -210,7 +214,7 @@ enum OUT_FIELD {
 #else
 #define DEFINE_TIC(x) do {} while (0)      
 #endif
-
+                
 #ifdef LOG_TIME   
 #define START_TIC(x) gettimeofday(&x##_0,NULL);
 #else
@@ -236,6 +240,10 @@ enum OUT_FIELD {
 #else
 #define TOC(x,y) do {} while (0)     
 #endif
+
+    
+    
+    
     
 //This  should no longer be used because we're not adding
 //any fields dynamically

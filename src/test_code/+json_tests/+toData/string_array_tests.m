@@ -6,6 +6,7 @@ function string_array_tests()
 json_tests.toData.string_array_tests
 %}
 
+fprintf('Running toData.string_array_tests()\n')
 
 
 fh2 = @json_tests.utils.runTest;
@@ -30,7 +31,7 @@ fh2(0,encode(data),'','deep strings V1',{'test'});
 %singleton dimensions
 
 data = {{{{'test','cheese'}}}};
-fh2(0,encode(data),'','deep strings V2',{'test';'cheese'}, {'column_major',true})
+fh2(0,encode(data),'','deep strings V2',{'test';'cheese'}, {'column_major',true});
 
 data = {{{{'test','cheese'}}}};
 temp = cell(1,1,1,2);

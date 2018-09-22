@@ -16,10 +16,8 @@ classdef tokens
             %x Load tokens from file
             %
             %   root = json.tokens.load(file_path,varargin)
-            %
-
-            %   
-            %   
+            % 
+            %   Options are described in json.load   
             %
             %   See Also
             %   --------
