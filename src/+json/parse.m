@@ -39,6 +39,7 @@ if nargin > 1
     end 
 end
 
+%'raw_string',true
 root = json.tokens.parse(json_string,token_options{:});
 
 data = root.getParsedData(data_options{:});

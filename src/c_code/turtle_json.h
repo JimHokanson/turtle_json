@@ -8,6 +8,10 @@
 #include <time.h>       //clock()
 #include <sys/time.h>   //for gettimeofday
 
+#ifdef _WIN32
+#include <windows.h> //QPC
+#endif
+
 //Added for tj_get_log_struct_as_mx
 //Currently required for main program ...
 #ifndef NO_OPENMP
@@ -24,6 +28,10 @@
 //=========================================================================
 //  Define Options
 //  --------------
+//
+//  Note, the LOG options aren't that critical because I'm now writing
+//  the times into a c-structure, rather than a Matlab structure, which is
+//  way more memory efficient for scalars.
 //
 //  LOG_TIME - If defined no timing will occur. Internally I track a fair
 //            amount of timing information and this disables the logging
@@ -47,9 +55,17 @@
 //TODO: This could be based on the threads. In general
 //I haven't tested what a good cutoff is. Note this only has 
 //a roughly 150 us overhead so it's not critical.
-#define N_NUMBERS_FOR_PARALLEL 21
+#define N_NUMBERS_FOR_PARALLEL 2001
 
+//This is our guess for the # of unique objects. An object is unique
+//if its field names are unique (order matters - i.e. 'a','b' is not 'b','a')
+//
+//See turtle_json_pp_objects.c
 #define N_INITIAL_UNIQUE_OBJECTS 40
+
+
+#define MAX_OPENMP_THREADS 16
+
 
 //AVX
 //#include "immintrin.h"
@@ -83,15 +99,34 @@
 #define ARRAY_ND_EMPTY 10
 
 
-//String Parsing Flag
+//String Parsing Flags
 //-------------------------------------------
+//
+//  turtle_json_post_process.c
+//  TODO: mention code that uses this ...
 #define STRING_PARSE_NOT_DONE 0
 #define STRING_PARSE_DONE 1
 #define STRING_PARSE_INVALID_ESCAPE 2
 #define STRING_PARSE_INVALID_HEX 3
+#define STRING_PARSE_NON_CONTINUED_UTF8 4
+#define STRING_PARSE_INVALID_LONG_UTF8 5
+#define STRING_PARSE_INVALID_FIRST_BYTE_UTF8 6
 
-//Structure data of fixed size ...
-//See Also: tj_get_log_struct_ax_mx.c
+//C Structure for fixed size output data
+//-----------------------------------------------------
+//
+//This is a C structure for logging data. It gets put into "slog" in the
+//output structure (shows up as an array of uint8). Using a C structure
+//has much less memory and performance overhead than using a Matlab structure.
+//
+//If the user wishes to inspect this structure in Matlab it needs to be 
+//converted to a Matlab structure. This can be done by passing the output
+//from turtle_json_mex to json.utils.getMexC().
+//
+//***Updating this requires updating tj_get_log_struct_as_mx.c
+//
+//  See Also
+//  tj_get_log_struct_ax_mx.c
 struct sdata{
     int obj__n_objects_at_depth[MAX_DEPTH_ARRAY_LENGTH];
     int arr__n_arrays_at_depth[MAX_DEPTH_ARRAY_LENGTH];
@@ -111,6 +146,7 @@ struct sdata{
     int obj__max_keys_in_object;
     int obj__n_unique_objects;
     double time__elapsed_read_time;
+    double time__c_parse_init_time;
     double time__c_parse_time;
     double time__parsed_data_logging_time;
     double time__total_elapsed_parse_time;
@@ -122,9 +158,21 @@ struct sdata{
     double time__string_parsing_time;
     double time__total_elapsed_pp_time;
     double time__total_elapsed_time_mex;
+    double qpc_freq;
+    int n_nulls;
+    int n_tokens;
+    int n_arrays;
+    int n_numbers;
+    int n_objects;
+    int n_keys;
+    int n_strings;
 };
 
 //Options structure
+//-------------------------------------------------------
+//  These are options that the parser can use to change parsing behavior.
+//
+//  TODO: Where are these defined. Potentially this should just be done here.
 typedef struct {
    bool has_raw_string;
    bool has_raw_bytes;
@@ -153,6 +201,12 @@ extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
 //Created using prepStructs.m
 //-------------------------------------------------
 //Change this and fieldnames_out in turtle_json_mex simultaneously
+//
+//These are fields in the output mex strcture.
+//
+//When setting structure fields we set them by number. This is our
+//numbering system. Turtle_json_mex defines the fieldnames (key strings) 
+//of the structure.
 enum OUT_FIELD {
      E_json_string,
      E_types,
@@ -206,37 +260,59 @@ enum OUT_FIELD {
 //These two MACROS are meant to be used like TIC and TOC in Matlab
 //These were added when I got an error declaring TIC(x) immediately
 //after a label
-       
+ 
+//          DEFINE_TIC
+//-----------------------------------
 #ifdef LOG_TIME
-#define DEFINE_TIC(x) \
-    struct timeval x ## _0; \
-    struct timeval x ## _1;
+    #ifdef _WIN32
+        #define DEFINE_TIC(x)  \
+        LARGE_INTEGER x ## _0; \
+        LARGE_INTEGER x ## _1;  
+    #else
+        #define DEFINE_TIC(x)   \
+        struct timeval x ## _0; \
+        struct timeval x ## _1;    
+    #endif
 #else
-#define DEFINE_TIC(x) do {} while (0)      
+    #define DEFINE_TIC(x) do {} while (0)      
 #endif
-                
+
+//          START_TIC
+//--------------------------------------------
 #ifdef LOG_TIME   
-#define START_TIC(x) gettimeofday(&x##_0,NULL);
+    #ifdef _WIN32 
+        #define START_TIC(x) QueryPerformanceCounter(&x##_0);
+    #else    
+        #define START_TIC(x) gettimeofday(&x##_0,NULL);
+    #endif
 #else
-#define START_TIC(x) do {} while (0) 
+    #define START_TIC(x) do {} while (0) 
 #endif    
     
-//TODO: Make this call start and define
+//          TIC
+//--------------------------------------------        
 #ifdef LOG_TIME    
 #define TIC(x) \
-    struct timeval x ## _0; \
-    struct timeval x ## _1; \
-    gettimeofday(&x##_0,NULL);
+    DEFINE_TIC(x); \
+    START_TIC(x);            
 #else
 #define TIC(x) do {} while (0)     
 #endif    
-     
+
+//          TOC
+//--------------------------------------------     
 //x->name of structure
 //y->output name
 #ifdef LOG_TIME   
-#define TOC(x,y) \
-    gettimeofday(&x##_1,NULL); \
-    slog->y = (double)(x##_1.tv_sec - x##_0.tv_sec) + (double)(x##_1.tv_usec - x##_0.tv_usec)/1e6;
+    #ifdef _WIN32 
+        #define TOC(x,y) \
+            QueryPerformanceCounter(&x##_1); \
+            slog->y = (double)(x##_1.QuadPart - x##_0.QuadPart)*1000000;
+    #else
+        #define TOC(x,y) \
+            gettimeofday(&x##_1,NULL); \
+            slog->y = (double)(x##_1.tv_sec - x##_0.tv_sec) + (double)(x##_1.tv_usec - x##_0.tv_usec)/1e6;
+    #endif
 #else
 #define TOC(x,y) do {} while (0)     
 #endif
@@ -262,7 +338,6 @@ void string_to_double_v2(double *value_p, char *p, int i, int *error_p, int *err
 void parse_json(unsigned char *js, size_t len, mxArray *plhs[], Options *options, struct sdata *slog);
 
 //
-void throw_error_simple(mxArray *plhs[], const char *error_source, const char *error_msg);
 
 //Helpers
 //-------------------------------------------------------------------------
@@ -291,6 +366,8 @@ mwSize get_field_length2(mxArray *p,const char *fieldname);
 
 //Post-processing related
 //-------------------------------------------------------------------------
+uint16_t parse_escaped_unicode_char(unsigned char **pp, unsigned char *p, int *parse_status);
+
 uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status);
 
 void populateProcessingOrder(int *process_order, uint8_t *types, int n_entries, 

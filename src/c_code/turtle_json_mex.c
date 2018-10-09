@@ -1,4 +1,6 @@
 #include "turtle_json.h"
+#include "simd_guard.h"
+
 //
 //  This file contains the entry function as well as handling of the inputs.
 
@@ -8,6 +10,7 @@
 //                                     \  "
 uint8_t BUFFER_STRING2[N_PADDING] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
+static struct cpu_x86 s;
 int initialized = 0;
 mxArray *perm_out; 
 
@@ -39,24 +42,33 @@ const char *fieldnames_out[] = {
 
 
 void initialize_structs(){
+    //We initialize a persistent array so that on subsequent calls
+    //we duplicate the array, rather than trying to parse the fieldnames
+    //
+    //TODO: Link to jim's mex testing speed code ...
     
     mxArray *mx_temp;
     
     perm_out = mxCreateStructMatrix(1,1,ARRAY_SIZE(fieldnames_out),fieldnames_out);   
     mexMakeArrayPersistent(perm_out);
     
-    //TODO: Add fields
-    
-    //mxSetFieldByNumber(perm_out,1,5,perm_obj);
-    //void mxSetFieldByNumber(mxArray *pm, mwIndex index, int fieldnumber, mxArray *pvalue);
+    //Currently we've defined the structure and the fieldnames, but
+    //the fields themselves are empty and need to be created and populated
+    //with data.
+    //
+    //TODO: It may be advantageous to populate each field with a properly
+    //defined mxArray with no data pointer (i.e. header only - because the 
+    //data are changed in the code, so no point in allocating that now)
     
 }
 
 static void clear_persistent_data(void)
 {
+    //When the mex clears we call this function which clears our 
+    //peristent data.
+    
     //mexPrintf("Clearing peristent memory.\n");
     mxDestroyArray(perm_out);
-    //mxDestroyArray(perm_obj);
 }
 
 //=========================================================================
@@ -102,22 +114,7 @@ void add_parse_buffer(unsigned char *buffer, size_t array_length){
     //  that process multiple characters at a time (i.e. we don't want to
     //  parse past the end of the string)
     
-    //TODO: Do a memcpy
-    
-    //void * memcpy ( void * destination, const void * source, s );
-    
     memcpy(&buffer[array_length],BUFFER_STRING2,N_PADDING);
-//     
-//     buffer[array_length] = 0;
-//     //On encountering a quote, we always need to look back.
-//     buffer[array_length+1] = '\\';
-//     buffer[array_length+2] = '"';
-//     for (int i = 3; i < N_PADDING; i++){
-//         //length 1, index 0
-//         //length file_length, max index - file_length-1
-//         //so padding starts at file_length + 0
-//         buffer[array_length + i] = 0;
-//     }
 }
 
 void process_input_string(const mxArray *prhs[], unsigned char **json_string, size_t *json_string_length, int *buffer_added){
@@ -133,6 +130,29 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
     unsigned char *input_string;
     unsigned char *output_string;
     
+    bool has_buffer;
+    
+    //TODO: Rewrite:
+    //1) Support buffer check of string, not on bytes
+    //2) Support string to bytes using better approach than whatever
+    //   Matlab is currently doing - need to verify no high bytes set.
+    
+    
+    input_string_length = mxGetNumberOfElements(prhs[0]);
+    
+    //Step 1 - check for buffer ...
+    //--------------------------------
+    has_buffer = false;
+    
+    //JAH: At this point ...
+    /*
+    output_string_length = input_string_length + N_PADDING;
+    output_string = mxMalloc(output_string_length);
+
+     */
+    
+    //For now we'll assume no high bytes ... (but check for it)
+    
     //  TODO: It is not clear that these methods will respect UTF-8 encoding
     //      => mxArrayToString_UTF8 - when was this deprecated?
     //      => mxArrayToUTF8String  - 2015a
@@ -144,7 +164,7 @@ void process_input_string(const mxArray *prhs[], unsigned char **json_string, si
     //  anyway, so we might as well both transform the string and add the buffer
     //  at the same time, rather than do two memory reallocations
     input_string = (unsigned char *) mxArrayToString(prhs[0]);
-    input_string_length = mxGetNumberOfElements(prhs[0]);
+    
     
     if (padding_is_necessary(input_string,input_string_length)){
         *buffer_added = 1;
@@ -218,7 +238,7 @@ void throw_missing_file_error(const char *file_path, size_t file_path_string_len
     sprintf(buffer,
             "Unable to read file: \"%s\"\nIf input is really a string use "
             "json.tokens.parse or json.parse instead",file_path_short);
-    throw_error_simple(0,"turtle_json:file_open",buffer);    
+    mexErrMsgIdAndTxt("turtle_json:file_open",buffer);    
 }
 
 void read_file_to_string(const mxArray *prhs[], unsigned char **p_buffer, size_t *string_byte_length){
@@ -282,12 +302,14 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[],
     unsigned char *raw_string;
     unsigned char *json_string2;
     int buffer_added = 1;
-    int is_input = 0;
+    
+    //TODO: I think this should be renamed ...
+    int is_input = 0; //Indicates that input bytes already had buffer
     
     if (options->has_raw_string){
         //Technically I think options checking covers this ...
      	if (!mxIsClass(prhs[0],"char")){
-            throw_error_simple(0,"turtle_json:invalid_input","'raw_string' input needs to be a string"); 
+            mexErrMsgIdAndTxt("turtle_json:invalid_input", "'raw_string' input needs to be a string");
         }
         process_input_string(prhs,json_string,string_byte_length,&buffer_added);
     }else if (options->has_raw_bytes){
@@ -295,7 +317,7 @@ void get_json_string(mxArray *plhs[], int nrhs, const mxArray *prhs[],
         process_input_bytes(prhs,json_string,string_byte_length,&buffer_added,&is_input);
     }else{
         if (!mxIsClass(prhs[0],"char")){
-            throw_error_simple(0,"turtle_json:invalid_input","'file_path' input needs to be a string"); 
+            mexErrMsgIdAndTxt("turtle_json:invalid_input","'file_path' input needs to be a string"); 
         }
         read_file_to_string(prhs,json_string,string_byte_length);
     }
@@ -327,20 +349,23 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
     //x Populate options structure based on optional inputs
     //
     //  The parsing function is called with the following format:
-    //
     //      turtle_json_mex(file_path__or__string,varargin)
     //
-    //  
-    //  The varargin represents property/value pairs
-    //
+    //  varargin represents property/value pairs
     //
     //  For example we might have:
-    //  
     //      turtle_json_mex(file_path,'n_tokens',10)
     //
     //  This function populates the options structure based on these
     //  optional inputs.
     //
+    //  Inputs
+    //  ------
+    //  raw_string
+    //  n_tokens
+    //  n_keys
+    //  n_strings
+    //  n_numbers
     //
     //  See Also
     //  --------
@@ -361,10 +386,11 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
         //We have an error if even, since the # of inputs is 
         //equal to the # of optional inputs + 1 (json string or bytes), 
         //thus if nrhs is even then the # of optional inputs is odd
-        mexErrMsgIdAndTxt("turtle_json:invalid_input","Number of optional inputs must be even");
+        mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "Number of optional inputs must be even");
     }
     
-    char* prop_string;
+    int64_t* prop_string;
     mxArray *mx_prop;
     mxArray *mx_value;
     for (int i = 1; i < nrhs; i+=2){
@@ -372,19 +398,30 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
         mx_value = prhs[i+1];
         
         if (!mxIsClass(mx_prop,"char")){
-            mexErrMsgIdAndTxt("turtle_json:invalid_input","Odd optional input was not a string as expected");
+            mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                    "Odd optional input was not a string as expected");
+        }else if(mxGetN(mx_prop) < 4){
+        	mexErrMsgIdAndTxt("turtle_json:invalid_input",
+                "String length too short");
         }
+            
+            
         
-        prop_string = mxArrayToString(mx_prop);
+        prop_string = (int64_t *)mxGetData(mx_prop);
         
-        //Could potentially hash this ...
-        if (strcmp(prop_string,"raw_string") == 0){
-            //TODO: Get logical and exit early if false ...
+        //TODO: Could replace with call 
+        //prop_string = mxArrayToString(mx_prop);
+        
+        //  typecast(uint16('raw_'),'int64')
+        if (*prop_string == 26740633894977650){
+            mexPrintf("raw_string\n");
             if (mxIsClass(mx_value,"logical")){
+                //If logical and false, exit early
                 if (!(*(uint8_t *)mxGetData(mx_value))){
                     continue;
                 }
             }else if (mxIsClass(mx_value,"double")){
+                //If double and 0, exit early
                 if (!(mxGetScalar(mx_value))){
                     continue;
                 }                
@@ -392,6 +429,7 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
                         "Optional input 'raw_string' must be double or logical");
             }
+            
         	if (mxIsClass(prhs[0],"char")){
                 options->has_raw_string = true;
             }else if (mxIsClass(prhs[0],"uint8") || mxIsClass(prhs[0],"int8")){
@@ -403,61 +441,56 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
                         "raw_string is true but the first data input was not of type 'char', 'int8', or 'uint8'");
             }
-        }else if (strcmp(prop_string,"n_tokens") == 0){
-            if (mxIsClass(mx_value,"double")){
-                options->n_tokens = (int)mxGetScalar(mx_value);
-            }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                        "n_tokens option needs to be a double");
-            }    
-        }else if (strcmp(prop_string,"n_keys") == 0){
-            if (mxIsClass(mx_value,"double")){
-                options->n_keys = (int)mxGetScalar(mx_value);
-            }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                        "n_keys option needs to be a double");
-            } 
-    	}else if (strcmp(prop_string,"n_strings") == 0){
-            if (mxIsClass(mx_value,"double")){
-                options->n_strings = (int)mxGetScalar(mx_value);
-            }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                        "n_strings option needs to be a double");
-            }
-        }else if (strcmp(prop_string,"n_numbers") == 0){
-         	if (mxIsClass(mx_value,"double")){
-                options->n_numbers = (int)mxGetScalar(mx_value);
-            }else{
-                mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                        "n_numbers option needs to be a double");
-            }
-        }else{
-            mexErrMsgIdAndTxt("turtle_json:invalid_input",
-                    "Unrecognized optional input: %s",prop_string);
         }
         
+// // //         else if (strcmp(prop_string,"n_tokens") == 0){
+// // //             if (mxIsClass(mx_value,"double")){
+// // //                 options->n_tokens = (int)mxGetScalar(mx_value);
+// // //             }else{
+// // //                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
+// // //                         "n_tokens option needs to be a double");
+// // //             }    
+// // //         }else if (strcmp(prop_string,"n_keys") == 0){
+// // //             if (mxIsClass(mx_value,"double")){
+// // //                 options->n_keys = (int)mxGetScalar(mx_value);
+// // //             }else{
+// // //                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
+// // //                         "n_keys option needs to be a double");
+// // //             } 
+// // //     	}else if (strcmp(prop_string,"n_strings") == 0){
+// // //             if (mxIsClass(mx_value,"double")){
+// // //                 options->n_strings = (int)mxGetScalar(mx_value);
+// // //             }else{
+// // //                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
+// // //                         "n_strings option needs to be a double");
+// // //             }
+// // //         }else if (strcmp(prop_string,"n_numbers") == 0){
+// // //          	if (mxIsClass(mx_value,"double")){
+// // //                 options->n_numbers = (int)mxGetScalar(mx_value);
+// // //             }else{
+// // //                 mexErrMsgIdAndTxt("turtle_json:invalid_input",
+// // //                         "n_numbers option needs to be a double");
+// // //             }
+// // //         }else{
+// // //             mexErrMsgIdAndTxt("turtle_json:invalid_input",
+// // //                     "Unrecognized optional input: %s",prop_string);
+// // //         }
     }  
 }
-
-void throw_error_simple(mxArray *plhs[], const char *error_source, const char *error_msg){
-    //TODO: If plhs is null, then don't do anything
-    
-     //TODO: Do the logging of the error message 
-     
-    mexErrMsgIdAndTxt(error_source, error_msg);
-
-}
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
 {
     //  This function is meant to be called by the json.tokens constructor
     //
+    //  It is also called via json.load or json.parse
+    //
     //  Usage:
     //  ------
-    //  token_info = turtle_json(file_path,varargin)
+    //  token_info = turtle_json_mex(file_path,varargin)
     //
-    //  token_info = turtle_json(raw_string,varargin)
+    //  token_info = turtle_json_mex(raw_string,varargin)
+    //
+    //  token_info = turtle_json_mex(raw_bytes,varargin)
     //
     //  Inputs
     //  ------
@@ -473,64 +506,61 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //  token_info
     //      - see wrapping Matlab function
     
-    //I think it might be better to 
-    //make structures that hold info on each thing
-    //  - objects
-    //  - arrays
-    //  etc
-//     const char *fieldnames[] = {
-//         "buffer_added","json_string","allocation_info","timing_info",
-//         "types", "d1","child_count_object","next_sibling_index_object",
-//         "object_depths","n_objects_at_depth","object_ids","object_indices"}
-    
-    //Structures
-    //1) output
-    //2) object info
-    //3) array info
-    //4) key_info
-    //5) timing_info
-    //6) allocation info
-    
     TIC(start_mex);
     
-    //# of inputs check  --------------------------------------------------
+    //# of inputs and outputs check ---------------------------------------
     if (nrhs < 1){
-        throw_error_simple(0,"turtle_json:n_inputs","Invalid # of inputs,at least 1 input expected");
+        mexErrMsgIdAndTxt("turtle_json:n_inputs",
+                "Invalid # of inputs, at least 1 input expected");
     }else if (!(nlhs == 1)){
-      	throw_error_simple(0,"turtle_json:n_inputs","Invalid # of outputs, 1 expected");
+      	mexErrMsgIdAndTxt("turtle_json:n_outputs",
+                "Invalid # of outputs, 1 expected");
     }
     
-    
-    
-    
+    //Initialization
+    //---------------------------------------------------------------------
     if (!initialized){
+        cpu_x86__detect_host(&s);
+        //TODO: This also needs to respect any compiling options
+        //HW_AVX && OS_AVX 
+        //s.HW_AVX && s.OS_AVX
+        if (!s.HW_SSE42){
+            mexErrMsgIdAndTxt("turtle_json:simd_error",
+                "Processor doesn't support SIMD code used");
+        }
+        //This is meant to speed up subsequent calls
         initialized = 1;
         initialize_structs();        
         mexAtExit(clear_persistent_data);
     }
     
+    //We hold onto this in memory as slog in the output structure
+    //Note zeroing is important as we don't always set all fields
+    //  and a default of 0 in those cases is appropriate.
     struct sdata *slog = (struct sdata*)mxCalloc(1,sizeof(struct sdata));
     
+    //For windows we get higher timing resolution with QPC. This however
+    //requires a conversion factor which we grab here.
+    #ifdef _WIN32
+        LARGE_INTEGER Frequency;
+        QueryPerformanceFrequency(&Frequency); 
+        slog->qpc_freq = (double)Frequency.QuadPart;
+    #endif
+    
+    //We duplicate to try and minimize the time it takes to initialize
+    //the output structure. Fields are already defined but currently
+    //data types and sizes are not.
     plhs[0] = mxDuplicateArray(perm_out);
-    
-    //TODO: Let's try copying the output 
-    
-    
-    //plhs[0] = mxCreateStructMatrix(1,1,0,NULL);
-    
-    
-    
     
     //TODO: Detect the supported features of the processor
     //http://stackoverflow.com/questions/6121792/how-to-check-if-a-cpu-supports-the-sse3-instruction-set
     //https://github.com/JimHokanson/turtle_json/issues/13
+    //TODO: We do this in plotBig
     
     size_t string_byte_length;
     unsigned char *json_string = NULL;
 
     Options options = {};
-    
-    
     
     //Processing of inputs
     //-------------------------------------
@@ -541,22 +571,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             &options, slog);
     TOC(start_read,time__elapsed_read_time);
     
-    
     //Token parsing
     //-------------
     TIC(start_parse);
     parse_json(json_string, string_byte_length, plhs, &options, slog);
     TOC(start_parse, time__total_elapsed_parse_time);
    
-    
     //Post token parsing
     post_process(json_string, plhs, slog);
     
     TOC(start_mex,time__total_elapsed_time_mex);
-
-    //TODO: Only if defined
-    //ADD_STRUCT_FIELD(timing_info,timing_info);
-    
     
     //Move c_struct log to field of output
     //---------------------------------------
@@ -566,6 +590,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     mxSetFieldByNumber(plhs[0],0,E_slog,mx_slog);
     
     TOC(start_mex,time__total_elapsed_time_mex);
-    
 }
-

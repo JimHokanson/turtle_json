@@ -4,35 +4,42 @@ function json_checker
 %
 %   http://www.json.org/JSON_checker/
 
+%TODO: See https://github.com/JimHokanson/turtle_json/issues/1
+
 fprintf('Running json_tests.json_checker\n');
 
 temp_path = fileparts(which('json_tests.json_checker'));
 data_root = fullfile(temp_path,'data');
 
-t = cell(33,2);
+f = @json_tests.utils.tokenErrorTest;
+p = @json_tests.utils.tokenPassTest;
+
 %This could be relaxed ... (would require changes to the parser)
-t(1,:) = {'"A JSON payload should be an object or array, not a string."',0};
+f(1,'"A JSON payload should be an object or array, not a string."','turtle_json:invalid_start');
+f(2,'["Unclosed array"','turtle_json:invalid_token');
+f(3,'{unquoted_key: "keys must be quoted"}','turtle_json:invalid_token');
+f(4,'["extra comma",]','turtle_json:invalid_token');
+f(5,'["double extra comma",,]','turtle_json:invalid_token');
+f(6,'[   , "<-- missing value"]','turtle_json:invalid_token');
+f(7,'["Comma after the close"],','turtle_json:invalid_end');
+f(8,'["Extra close"]]','turtle_json:invalid_end');
+f(9,'"Extra comma": true,}','turtle_json:invalid_start');
+f(10,'{"Extra value after close": true} "misplaced quoted value"','turtle_json:invalid_end');
+f(11,'{"Illegal expression": 1 + 2}','turtle_json:invalid_token');
+f(12,'{"Illegal invocation": alert()}','turtle_json:invalid_token');
 
+%I'll allow it ...
+p(13,'{"Numbers cannot have leading zeroes": 013}');
 
-t(2,:) = {'["Unclosed array"',0};
-t(3,:) = {'{unquoted_key: "keys must be quoted"}',0};
-t(4,:) = {'["extra comma",]',0};
-t(5,:) = {'["double extra comma",,]',0};
-t(6,:) = {'[   , "<-- missing value"]',0};
-t(7,:) = {'["Comma after the close"],',0};
-t(8,:) = {'["Extra close"]]',0};
-t(9,:) = {'"Extra comma": true,}',0};
-t(10,:) = {'{"Extra value after close": true} "misplaced quoted value"',0};
-t(11,:) = {'{"Illegal expression": 1 + 2}',0};
-t(12,:) = {'{"Illegal invocation": alert()}',0};
+error('The rest of this is in translation ...')
 
-%I need to look into this one ...
-t(13,:) = {'{"Numbers cannot have leading zeroes": 013}',1};
+f(14,'{"Numbers cannot be hex": 0x14}','turtle_json:invalid_token');
+f(15,'["Illegal backslash escape: \x15"','turtle_json:invalid_token');
+f(16,'[\naked]','turtle_json:invalid_token');
 
-t(14,:) = {'{"Numbers cannot be hex": 0x14}',0};
-t(15,:) = {'["Illegal backslash escape: \x15"',0};
-t(16,:) = {'[\naked]',0};
-t(17,:) = {'["Illegal backslash escape: \017"]',0};
+%TODO: Bad error here ...
+f(17,'["Illegal backslash escape: \017"]','asdf');
+
 
 %Not really too deep ...
 t(18,:) = {'[[[[[[[[[[[[[[[[[[[["Too deep"]]]]]]]]]]]]]]]]]]]]',1};

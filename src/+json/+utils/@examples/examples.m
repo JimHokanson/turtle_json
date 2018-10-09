@@ -8,6 +8,7 @@ classdef examples
     %   json_tests.time_example_file
 
     properties (Constant)
+        %I don't think this is used ...
         FILE_LIST = {
             '1.json'        
             'big.json'          
@@ -33,11 +34,24 @@ classdef examples
     end
     
     methods (Static)
-        function data = speedTokenTest(file_name_or_index,N,option)
+        function [data,time_info] = speedTokenTest(file_name_or_index,N,option)
             %
-            %   data = json.utils.examples.speedTokenTest(file_name_or_index)
+            %   [data,time_info] = json.utils.examples.speedTokenTest(file_name_or_index,N,*option)
             %
             %   TODO: Document option ...
+            %
+            %   Inputs
+            %   ------
+            %   option :
+            %       - 1 - as object
+            %       - 2 - as raw struct
+            %       - 3 - as object, don't time clearing data
+            %       - 4 - as raw struct, don't time clearing data
+            %       - 5 - 
+            %   
+            %   Examples
+            %   --------
+            %   data = json.utils.examples.speedTokenTest('1.json',10,2)
             
             if nargin < 3
                 option = 1;
@@ -45,9 +59,9 @@ classdef examples
             
             %turtle_json_mex
             
-            if option == 1
+            if option == 1 || option == 3
                 fh = @json.tokens.load;
-            elseif option == 2
+            elseif option == 2 || option == 4 || option == 5
                 fh = @turtle_json_mex;
             end
             
@@ -59,6 +73,9 @@ classdef examples
             tic
             data = fh(file_path);
             t = toc;
+            clear('data')
+            
+            
             if nargin == 1
                 if t > 1
                     N = 4;
@@ -71,17 +88,43 @@ classdef examples
                 N = N-1;
             end
             
-            for i = 1:N
-            	data = fh(file_path);
-            end
-            t = toc;
-            
-            avg_time = t/(N+1);
-            if avg_time > 1
-                fprintf('avg elapsed time: %0.2f (s)\n',avg_time);
+            if option <= 2
+                tic
+                for i = 1:N
+                    data = fh(file_path);
+                end
+                t = toc;
+            elseif option == 5
+                ta = json.utils.time_averager(N);
+                for i = 1:N
+                    data = fh(file_path);
+                    ta.add(data);
+                end
             else
-                fprintf('avg elapsed time: %0.2f (ms)\n',1000*avg_time);
-            end           
+                t = 0;
+                for i = 1:N
+                    tic
+                    data = fh(file_path);
+                    t = t + toc;
+                    if i ~= N
+                        clear('data')
+                    end
+                end
+            end
+            
+            if option == 5
+                m = ta.getMeans();
+                avg_time = m.total_elapsed_time_mex/1000;
+                time_info = ta;
+            else
+                avg_time = t/(N+1);
+                time_info = avg_time;
+            end
+                if avg_time > 1
+                    fprintf('avg elapsed time: %0.2f (s)\n',avg_time);
+                else
+                    fprintf('avg elapsed time: %0.2f (ms)\n',1000*avg_time);
+                end    
         end
         function data = speedDataTest(file_name_or_index,N,option)
             %

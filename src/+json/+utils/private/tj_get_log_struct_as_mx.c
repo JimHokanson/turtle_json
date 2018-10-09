@@ -1,8 +1,9 @@
-#include "turtle_json.h"
+#include "../../../c_code/turtle_json.h"
+
+//  Note this is not designed to be fast since this is only for debugging
 
 //  mex -DNO_OPENMP tj_get_log_struct_as_mx.c 
 
-//TODO: Move this to being private in json
 //TODO: Do an input check ...
 
 #define addINT32(y) \
@@ -51,7 +52,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     
     
     
-        int obj__n_objects_at_depth[MAX_DEPTH_ARRAY_LENGTH];
+    int obj__n_objects_at_depth[MAX_DEPTH_ARRAY_LENGTH];
     int arr__n_arrays_at_depth[MAX_DEPTH_ARRAY_LENGTH];
     
     //int i = 0;
@@ -74,6 +75,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     addINT32(obj__max_keys_in_object);
     addINT32(obj__n_unique_objects);
     addDOUBLE(time__elapsed_read_time);
+    addDOUBLE(time__c_parse_init_time);
     addDOUBLE(time__c_parse_time);
     addDOUBLE(time__parsed_data_logging_time);
     addDOUBLE(time__total_elapsed_parse_time);
@@ -85,5 +87,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     addDOUBLE(time__string_parsing_time);
     addDOUBLE(time__total_elapsed_pp_time);
     addDOUBLE(time__total_elapsed_time_mex);
- 
+    addDOUBLE(qpc_freq);
+  	addINT32(n_nulls);
+    addINT32(n_tokens);
+    addINT32(n_arrays);
+    addINT32(n_numbers);
+    addINT32(n_objects);
+    addINT32(n_keys);
+    addINT32(n_strings);
+
 }

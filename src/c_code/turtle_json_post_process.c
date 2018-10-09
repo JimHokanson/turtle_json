@@ -303,7 +303,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[], struct sdata *slog)
     //TODO: I need to go through and rename things 
     
     //---- array info ------
-    mxArray *array_info = plhs[0]; //mxGetField(plhs[0],0,"array_info");
+    mxArray *array_info = plhs[0];
     mwSize n_arrays = get_field_length2(array_info,"arr__next_sibling_index_array");
     
     if (n_arrays == 0){
@@ -354,7 +354,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[], struct sdata *slog)
     //been processed (since they are deeper structures
     //
     //  process_order = 
-    int *process_order = mxMalloc(n_arrays*sizeof(int));
+    int *process_order = malloc(n_arrays*sizeof(int));
     populateProcessingOrder(process_order, types, n_entries, TYPE_ARRAY, 
             n_arrays_at_depth, n_depths, array_depths);
 
@@ -565,7 +565,7 @@ void populate_array_flags(unsigned char *js,mxArray *plhs[], struct sdata *slog)
         }
     }
     
-    mxFree(process_order);
+    free(process_order);
     setStructField2(array_info,array_types,mxUINT8_CLASS,n_arrays,E_arr__array_types); 
 }
 
@@ -583,45 +583,8 @@ void parse_char_data(unsigned char *js,mxArray *plhs[],struct sdata *slog){
     //  Note, not a lot of time was spent on trying to be clever in this 
     //  section. The majority of 
     
-    //Character Escapes
-    //---------------------------------------------------------------------
-    //Goal is to replace escape characters with their values.
-    //
-    //  When an escape is detected, then if the next character is:
-    //  1) '"' (ASCII 34), then the output is '"'
-    //  i.e. escape_values[34] => '"'
-    //  2) 'n' (ASCII 110), then the output is is '\n' (i.e. newline)
-    //  i.e. escape_values[110] => '\n'
-    //
-    //  Note that the input chars are 1 based (UTF-8/ASCII) and are not 
-    //  being used as indices (which you might expect to be zero based)
-    //
-    //  Default value is 0, which indicates an invalid escape
-    const uint16_t escape_values[256] = {
-        [34] = '"',
-        [47] = '/',
-        [92] = '\\',
-        [98] = '\b',
-        [102] = '\f',
-        [110] = '\n',
-        [114] = '\r',
-        [116] = '\t'};
+    
         
-    //Unicode escapes
-    //---------------------------------------------------------------------
-    //Input character
-    //Output, numerical value to add, unless invalid then -1
-    //e.g. a => 10 (hex a has value 10)
-    //     C => 12 (hex C has value 12, handling lower and upper case)
-    const int hex_numerical_values[256] = {
-        [0 ... 47] = -1,
-        [48] = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, // '0 ... 9'
-        [58 ... 64] = -1,
-        [65] = 10, 11, 12, 13, 14, 15,      // 'A - F'
-        [71 ... 96] = -1,
-        [97] = 10, 11, 12, 13, 14, 15, 
-        [103 ... 255] = -1};
-
     mxArray *temp = mxGetFieldByNumber(plhs[0],0,E_string_p);
     unsigned char **char_p = (unsigned char **)mxGetData(temp);
     int n_entries = mxGetN(temp);
@@ -667,31 +630,46 @@ void parse_char_data(unsigned char *js,mxArray *plhs[],struct sdata *slog){
     //Parsing of the string into proper UTF-8
     //---------------------------------------------------------------------
     TIC(string_parse);
+
+    
+    //  Character Escapes
+    //  -----------------
+    //  Goal is to replace escape characters with their values.
+    //
+    //  When an escape is detected, then if the next character is:
+    //  1) '"' (ASCII 34), then the output is '"'
+    //  i.e. escape_values[34] => '"'
+    //  2) 'n' (ASCII 110), then the output is is '\n' (i.e. newline)
+    //  i.e. escape_values[110] => '\n'
+    //
+    //  Note that the input chars are 1 based (UTF-8/ASCII) and are not 
+    //  being used as indices (which you might expect to be zero based)
+    //
+    //  Default value is 0, which indicates an invalid escape
+    const uint16_t escape_values[256] = {
+        [34] = '"',
+        [47] = '/',
+        [92] = '\\',
+        [98] = '\b',
+        [102] = '\f',
+        [110] = '\n',
+        [114] = '\r',
+        [116] = '\t'};
+    
     unsigned char *p;
-    int cur_index;
+    uint16_t *output_data;
     bool shrink_string; //Set true when we reduce the # of characters in 
     //the string due to escapes or UTF-8 conversion
-    uint16_t *output_data;
     int parse_status;
-    int hex_numerical_value; //TODO: This could be uint8_t
-    uint16_t unicode_char_value;
-    
-    
-    
-    //utf_8 parsing
-    uint32_t utf8_value;
-    
-    
-    
     int escape_value;
-    int hex_multipliers[4] = {4096, 256, 16, 1};
+    int cur_index;
     uint16_t escape_char;
     
+    //OPENMP LOOP
     for (int i = 0; i < n_entries; i++){
         
         p = char_p[i];
         output_data = all_cells_data[i];
-        
         cur_index = -1;
         shrink_string = false;
         parse_status = STRING_PARSE_NOT_DONE;
@@ -702,91 +680,81 @@ void parse_char_data(unsigned char *js,mxArray *plhs[],struct sdata *slog){
         //
         //Depending on length, we may want to try SIMD
         
-        //parse_status
-        //---------------------------
-        //TODO: Make these constants
-        //0 - not done
-        //1 - done
-        //2 - invalid escape char
-        //3 - invalid hex 
+        //Note, we could allow the user to specify a string processing
+        //algorithm ...
+        //1) Current
+        //2) Assume no escapes, quick search for escapes
+        //     then apply a memcpy
         
-        //TODO: This code would benefit from being broken up into functions ...
-        
+        //parse the current string
+        //--------------------------
         while (!parse_status) {
             if (*p == '"'){
                 parse_status = STRING_PARSE_DONE;
             }else if(*p == '\\'){
-                ++p; //Move onto the next character that is escaped
-                //TODO: Make this a function
-                //Process a unicode escape value e.g. \u00C8 => È
-                //---------------------------------------------------------
+            	++p; //Move onto the next character that is escaped
+                shrink_string = true;
                 if (*p == 'u'){
-                    shrink_string = true;
-                    
-                    unicode_char_value = 0;
-                    for (int iHex = 0; iHex < 4; iHex++){
-                        //Go from hex char to numerical value, e.g. from f to 15
-                        hex_numerical_value = hex_numerical_values[*(++p)];
-                        //-1 is internal value for not valid 
-                        //  (i.e. not 0-9,a-f, or A-F)
-                        // Couldn't use 0, as 0 is a valid value
-                        if (hex_numerical_value == -1){
-                            parse_status == STRING_PARSE_INVALID_HEX;
-                            break;
-                        }else{
-                            unicode_char_value = (unicode_char_value << 4) + hex_numerical_value;
-                        }
-                    }
-                    
-                    output_data[++cur_index] = unicode_char_value;
+                    output_data[++cur_index] = parse_escaped_unicode_char(&p,p,&parse_status);
                 }else{
-                    //mexPrintf("escape3 %c\n",*p);
                     escape_char = escape_values[*p];
-                    //Here 0 represents an in invalid
-                    //mexPrintf("escape %c\n",escape_char);
-                    if(escape_char == 0){
-                        //mexPrintf("escape2 %c\n",escape_char);
-                        parse_status = STRING_PARSE_INVALID_ESCAPE;
-                    }else{
-                        shrink_string = true;
+                    //Here 0 represents an in invalid escape
+                    if(escape_char){
                         output_data[++cur_index] = escape_char;
-                    }
+                    }else{
+                        parse_status = STRING_PARSE_INVALID_ESCAPE;
+                    }   
                 }
             }else if(*p > 127){
+                //> 127 indicates non-ASCII
                 shrink_string = true;
-                //mexPrintf("diff3 %d\n",p-js);
                 output_data[++cur_index] = parse_utf8_char(&p,p,&parse_status);
-                //mexPrintf("diff4 %d\n",p-js);
- 
-            //Just a regular old character to store    
             }else{
+                //Just a regular old character to store   
                 output_data[++cur_index] = *p;    
             }
-            
             ++p;
-            
         } // End of while statement ...
         
+        //Handling output
+        //------------------------------------------------
         if (parse_status == STRING_PARSE_DONE){
             if (shrink_string){
+                //Don't we have pointers from above
+                //no, we have pointers to data, not the cell
                 mxSetN(mxGetCell(cell_array,i),cur_index+1);
             }
-        }else{
-// //             switch (parse_status){
-// //                 case 2:
-// //                     break;
-// //                 case 3:
-// //                     break;
-// //                 case 11:
-// //                     break;
-// //                 case 12:
-// //                     break;
-// //             }
-            //TODO: This needs to be flushed out with parse_status values
-            //mexPrintf("diff %d\n",p-js);
-            //mexPrintf("error parse status: %d\n",parse_status);
-            mexErrMsgIdAndTxt("turtle:json","Error parsing string or key");
-            //We have an error 
+        }else{  
+            //TODO: We need to throw errors with more context ...
+            switch (parse_status){
+                case STRING_PARSE_INVALID_ESCAPE:
+                    mexErrMsgIdAndTxt("turtle_json:invalid_char_escape",
+                        "Invalid character escape string");
+                    break;
+                case STRING_PARSE_INVALID_HEX:
+                    mexErrMsgIdAndTxt("turtle_json:invalid_char_hex",
+                        "Invalid hex character value");
+                    break;
+                case STRING_PARSE_NON_CONTINUED_UTF8:
+                    //TODO: This needs more info ...
+                    mexErrMsgIdAndTxt("turtle_json:invalid_utf8",
+                        "Invalid non-continued UTF8");
+                    break;
+                case STRING_PARSE_INVALID_LONG_UTF8:
+                    //TODO: This needs more info ...
+                    mexErrMsgIdAndTxt("turtle_json:invalid_utf8",
+                        "Invalid too long UTF8");
+                    break;
+                case STRING_PARSE_INVALID_FIRST_BYTE_UTF8:
+                    //TODO: This needs more info ...
+                    //>127 but not a continuation????
+                    mexErrMsgIdAndTxt("turtle_json:invalid_utf8",
+                        "Invalid first bytes UTF8");
+                    break;    
+                default:
+                    mexErrMsgIdAndTxt("turtle_json:code_error",
+                    "Unexpected error when parsing string");
+            }
         }
     }
 
@@ -799,24 +767,99 @@ void parse_char_data(unsigned char *js,mxArray *plhs[],struct sdata *slog){
 
 }
 
+uint16_t parse_escaped_unicode_char(unsigned char **pp, unsigned char *p, int *parse_status){
+    
+    
+    //Outputs
+    //pp - new location for pointer
+    //parse_status
+    //
+    //Inputs    
+    //p -starting point for pointer
+    //
+    //Returns
+    //parsed character
+    
+    //Unicode escapes
+    //---------------------------------------------------------------------
+    //Input character
+    //Output, numerical value to add, unless invalid then -1
+    //e.g. a => 10 (hex a has value 10)
+    //     C => 12 (hex C has value 12, handling lower and upper case)
+    const int hex_numerical_values[256] = {
+        [0 ... 47] = -1,
+        [48] = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, // '0 ... 9'
+        [58 ... 64] = -1,
+        [65] = 10, 11, 12, 13, 14, 15,      // 'A - F'
+        [71 ... 96] = -1,
+        [97] = 10, 11, 12, 13, 14, 15, 
+        [103 ... 255] = -1};
+            
+    //      Things to parse:
+    //      \t, \n <= escaped characters
+    //      \u   <= unicode escape
+    //      \u00C8 => È
+    
+    int hex_numerical_value; //TODO: This could be uint8_t
+
+ //Process a unicode escape value e.g. \u00C8 => È
+ //---------------------------------------------------------
+
+     uint16_t unicode_char_value = 0;
+     for (int iHex = 0; iHex < 4; iHex++){
+         //Go from hex char to numerical value, e.g. from f to 15
+         ++p;
+         hex_numerical_value = hex_numerical_values[*p];
+         //-1 is internal value for not valid
+         //  (i.e. not 0-9,a-f, or A-F)
+         // Couldn't use 0, as 0 is a valid value
+         if (hex_numerical_value == -1){
+             *parse_status == STRING_PARSE_INVALID_HEX;
+             break;
+         }else{
+             unicode_char_value = (unicode_char_value << 4) + hex_numerical_value;
+         }
+     }
+     *pp = p;
+     return unicode_char_value;
+
+}
+
 uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status){
     //
     //
     //  This should be encapsulated by:
     //  if(*p > 127) - i.e. this should only be run if the ascii value is above 127
     //
-    
-    
-    //JAH: This is a work in progress
-    //refactoring code from above function
-    
+    // 
+    //
+    //  Inputs
+    //  ------
+    //  p - pointer to first character (that is above 127)
+    //  
+    //  Outputs
+    //  -------
+    //  pp - pointer to next char after utf8 char
+    //  parse_status
+    // 
+    //  Returns
+    //  -------
+    //  parsed UTF8 character as UTF-16 (ish?)
+    //
+    //  See Also
+    //  --------
+    //  parse_char_data
+
+    //Implementation Details
+    //===============================================
     //Inspect first byte to get # of bytes
     //2 bytes 110...   >> 5 == 6 - switch to 0b110
     //3 bytes 1110.... >> 4 == 14
     //4 bytes 11110... >> 3 == 30
     //are 5 & 6 valid?
     //
-    //errors (parse status # listed)
+    //  Errors (parse status # listed)
+    //  ---------------------------
     //- 10 - invalid first byte (currently no distinction
     //       between 5 & 6 bytes, or other alternatives:
     //       10... or 11111110 or 11111111
@@ -835,25 +878,26 @@ uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status
     uint32_t utf8_value;
     
     //2 bytes
+    //----------------------
     if ((*p >> 5) == 0b110){ 
         //# of bits in each byte
         //
         //  byte   # bits
         //  1      5
-        //  2      6  => 11 total bits
+        //  2      6 
+        //         11 total bits
 
-        //With 3 byte utf-8, keep 5 bits
+        //Keep 5 bits of first byte
         utf8_value = *p & 0b11111;
         ++p;
 
         if (IS_CONTINUATION_BYTE){
             ADD_CONTINUATION_BYTE_VALUE;
-            //mexPrintf("2 byte result: %d\n",utf8_value);
             *pp = p;
-             return (uint16_t) utf8_value;
+            return (uint16_t) utf8_value;
         }else{
             //TODO: Make this a macro
-            *parse_status = 11;
+            *parse_status = STRING_PARSE_NON_CONTINUED_UTF8;
             return ERROR_UTF_CHAR;
         }
 
@@ -903,12 +947,12 @@ uint16_t parse_utf8_char(unsigned char **pp, unsigned char *p, int *parse_status
     //This is not utf-8, but it would help anyone that has
     //tried to use these high encoding values ...
     }else if((*p >> 2) == 0b111110){   
-        *parse_status = 13;
+        *parse_status = STRING_PARSE_INVALID_LONG_UTF8;
         return ERROR_UTF_CHAR;
     }else{
         //mexPrintf("first byte: %d\n",*p);
         //invalid first byte
-        *parse_status = 10;
+        *parse_status = STRING_PARSE_INVALID_FIRST_BYTE_UTF8;
         return ERROR_UTF_CHAR;
     }
 

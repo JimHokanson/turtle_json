@@ -8,11 +8,6 @@
  *
  */
 
-
-
-#define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
-#define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
-  
 //=========================================================================
 //=========================================================================
 // The main code is essentially a state machine. States within the machine
@@ -21,21 +16,27 @@
 //      1) key or array specific initialization code
 //      2) common processing
 //      3) navigation to the next state
-//        
-    
+//    
+
+#define PRINT_CURRENT_POSITION mexPrintf("Current Position: %d\n",CURRENT_INDEX);
+#define PRINT_CURRENT_CHAR  mexPrintf("Current Char: %c\n",CURRENT_CHAR);
+   
 //===================  Index functions  ===================================
 
 
 //===================    Opening    [ { :    ==============================
 #define INCREMENT_PARENT_SIZE \
     parent_sizes[current_depth] += 1
-
             
 //example types include object, array, string, etc.            
 #define SET_TYPE(x) \
     types[current_data_index] = x;            
 
 //OA => stands for object/array
+//1) Increase deapth
+//2) set type -> object or array
+//3) set index -> ??? Why is this needed????
+//4) reset parent size
 #define INITIALIZE_PARENT_INFO_OA(x) \
         ++current_depth; \
         if (current_depth > MAX_DEPTH){\
@@ -45,8 +46,8 @@
         parent_indices[current_depth] = current_data_index; \
         parent_sizes[current_depth] = 0;
 
-//TODO: Including a separate definition for key may give worse performance ...
 //key does not care about size, size = 1
+//=> parent type (x) could be hardcoded here ... (it is always key!)
 #define INITIALIZE_PARENT_INFO_KEY(x) \
         ++current_depth; \
         if (current_depth > MAX_DEPTH){\
@@ -54,7 +55,8 @@
         }\
         parent_types[current_depth] = x; \
         parent_indices[current_depth] = current_data_index;        
-        
+
+//PROCESS_OPENING_ARRAY        
 #define LOG_ARRAY_DEPTH \
         array_depths[current_array_index] = current_depth; \
         n_arrays_at_depth[current_depth] += 1;
@@ -144,9 +146,13 @@
     /* We won't count the closing quote, but we would normally add 1 to */ \
     /* be inclusive on a count, so they cancel out */ \
     key_sizes[current_key_index] = CURRENT_POINTER - key_p[current_key_index]; \
-                
+
+            
+// See Also:
+// S_PARSE_NUMBER_IN_KEY
+// S_PARSE_NUMBER_IN_ARRAY
 #define PROCESS_NUMBER \
-    EXPAND_NUMERIC_CHECK; \
+    INCREMENT_NUMERIC_INDEX; \
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NUMBER); \
     numeric_p[current_numeric_index] = CURRENT_POINTER; \
@@ -154,7 +160,8 @@
     string_to_double_no_math(CURRENT_POINTER, &CURRENT_POINTER);    
     
 #define PROCESS_NULL \
-    EXPAND_NUMERIC_CHECK; \
+    ++n_nulls; \
+    INCREMENT_NUMERIC_INDEX; \
     INCREMENT_MD_INDEX; \
     SET_TYPE(TYPE_NULL); \
     numeric_p[current_numeric_index] = 0; \
@@ -183,7 +190,7 @@
 
   
 //========================       Navigation       =========================
-#define CURRENT_CHAR    *p
+#define CURRENT_CHAR   *p
 #define CURRENT_POINTER p
 #define CURRENT_INDEX   p - js
 #define ADVANCE_POINTER_AND_GET_CHAR_VALUE *(++p)
@@ -254,7 +261,6 @@
     
 //This is for values following a key that are simple such as:
 //number, string, null, false, true    
-    
 #define PROCESS_END_OF_KEY_VALUE_SIMPLE \
     ADVANCE_TO_NON_WHITESPACE_CHAR; \
 	switch (CURRENT_CHAR) { \
@@ -336,6 +342,13 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     
     //These are all the valid characters in a number
     //-+0123456789.eE
+    
+    //Just playing around with this to see how bad it is
+    //
+//     while (*p != ',' && *p != ']'){
+//         p++;
+//     }
+    
     const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','.','-','+','e','E','0');
     
     __m128i chars_to_search_for_digits;
@@ -357,7 +370,6 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         	mexErrMsgIdAndTxt("turtle_json:too_long_math", "too many digits when parsing a number");
         }
     }
-    
     *char_offset = p;    
 }
 
@@ -448,8 +460,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
         Options *options, struct sdata *slog) {
     
     //TODO: Check string_byte_length - can't be zero ...
-    
-    TIC(start_parse2);
+    TIC(c_parse_init_time);
     
     //This apparently needs to be done locally for intrinsics ...
     INIT_LOCAL_WS_CHARS;
@@ -498,16 +509,10 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     DEFINE_TIC(parsed_data_logging);
         
     //---------------------------------------------------------------------
-    //TODO: This should be made dynamic, with user capable modification
-    //This would require creating and holding onto a dims array
-    //for converting to data
     int parent_types[MAX_DEPTH_ARRAY_LENGTH];
     int parent_indices[MAX_DEPTH_ARRAY_LENGTH];
     int parent_sizes[MAX_DEPTH_ARRAY_LENGTH];
     
-    
-    //int *n_arrays_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
-    //int *n_objects_at_depth = mxCalloc(MAX_DEPTH_ARRAY_LENGTH,sizeof(int));
     int *n_arrays_at_depth = slog->arr__n_arrays_at_depth;
     int *n_objects_at_depth = slog->obj__n_objects_at_depth;
     int current_parent_data_index;
@@ -564,6 +569,7 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     INITIALIZE_STRING_DATA;
     //---------------------------------------------------------------------
     int n_numeric_allocations = 1;
+    int n_nulls = 0;
     int numeric_size_allocated;
     if (options->n_numbers){
         numeric_size_allocated = options->n_numbers;
@@ -573,11 +579,16 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
     int numeric_size_index_max = numeric_size_allocated - 1;
     int current_numeric_index = -1;
     INITIALIZE_NUMERIC_DATA
+            
+    TOC(c_parse_init_time,time__c_parse_init_time);        
     //---------------------------------------------------------------------
 //=========================================================================    
 //        ================= Start of the parsing =================
 //=========================================================================
-          
+        
+    TIC(start_parse2);        
+    //DEFINE_TIC(parsed_data_logging);        
+            
     //We decrement so that we can use the same advance to non-whitespace
     //code that we use everywhere else, where we assume that we've already
     //consumed the current character, even though we may not have
@@ -592,7 +603,8 @@ void parse_json(unsigned char *js, size_t string_byte_length, mxArray *plhs[],
             PROCESS_OPENING_ARRAY;
             NAVIGATE_AFTER_OPENING_ARRAY;
         default:
-            mexErrMsgIdAndTxt("turtle_json:invalid_start", "Starting token needs to be an opening object or array");
+            mexErrMsgIdAndTxt("turtle_json:invalid_start", 
+                    "Starting token needs to be an opening object or array");
 	}
 
 //    [ {            ======================================================
@@ -751,7 +763,7 @@ S_PARSE_NUMBER_IN_ARRAY:
         ADVANCE_TO_NON_WHITESPACE_CHAR;
         DO_ARRAY_JUMP;
     }else{
-        //See
+        //See comment in S_PARSE_NUMBER_IN_KEY
         DECREMENT_POINTER;
         PROCESS_END_OF_ARRAY_VALUE;
     }
@@ -890,38 +902,41 @@ S_FINISH_GOOD:
     
     //------------------------    Main Data   -----------------------------
     
+    slog->n_nulls = n_nulls;
+    
     TRUNCATE_MAIN_DATA
+    slog->n_tokens = current_data_index+1;
     setStructField2(plhs[0],types,mxUINT8_CLASS,current_data_index + 1,E_types);
     setStructField2(plhs[0],d1,mxINT32_CLASS,current_data_index + 1,E_d1);
         
     TRUNCATE_OBJECT_DATA
+    slog->n_objects = current_object_index + 1;
     setStructField2(plhs[0],child_count_object,
             mxINT32_CLASS,current_object_index + 1,E_obj__child_count_object); 
     setStructField2(plhs[0],next_sibling_index_object,
             mxINT32_CLASS,current_object_index + 1,E_obj__next_sibling_index_object);
     setStructField2(plhs[0],object_depths,
             mxUINT8_CLASS,current_object_index + 1,E_obj__object_depths);
-    //Note we don't track what's used, so we just pass in its size
-    //setStructField2(plhs[0],n_objects_at_depth,
-    //        mxINT32_CLASS,MAX_DEPTH_ARRAY_LENGTH,E_obj__n_objects_at_depth);
   
     TRUNCATE_ARRAY_DATA
-    //TODO: This is of fixed size so we can use slog ...
-    //setStructField(plhs[0],n_arrays_at_depth,"n_arrays_at_depth",mxINT32_CLASS,MAX_DEPTH + 1);
+    slog->n_arrays = current_array_index + 1;
     setStructField2(plhs[0],child_count_array,mxINT32_CLASS,current_array_index + 1,E_arr__child_count_array); 
     setStructField2(plhs[0],next_sibling_index_array,mxINT32_CLASS,current_array_index + 1,E_arr__next_sibling_index_array);
     setStructField2(plhs[0],array_depths,mxUINT8_CLASS,current_array_index + 1,E_arr__array_depths);
 
     TRUNCATE_KEY_DATA
+    slog->n_keys = current_key_index + 1;
     setStructField2(plhs[0],key_p,mxUINT64_CLASS,current_key_index + 1,E_key__key_p);
     setStructField2(plhs[0],key_sizes,mxINT32_CLASS,current_key_index + 1,E_key__key_sizes);
     setStructField2(plhs[0],next_sibling_index_key,mxINT32_CLASS,current_key_index + 1,E_key__next_sibling_index_key);
         
     TRUNCATE_STRING_DATA
+    slog->n_strings = current_string_index + 1;
     setStructField2(plhs[0],string_p,mxUINT64_CLASS,current_string_index + 1,E_string_p);
     setStructField2(plhs[0],string_sizes,mxINT32_CLASS,current_string_index + 1,E_string_sizes);
     
     TRUNCATE_NUMERIC_DATA
+    slog->n_numbers = current_numeric_index + 1;
     //Note, it seems the class type may only be needed for viewing in Matlab
     //Internally it is just bytes (assuming sizeof is the same)
     setStructField2(plhs[0],numeric_p,mxDOUBLE_CLASS,current_numeric_index + 1,E_numeric_p);

@@ -28,11 +28,15 @@ fh2(0,'["Hello \" World"]',     '',                                 'Escaped quo
 fh2(0,'["Hello World\\"]',      '',                                 'Escape character is escaped, so string is terminated','');
 fh2(0,'["Hello World\\\"]',     'turtle_json:unterminated_string',  'unterminated string','');
 fh2(0,'["Hello World\\\\"]',    '',                                 'terminated string','');
+
+
 %Tests focused on the proper escapes of characters
 %--------------------------------------------------
 %1) Valid escape characters
 %2) Characters that need to be escaped => less than 32
+
 fh2(0,'["This \" is a test"]','', 'Escape of " character',{sprintf('This \" is a test')});
+
 fh2(0,'["This \n is a test"]','', 'Escape of \n character',{sprintf('This \n is a test')});
 fh2(0,'["15\u00f8C 3\u0111"]','', 'Escape of unicode characters',{fh('15\u00f8C 3\u0111')});
 
