@@ -47,7 +47,7 @@ classdef token < handle
             %   Returns raw structure of performance. Times are in
             %   milliseconds.
             use_ms_time = true;
-            output = json.utils.getMexC(obj.mex,use_ms_time); 
+            output = json.utils.getPerformanceLog(obj.mex,use_ms_time); 
         end
         function data = getParsedData(obj,varargin)
             %x Returns a fully parsed structure or array for this token

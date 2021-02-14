@@ -414,7 +414,7 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
         
         //  typecast(uint16('raw_'),'int64')
         if (*prop_string == 26740633894977650){
-            mexPrintf("raw_string\n");
+            //mexPrintf("raw_string\n");
             if (mxIsClass(mx_value,"logical")){
                 //If logical and false, exit early
                 if (!(*(uint8_t *)mxGetData(mx_value))){
