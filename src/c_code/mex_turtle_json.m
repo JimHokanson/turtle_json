@@ -11,37 +11,59 @@ function mex_turtle_json(file_id,varargin)
 %   file_id : default compile all
 %       1 - turtle_json_mex.c
 %       2 - json_info_to_data.c
+%
+%   Optional Inputs
+%   ---------------
+%   allow_ref_count : default true
+%       If true, allocations can be made by simply increasing the reference
+%       count. If not, all allocations that are made that could be done
+%       with just reference counts are done via deep copies.
+%
+%   Implementation Notes
+%   --------------------
+%   Compilation relies on:
+%       https://github.com/JimHokanson/mex_maker
+%
+%   The C code relies on GCC. 
+%
+%       mac : used homebrew to install GCC
+%   windows : used mingw
+%     linux : not tested, something like the following should work.
+%
+%       email me if you want Linux and can't figure it out ...
+%
+%       mex CFLAGS="$CFLAGS -std=c11 -mavx2 -fopenmp" LDFLAGS="$LDFLAGS -fopenmp" turtle_json_mex.c turtle_json_main.c
+%
+%
 %   
 %   Examples
 %   --------
-%   mex_turtle_json(1,'no_timing',true)
-%   mex_turtle_json(1,'no_timing',false)
-%
-%   TODO: Document file_id
-%   TODO: Add verbose option
-%
-%   TODO: move clearing code to mex maker
+%   mex_turtle_json()
+%   mex_turtle_json(1,'allow_ref_count',false)
 
 
-%TODO: These are not really needed anymore ...
+%   OLD
+%   log_timing : default true
+%       Whether to log timing. I made some improvements so this should
+%       really just be left true.
+%   log_alloc : default true
+%       Whether to log allocations made. I made some improvements so 
+%       this should really just be left true.
+
+
 p = inputParser;
 addOptional(p,'log_timing',true);
 addOptional(p,'log_alloc',true);
+addOptional(p,'allow_ref_count',true);
 parse(p,varargin{:});
 
 in = p.Results;
-
-%Compile Flags
-%---------------
-%in.no_timing = false;
-%in = sl.in.processVarargin
 
 if nargin == 0
    file_id = [];
 end
 
-%This file is using mex_maker:
-%https://github.com/JimHokanson/mex_maker
+
 
 %TODO: Ideally I would include the final code so that someone
 %   could recompile by modifying the long form of the code
@@ -69,12 +91,17 @@ c = mex.compilers.gcc('./turtle_json_mex.c',...
     './turtle_json_number_parsing.c'});
 c.addLib('openmp');
 c.addCompileFlags('-mavx');
+
 if in.log_timing
     c.addCompileDefines({'LOG_TIME'});
 end
 if in.log_alloc
     c.addCompileDefines({'LOG_ALLOC'});
 end
+
+%build_spec = c.getBuildSpec();
+%   -> can be examined for the compile statements
+
 c.build();
 end
 
@@ -83,12 +110,19 @@ end
 if isempty(file_id) || file_id == 2
 fprintf('Compiling json_info_to_data.c\n');
 clear json_info_to_data
+
 c = mex.compilers.gcc('./json_info_to_data.c',...
     'files',{...
     './json_info_to_data__arrays.c', ...
     './json_info_to_data__objects.c', ...
     './json_info_to_data__utils.c', ...
     './json_info_to_data__option_handling.c'});
+if in.allow_ref_count
+    c.addCompileDefines({'ALLOW_REF_COUNT'});
+else
+    %nothing
+end
+    
 c.build();
 end
 

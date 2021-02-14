@@ -35,12 +35,20 @@ classdef token < handle
     end
     
     methods
+        %output = json.utils.getMexC(mex_struct,*use_ms_time) 
         function value = get.parse_info(obj)
            value = json.objs.token.parsing_info(obj.mex);
         end
     end
     
     methods
+        function output = getLogStruct(obj)
+            %
+            %   Returns raw structure of performance. Times are in
+            %   milliseconds.
+            use_ms_time = true;
+            output = json.utils.getMexC(obj.mex,use_ms_time); 
+        end
         function data = getParsedData(obj,varargin)
             %x Returns a fully parsed structure or array for this token
             %
