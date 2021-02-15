@@ -189,6 +189,9 @@ classdef examples
             %
             %   TODO: allow regex if strcmp fails
             
+            %Manual download via:
+            %https://drive.google.com/drive/folders/0B7to9gBdZEyGMExwTFA0ZWh1OTA
+            
             root_path = json.utils.examples.getExamplesRoot();
             if ischar(file_name_or_index)
                 file_name = file_name_or_index;

@@ -102,31 +102,38 @@ void set_double_output(mxArray **s, double value){
 
 int ref_offset = -1;
 
+//#include "stdlib.h"  /* atoi */
+//#include "string.h" /* strchr */
+
 mxArray* mxCreateReference(const mxArray *mx){
-    //return mxDuplicateArray(mx);
-    //return mxCreateSharedDataCopy(mx);
     #ifdef ALLOW_REF_COUNT
         if (ref_offset == -1){
             //Grabs output of version() e.g. 9.9.0.15 etc.
             //and translates into 909 - we add a 0 because we would want
             //9.12 to be 912 and newer/higher than 9.9
-            mxArray *version = mxCreateNumericMatrix(1,100,mxUINT8_CLASS,mxREAL);
+            mxArray *version;
             mexCallMATLAB(1,&version,0, NULL, "version");
-            char *str = mxArrayToString(version);
-            float temp = strtof(str,NULL);
-            int major_ver = (int)temp;
-            int minor_ver = (int)roundf((temp-(float)major_ver)*10);
-            int version_id = major_ver*100 + minor_ver;
+            char* str = mxArrayToString(version);            
+            char* loc = strchr(str, '.');
+            int mantissa = atoi(loc+1);
+            int whole = atoi(str);
+            int version_id = whole*100 + mantissa;
 
+            mxDestroyArray(version);
+            mxFree(str);
+            
+            //_Static_assert => c11
+            _Static_assert(sizeof(void *) == 8, "Error: 32bit MATLAB not supported");
+            
             //907 -> 2019b
             if (version_id < 907){
-                ref_offset = 4;
+                ref_offset = 8;
             }else{
-                ref_offset = 3;
+                ref_offset = 6;
             }
         }
 
-        mwSize *ref_count = ((mwSize *) mx) + ref_offset; 
+        uint32_t *ref_count = ((uint32_t *) mx) + ref_offset; 
         (*ref_count)++;
 
         //struct mxArray_Tag_Partial *my = (struct mxArray_Tag_Partial *) mx;

@@ -2,6 +2,7 @@
 //https://undocumentedmatlab.com/articles/matlabs-internal-memory-representation
 #include "mex.h"
 #include "math.h"
+#include <stdint.h>
 void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     
     
@@ -43,15 +44,25 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     //
         
     struct mxArray_Tag_Partial {
-        size_t b1;
-        size_t b2;
-        size_t b3;
-        size_t b4;
-        size_t b5;
-        size_t b6;
-        size_t b7;
-        size_t b8;
-        size_t b9;
+        uint32_t b1;
+        uint32_t b2;
+        uint32_t b3;
+        uint32_t b4;
+        uint32_t b5;
+        uint32_t b6;
+        uint32_t b7;
+        uint32_t b8;
+        uint32_t b9;
+        uint32_t b10;
+        uint32_t b11;
+        uint32_t b12;
+        uint32_t b13;
+        uint32_t b14;
+        uint32_t b15;
+        uint32_t b16;
+        uint32_t b17;
+        uint32_t b18;
+        
     };
     
     //int mexCallMATLAB(int nlhs, mxArray *plhs[], int nrhs, mxArray *prhs[], const char *functionName);
@@ -87,6 +98,27 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     mexPrintf("%d\n",my->b7);
     mexPrintf("%d\n",my->b8);
     mexPrintf("%d\n",my->b9);
+    mexPrintf("%d\n",my->b10);
+    mexPrintf("%d\n",my->b11);
+    mexPrintf("%d\n",my->b12);
+    mexPrintf("%d\n",my->b13);
+    mexPrintf("%d\n",my->b14);
+    mexPrintf("%d\n",my->b15);
+    mexPrintf("%d\n",my->b16);
+    mexPrintf("%d\n",my->b17);
+    mexPrintf("%d\n",my->b18);
+    
+    mexPrintf("cid: %d\n",sizeof(mxClassID));
+    mexPrintf("int: %d\n",sizeof(int));
+    mexPrintf("size_t: %d\n",sizeof(size_t));
+    mexPrintf("uint:  %d\n",sizeof(unsigned int));
+    
+    //void 0,1
+    //cid 2
+    //int 3
+    //mx, 4,5
+    //size_t 6,7
+    //
 
  
  
