@@ -3,40 +3,50 @@
 
 //  Name: json_info_to_data__utils.c
 
-//Scalar retrieval
+//******** Scalar retrieval
 //=========================================================================
-//TODO: rename to correct casing
-mxArray* getString(int *d1, mxArray *strings, int md_index){    
+//
+//  These are all scalars and are not put into an array
+//
+//  TODO: rename to correct casing
+mxArray* getString(int *d1, mxArray *strings, int md_index){ 
+    //TODO: I think on the up front creation we need to be
+    //better about not duplicating short strings
     int temp_data_index = RETRIEVE_DATA_INDEX(md_index);
     mxArray *temp_mxArray = mxGetCell(strings,temp_data_index);
     return mxCreateReference(temp_mxArray);
 }
 mxArray* getNumber(Data data, int md_index){
     int temp_data_index = data.d1[md_index];
-    mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
-    double *numeric_data = mxGetData(temp_mxArray);
-    *numeric_data = data.numeric_data[temp_data_index];
-    return temp_mxArray;
+    //mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+    //double *numeric_data = mxGetData(temp_mxArray);
+    //*numeric_data = data.numeric_data[temp_data_index];
+    //return temp_mxArray; 
+    return mxCreateDoubleScalar(data.numeric_data[temp_data_index]);
 }
 mxArray* getNull(Data data, int md_index){
     //TODO: Just increment a reference
-    int temp_data_index = data.d1[md_index];
-    mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
-    double *numeric_data = mxGetData(temp_mxArray);
-    *numeric_data = mxGetNaN();
-    return temp_mxArray;
+//     int temp_data_index = data.d1[md_index];
+//     mxArray *temp_mxArray = mxCreateNumericMatrix(1,1,mxDOUBLE_CLASS,0);
+//     double *numeric_data = mxGetData(temp_mxArray);
+//     *numeric_data = mxGetNaN();
+//     return temp_mxArray;
+    
+    return mxCreateReference(data.mxnan);
 }
 mxArray* getTrue(Data data, int md_index){
-    //TODO: Just increment a reference
-    mxArray *temp_mxArray = mxCreateLogicalMatrix(1,1);
-    bool *ldata = mxGetData(temp_mxArray);
-    *ldata = 1;
-    return temp_mxArray;
+//     //TODO: Just increment a reference
+//     mxArray *temp_mxArray = mxCreateLogicalMatrix(1,1);
+//     bool *ldata = mxGetData(temp_mxArray);
+//     *ldata = 1;
+//     return temp_mxArray;
+    return mxCreateReference(data.mxtrue);
 }
 mxArray* getFalse(Data data, int md_index){
     //TODO: Just increment a reference
     //Default value is false
-    return mxCreateLogicalMatrix(1,1);
+    //return mxCreateLogicalMatrix(1,1);
+    return mxCreateReference(data.mxfalse);
 }
 
 //Field retrieval with checks on existence 

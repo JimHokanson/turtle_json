@@ -202,7 +202,7 @@ typedef struct {
 
 
 
-
+//Pretty sure this is not used, implementation doesn't exist
 extern mxArray *mxCreateSharedDataCopy(const mxArray *pr);
 
 //Created using prepStructs.m

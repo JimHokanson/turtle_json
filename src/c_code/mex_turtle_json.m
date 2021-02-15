@@ -1,7 +1,7 @@
 function mex_turtle_json(file_id,varargin)
 %x Code to compile turtle_json
 %
-%   mex_turtle_json(*file_id)
+%   mex_turtle_json(*file_id,varargin)
 %
 %   This code has been designed with OpenMP and pointers to labels. I've
 %   used GCC for both mac and windows.
@@ -14,7 +14,7 @@ function mex_turtle_json(file_id,varargin)
 %
 %   Optional Inputs
 %   ---------------
-%   allow_ref_count : default true
+%   allow_ref_count : default false
 %       If true, allocations can be made by simply increasing the reference
 %       count. If not, all allocations that are made that could be done
 %       with just reference counts are done via deep copies.
@@ -39,15 +39,32 @@ function mex_turtle_json(file_id,varargin)
 %   Examples
 %   --------
 %   mex_turtle_json()
-%   mex_turtle_json(1,'allow_ref_count',false)
+%   mex_turtle_json([],'allow_ref_count',true)
 
 
 %{
 %After compiling testing:
 data = json.utils.examples.speedDataTest('1.json',1);
 data = json.utils.examples.speedDataTest('big.json',10);
-data = json.utils.examples.speedDataTest('XJ30',10);\
+data = json.utils.examples.speedDataTest('XJ30',10);
 
+%----------------------------------
+s = struct('id',num2cell(1:1e6),'flag',true,'fflag',false,'null',NaN);
+tic
+json_str = jsonencode(s);
+toc
+
+tic
+f = json.tokens.parse(json_str);
+toc
+s2 = f.getLogStruct();
+tic
+data = f.getParsedData();
+toc
+%data verification ...
+isequalwithequalnans(s,data)
+
+%----------------------------------
 file_path = json.utils.examples.getFilePath('XJ3');
 f = json.tokens.load(file_path);
 s = f.getLogStruct();
@@ -67,7 +84,7 @@ data = f.getParsedData();
 p = inputParser;
 addOptional(p,'log_timing',true);
 addOptional(p,'log_alloc',true);
-addOptional(p,'allow_ref_count',true);
+addOptional(p,'allow_ref_count',false);
 parse(p,varargin{:});
 
 in = p.Results;
