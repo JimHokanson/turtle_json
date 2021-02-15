@@ -42,6 +42,19 @@ function mex_turtle_json(file_id,varargin)
 %   mex_turtle_json(1,'allow_ref_count',false)
 
 
+%{
+%After compiling testing:
+data = json.utils.examples.speedDataTest('1.json',1);
+data = json.utils.examples.speedDataTest('big.json',10);
+data = json.utils.examples.speedDataTest('XJ30',10);\
+
+file_path = json.utils.examples.getFilePath('XJ3');
+f = json.tokens.load(file_path);
+s = f.getLogStruct();
+data = f.getParsedData();
+%}
+
+
 %   OLD
 %   log_timing : default true
 %       Whether to log timing. I made some improvements so this should

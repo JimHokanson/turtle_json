@@ -46,4 +46,19 @@ if scale_factor ~= 1
     end
 end
 
+%Was going to keep 2 digits but we are way off sometimes ...
+%fh = @(x) round(x*100*1e4)/1e4;
+
+%TODO: Unfortunately our counts are integers, ideally we would return
+%doubles so that any MATLAB math would work ...
+fh = @(x,y) double(x)/double(y)*100;
+
+output.pct_allocations = '---------------------------------';
+output.pct_tokens_used = fh(output.n_tokens,output.alloc__n_tokens_allocated);
+output.pct_arrays_used = fh(output.n_arrays,output.alloc__n_arrays_allocated);
+output.pct_numbers_used = fh(output.n_numbers,output.alloc__n_numbers_allocated);
+output.pct_objects_used = fh(output.n_objects,output.alloc__n_objects_allocated);
+output.pct_keys_used = fh(output.n_keys,output.alloc__n_keys_allocated);
+output.pct_strings_used = fh(output.n_strings,output.alloc__n_strings_allocated);
+
 end
