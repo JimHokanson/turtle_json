@@ -36,6 +36,17 @@ function mex_turtle_json(file_id,varargin)
 %
 %       mex CFLAGS="$CFLAGS -std=c11 -mavx2 -fopenmp" LDFLAGS="$LDFLAGS -fopenmp" turtle_json_mex.c turtle_json_main.c
 %
+%   Issues
+%   ------------------------------------------------------------------
+%   Windows: -----------------------
+%   Problem: .o file, no such file or directory
+%       GCC relies on libwinpthread-1.dll. I'm not sure how gcc has this
+%       included when called, but if you are getting the above error
+%       you may try including the bin folder on your Windows Path.
+%       - path is something like:
+%       C:\Program Files\mingw-w64\x86_64...\mingw64\bin\
+%
+%   
 %
 %
 %   Examples
