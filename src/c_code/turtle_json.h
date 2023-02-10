@@ -22,9 +22,19 @@
 
 
 #include "turtle_json_memory.h"
-//TODO: Need to build in checks for support 
-//SSE4.2
-#include "nmmintrin.h"
+
+//nmmintrin is SSE4.2
+//Consider doing "x86intrin.h"
+//https://stackoverflow.com/questions/11228855/header-files-for-x86-simd-intrinsics
+
+#include "nmmintrin.h" 
+
+//I think this wasn't working before because I missed the architecture flag
+//#ifdef IS_M1_MAC
+//  #include "sse2neon.h"
+//#else
+//  #include "nmmintrin.h" 
+//#endif
 
 
 //=========================================================================

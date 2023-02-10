@@ -1,6 +1,10 @@
 #include "turtle_json.h"
-#include "simd_guard.h"
 
+#ifndef IS_M1_MAC
+  #include "simd_guard.h"
+  static struct cpu_x86 s;
+#endif
+  
 //
 //  This file contains the entry function as well as handling of the inputs.
 
@@ -10,12 +14,12 @@
 //                                     \  "
 uint8_t BUFFER_STRING2[N_PADDING] = {0,92,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-static struct cpu_x86 s;
+
 int initialized = 0;
 mxArray *perm_out; 
 
 const char *fieldnames_out[] = {
-    "json_string",
+     "json_string",
      "types",
      "d1",
      "obj__child_count_object",
@@ -413,6 +417,10 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
         //prop_string = mxArrayToString(mx_prop);
         
         //  typecast(uint16('raw_'),'int64')
+        //
+        //Where did this number come from?
+        //
+        //This encodes 'raw_' as single number
         if (*prop_string == 26740633894977650){
             //mexPrintf("raw_string\n");
             if (mxIsClass(mx_value,"logical")){
@@ -442,6 +450,8 @@ void init_options(int nrhs, const mxArray* prhs[], Options *options){
                         "raw_string is true but the first data input was not of type 'char', 'int8', or 'uint8'");
             }
         }
+        
+        //JAH 2023-02-10: Is this just incomplete code?
         
 // // //         else if (strcmp(prop_string,"n_tokens") == 0){
 // // //             if (mxIsClass(mx_value,"double")){
@@ -520,6 +530,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
     //Initialization
     //---------------------------------------------------------------------
     if (!initialized){
+        #ifndef IS_M1_MAC
         cpu_x86__detect_host(&s);
         //TODO: This also needs to respect any compiling options
         //HW_AVX && OS_AVX 
@@ -528,6 +539,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray*prhs[])
             mexErrMsgIdAndTxt("turtle_json:simd_error",
                 "Processor doesn't support SIMD code used");
         }
+        #endif
         //This is meant to speed up subsequent calls
         initialized = 1;
         initialize_structs();        

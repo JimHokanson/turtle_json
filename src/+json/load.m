@@ -111,6 +111,14 @@ if nargin > 1
     end 
 end
 
+if ismac()
+    [~,result] = system('uname -v');
+    is_m1_mac = any(strfind(result,'ARM64'));
+else
+    is_m1_mac = false;
+end
+
+
 mex_result = turtle_json_mex(file_path,token_options{:});
 
 %Parse the resulting data

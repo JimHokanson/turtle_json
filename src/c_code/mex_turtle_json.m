@@ -54,6 +54,40 @@ function mex_turtle_json(file_id,varargin)
 %   mex_turtle_json()
 %   mex_turtle_json([],'allow_ref_count',true)
 
+%{
+
+- copied terminal app to desktop
+- get info - open with Rosetta
+- /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+THIS DOESN'T WORK, RUNNING ZSH
+SEE VIA: echo $SHELL
+- cd ~/
+- touch .bash_profile
+- open -e .bash_profile
+
+open ~/.zshrc
+
+ADD THESE LINES:
+alias ibrew='arch -x86_64 /usr/local/bin/brew'
+alias mbrew='arch -arm64e /opt/homebrew/bin/brew'
+
+M1 mac targeting arch x86_64
+- need brew to be for Rosetta 2
+
+Install brew for Rosetta 2:
+https://stackoverflow.com/a/64883440/764365
+
+How to update .bash_profile
+https://stackoverflow.com/a/8967864/764365
+
+Setup aliases:
+https://stackoverflow.com/a/65424574/764365
+
+
+%}
+
+
 
 %{
 %After compiling testing:
@@ -134,7 +168,24 @@ if isempty(file_id) || file_id == 1
         './turtle_json_pp_objects.c', ...
         './turtle_json_number_parsing.c'},'verbose',in.verbose);
     c.addLib('openmp');
-    c.addCompileFlags('-mavx');
+    
+    %Only if not m1
+    %
+    %   TODO: At some point run explicit test
+    
+    if ismac()
+        [~,result] = system('uname -v');
+        is_m1_mac = any(strfind(result,'ARM64'));
+    else
+        is_m1_mac = false;
+    end
+    
+    if is_m1_mac
+        c.addCompileDefines({'IS_M1_MAC'});
+        c.addCompileFlags('-march=native');
+    else
+        c.addCompileFlags('-mavx');
+    end
     
     if in.log_timing
         c.addCompileDefines({'LOG_TIME'});
