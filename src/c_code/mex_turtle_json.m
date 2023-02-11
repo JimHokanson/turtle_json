@@ -182,7 +182,9 @@ if isempty(file_id) || file_id == 1
     
     if is_m1_mac
         c.addCompileDefines({'IS_M1_MAC'});
-        c.addCompileFlags('-march=native');
+        c.addCompileDefines({'NO_SIMD'});
+        %c.addCompileFlags('-march=native');
+        c.addCompileFlags('-msse4.2')
     else
         c.addCompileFlags('-mavx');
     end
@@ -200,6 +202,19 @@ if isempty(file_id) || file_id == 1
     %   -> can be examined for the compile statements
     
     c.build();
+    
+    %TODO: Copy to committed location as well
+    %
+    %compiles to used location, but doesn't update
+    %_m1_rosetta or _intel_mac
+    %
+    %refactor code from json.install
+    if is_m1_mac
+         
+    else
+        
+    end
+    
 end
 
 %Compiling of json_info_to_data.c and associated files

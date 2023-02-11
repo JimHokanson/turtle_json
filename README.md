@@ -1,4 +1,4 @@
-This code parses JSON files/strings using C (mex) code. Writing is not supported.
+This code parses JSON files/strings using C (mex) code. Writing is not supported. It can be much faster than MATLAB's Json parser (10-100x)
 
 # Why This Code?
 
@@ -18,7 +18,6 @@ More on performance can be found here: [https://jimhokanson.com/blog/2018/2018_0
 ## Disadvantages
 * I used a non-native compiler for both Windows and Mac (GCC)
 * Currently favors speed over memory usage (this can be improved)
-* Currently requires newer computers due to use of SIMD (I believe I'm only using AVX so ~2011 or newer processor required). Ideally a switch would allow an option not to use SIMD.
 
 ## Limitations
 
@@ -27,6 +26,7 @@ More on performance can be found here: [https://jimhokanson.com/blog/2018/2018_0
 * Parser won't catch edge errors in JSON files (leading 0s in numbers, characters - like newline - that aren't escaped in strings, etc.). In general these shouldn't impact most users but this parser should not be used to validate if the file is valid JSON.
 * No support for integers (in particular 64 bit integers). Everything gets returned as a double.
 * The information returned during error parsing could be improved to provide more context in the file.
+* Support for Apple silicon (M1/M2) macs should be OK although may be slightly slower (still fast) and is less stringent with error checking.
 
 TODO: Provide a link to the standard JSON tests and show which ones pass and which ones don't (like I would say that '03' is ok for 3 whereas technically the leading 0 is invalid)
 
@@ -38,11 +38,6 @@ TODO: Provide a link to the standard JSON tests and show which ones pass and whi
 
 # Usage
 
-## Requirements
-
-1. 64bit Matlab on Windows or Mac.
-2. A computer that supports AVX instructions (~2011 and newer)
-
 ## Setup
 
 Two folders in the repository need to be added to the path. These are:
@@ -53,6 +48,8 @@ Two folders in the repository need to be added to the path. These are:
 Note that the "+json" folder is a package. Packages should not be added to the path. To call code in a package, the folder that contains the package (in this case "src") must be added to the path.
 
 I'm currently distributing compiled mex files. More details on compiling can be found at [here](./docs/compiling.md)
+
+**running on a mac ** - be sure to run json.install (once) before your first time using it - only needs to be done once ever
 
 ## Parsing to a Complete Matlab Data Structure
 

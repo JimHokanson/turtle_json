@@ -212,7 +212,15 @@
 //                   "key1":1,
 //                   "key2":2,
 // -- whitespace --  "key3":3, etc.
-//
+
+#ifdef NO_SIMD   
+#define ADVANCE_TO_NON_WHITESPACE_CHAR  \
+    ++p; \
+    while (*p <= ' '){ \
+       ++p; \
+    } \
+            
+#else
 #define ADVANCE_TO_NON_WHITESPACE_CHAR  \
     /* Ideally, we want to quit early with a space, and then no-whitespace */ \
     if (*(++p) == ' '){ \
@@ -231,6 +239,8 @@
             } \
         } \
     } \
+            
+#endif
 
             
 #define DO_KEY_JUMP   goto *key_jump[CURRENT_CHAR]
@@ -343,11 +353,12 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
     //These are all the valid characters in a number
     //-+0123456789.eE
     
-    //Just playing around with this to see how bad it is
-    //
-//     while (*p != ',' && *p != ']'){
-//         p++;
-//     }
+    #ifdef NO_SIMD
+    //Note, this could allow invalid numbers that are not properly checked later
+    while (*p != ',' && *p != ']' && *p > ' ' && *p != '}'){
+       p++;
+    }
+    #else
     
     const __m128i digit_characters = _mm_set_epi8('0','1','2','3','4','5','6','7','8','9','.','-','+','e','E','0');
     
@@ -370,6 +381,8 @@ void string_to_double_no_math(unsigned char *p, unsigned char **char_offset) {
         	mexErrMsgIdAndTxt("turtle_json:too_long_math", "too many digits when parsing a number");
         }
     }
+    
+    #endif
     *char_offset = p;    
 }
 
@@ -804,9 +817,13 @@ S_PARSE_FALSE_IN_ARRAY:
 	//=============================================================
 S_PARSE_END_OF_FILE:
 	ADVANCE_TO_NON_WHITESPACE_CHAR
+    //With hack for no simd we are comparing to <= 32
+    //which will push this pointer too far
+    #ifndef  NO_SIMD
     if (!(CURRENT_CHAR == '\0')) {
         goto S_ERROR_BAD_ENDING;
     }
+    #endif
 	goto S_FINISH_GOOD;
 
 

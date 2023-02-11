@@ -111,15 +111,19 @@ if nargin > 1
     end 
 end
 
-if ismac()
-    [~,result] = system('uname -v');
-    is_m1_mac = any(strfind(result,'ARM64'));
-else
-    is_m1_mac = false;
+try
+mex_result = turtle_json_mex(file_path,token_options{:});
+catch ME
+    if strcmp(ME.identifier,'MATLAB:UndefinedFunction') && ismac()
+        fprintf(2,'\n')
+        fprintf(2,'--------------------------------------------------------\n')
+        fprintf(2,'run json.install() once (ever) to setup for Apple computer\n')
+        fprintf(2,'--------------------------------------------------------\n')
+    end
+    rethrow(ME)
 end
 
-
-mex_result = turtle_json_mex(file_path,token_options{:});
+%perf = json.utils.getPerformanceLog(mex_result);
 
 %Parse the resulting data
 %Taken from json.objs.token.getParsedData - TODO: Need to implement
